@@ -113,9 +113,9 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Nutrition", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text("Nutrition & Habits", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text(
-                            "Track your daily intake",
+                            "Track your daily intake & habits",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

@@ -108,7 +108,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem("workout", "Workout", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter),
-    BottomNavItem("nutrition", "Nutrition", Icons.Filled.Restaurant, Icons.Outlined.Restaurant),
+    BottomNavItem("nutrition", "Nutrition & Habits", Icons.Filled.Restaurant, Icons.Outlined.Restaurant),
     BottomNavItem("stats", "Stats", Icons.Filled.BarChart, Icons.Outlined.BarChart),
     BottomNavItem("user", "Profile", Icons.Filled.Person, Icons.Outlined.Person)
 )
