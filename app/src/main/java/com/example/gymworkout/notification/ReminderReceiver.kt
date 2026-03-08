@@ -4,6 +4,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.gymworkout.data.NutritionCategory
+import com.example.gymworkout.data.WorkoutDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class ReminderReceiver : BroadcastReceiver() {
 
@@ -16,10 +20,14 @@ class ReminderReceiver : BroadcastReceiver() {
         val categoryEnum = try {
             NutritionCategory.valueOf(category)
         } catch (_: Exception) {
-            return
+            null
         }
 
-        val title = "${categoryEnum.label} Reminder"
+        val title = if (categoryEnum != null) {
+            "${categoryEnum.label} Reminder"
+        } else {
+            "$category Reminder"
+        }
         val text = customText.ifBlank {
             when (categoryEnum) {
                 NutritionCategory.WATER -> "Time to drink water!"
@@ -27,13 +35,22 @@ class ReminderReceiver : BroadcastReceiver() {
                 NutritionCategory.PROTEIN -> "Time for your protein!"
                 NutritionCategory.VITAMINS -> "Remember to take your vitamins!"
                 NutritionCategory.SLEEP -> "Time to prepare for sleep!"
+                null -> "Don't forget your $category!"
             }
         }
 
         NotificationHelper.createNotificationChannel(context)
-        // Unique notification ID per reminder + time slot
         val notificationId = reminderId * 100 + timeIndex
         NotificationHelper.showNotification(context, notificationId, title, text)
+
+        // Reschedule for next day
+        CoroutineScope(Dispatchers.IO).launch {
+            val dao = WorkoutDatabase.getDatabase(context).reminderDao()
+            val reminder = dao.getReminderById(reminderId)
+            if (reminder != null && reminder.enabled) {
+                ReminderScheduler.scheduleReminder(context, reminder)
+            }
+        }
     }
 
     companion object {
