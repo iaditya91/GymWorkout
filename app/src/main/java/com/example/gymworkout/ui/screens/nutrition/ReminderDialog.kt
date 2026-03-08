@@ -79,7 +79,26 @@ fun ReminderListDialog(
     viewModel: NutritionViewModel,
     onDismiss: () -> Unit
 ) {
-    val reminders by viewModel.getRemindersForCategory(category.name)
+    ReminderListDialog(
+        categoryKey = category.name,
+        categoryLabel = category.label,
+        categoryIcon = { Icon(getCategoryIcon(category), contentDescription = null, tint = color, modifier = Modifier.size(24.dp)) },
+        color = color,
+        viewModel = viewModel,
+        onDismiss = onDismiss
+    )
+}
+
+@Composable
+fun ReminderListDialog(
+    categoryKey: String,
+    categoryLabel: String,
+    categoryIcon: @Composable (() -> Unit)? = null,
+    color: Color,
+    viewModel: NutritionViewModel,
+    onDismiss: () -> Unit
+) {
+    val reminders by viewModel.getRemindersForCategory(categoryKey)
         .collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
     var editingReminder by remember { mutableStateOf<NutritionReminder?>(null) }
@@ -88,14 +107,11 @@ fun ReminderListDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    getCategoryIcon(category),
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("${category.label} Reminders")
+                if (categoryIcon != null) {
+                    categoryIcon()
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text("$categoryLabel Reminders")
             }
         },
         text = {
@@ -159,7 +175,7 @@ fun ReminderListDialog(
 
     if (showAddDialog) {
         AddEditReminderDialog(
-            category = category,
+            categoryKey = categoryKey,
             color = color,
             existingReminder = null,
             onDismiss = { showAddDialog = false },
@@ -172,7 +188,7 @@ fun ReminderListDialog(
 
     if (editingReminder != null) {
         AddEditReminderDialog(
-            category = category,
+            categoryKey = categoryKey,
             color = color,
             existingReminder = editingReminder,
             onDismiss = { editingReminder = null },
@@ -280,6 +296,23 @@ private fun getReminderSummary(reminder: NutritionReminder): String {
 @Composable
 fun AddEditReminderDialog(
     category: NutritionCategory,
+    color: Color,
+    existingReminder: NutritionReminder?,
+    onDismiss: () -> Unit,
+    onSave: (NutritionReminder) -> Unit
+) {
+    AddEditReminderDialog(
+        categoryKey = category.name,
+        color = color,
+        existingReminder = existingReminder,
+        onDismiss = onDismiss,
+        onSave = onSave
+    )
+}
+
+@Composable
+fun AddEditReminderDialog(
+    categoryKey: String,
     color: Color,
     existingReminder: NutritionReminder?,
     onDismiss: () -> Unit,
@@ -509,7 +542,7 @@ fun AddEditReminderDialog(
                 onClick = {
                     val reminder = NutritionReminder(
                         id = existingReminder?.id ?: 0,
-                        category = category.name,
+                        category = categoryKey,
                         type = type,
                         customText = customText,
                         enabled = existingReminder?.enabled ?: true,

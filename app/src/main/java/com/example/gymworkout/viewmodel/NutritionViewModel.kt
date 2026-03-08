@@ -118,15 +118,17 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
                 NutritionCategory.SLEEP to 8f
             )
             defaults.forEach { (cat, value) ->
-                dao.insertTarget(
-                    NutritionTarget(
-                        category = cat.name,
-                        targetValue = value,
-                        label = cat.label,
-                        unit = cat.unit,
-                        isCustom = false
+                if (dao.getTargetSync(cat.name) == null) {
+                    dao.insertTarget(
+                        NutritionTarget(
+                            category = cat.name,
+                            targetValue = value,
+                            label = cat.label,
+                            unit = cat.unit,
+                            isCustom = false
+                        )
                     )
-                )
+                }
             }
         }
     }

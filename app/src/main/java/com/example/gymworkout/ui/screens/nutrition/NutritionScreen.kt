@@ -81,6 +81,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     var showTargetDialog by remember { mutableStateOf(false) }
     var showAddObjectiveDialog by remember { mutableStateOf(false) }
     var reminderCategory by remember { mutableStateOf<NutritionCategory?>(null) }
+    var customReminderTarget by remember { mutableStateOf<NutritionTarget?>(null) }
     var deleteTargetCategory by remember { mutableStateOf<String?>(null) }
     val allTargets by viewModel.getAllTargets().collectAsState(initial = emptyList())
     val displayFormatter = DateTimeFormatter.ofPattern("EEE, MMM d")
@@ -202,6 +203,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                     target = target,
                     date = selectedDate,
                     viewModel = viewModel,
+                    onReminderClick = { customReminderTarget = target },
                     onDelete = { deleteTargetCategory = target.category }
                 )
             }
@@ -291,6 +293,16 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
             color = getCategoryColor(reminderCategory!!),
             viewModel = viewModel,
             onDismiss = { reminderCategory = null }
+        )
+    }
+
+    if (customReminderTarget != null) {
+        ReminderListDialog(
+            categoryKey = customReminderTarget!!.category,
+            categoryLabel = customReminderTarget!!.label,
+            color = Color(0xFF78909C),
+            viewModel = viewModel,
+            onDismiss = { customReminderTarget = null }
         )
     }
 }
@@ -649,9 +661,12 @@ fun CustomCategoryCard(
     target: NutritionTarget,
     date: String,
     viewModel: NutritionViewModel,
+    onReminderClick: () -> Unit = {},
     onDelete: () -> Unit
 ) {
     val total by viewModel.getTotalForCategory(date, target.category).collectAsState(initial = 0f)
+    val reminders by viewModel.getRemindersForCategory(target.category).collectAsState(initial = emptyList())
+    val hasActiveReminders = reminders.any { it.enabled }
     val targetVal = target.targetValue
     val progress = if (targetVal > 0) (total / targetVal).coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
@@ -736,16 +751,30 @@ fun CustomCategoryCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete ${target.label}",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
-                    modifier = Modifier.size(18.dp)
-                )
+            Column {
+                IconButton(
+                    onClick = onReminderClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Notifications,
+                        contentDescription = "Set reminder for ${target.label}",
+                        tint = if (hasActiveReminders) color
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete ${target.label}",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
