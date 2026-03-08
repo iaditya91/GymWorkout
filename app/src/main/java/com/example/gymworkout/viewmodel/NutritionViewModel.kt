@@ -3,8 +3,10 @@ package com.example.gymworkout.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.gymworkout.data.FoodItem
 import com.example.gymworkout.data.FoodLogEntry
 import com.example.gymworkout.data.NutritionCategory
+import com.example.gymworkout.data.ServingUnit
 import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionReminder
 import com.example.gymworkout.data.NutritionTarget
@@ -177,29 +179,40 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
     fun getFoodLogForDate(date: String): Flow<List<FoodLogEntry>> =
         dao.getFoodLogForDate(date)
 
-    fun logFood(date: String, foodName: String, quantityGrams: Float, caloriesPer100g: Float, proteinPer100g: Float, carbsPer100g: Float, fatPer100g: Float, fiberPer100g: Float) {
+    fun logFood(date: String, food: FoodItem, quantity: Float) {
         viewModelScope.launch {
-            val multiplier = quantityGrams / 100f
-            val calories = caloriesPer100g * multiplier
-            val protein = proteinPer100g * multiplier
-            val carbs = carbsPer100g * multiplier
-            val fat = fatPer100g * multiplier
-            val fiber = fiberPer100g * multiplier
+            val m = quantity / food.baseAmount
 
             dao.insertFoodLog(
                 FoodLogEntry(
                     date = date,
-                    foodName = foodName,
-                    quantityGrams = quantityGrams,
-                    calories = calories,
-                    protein = protein,
-                    carbs = carbs,
-                    fat = fat,
-                    fiber = fiber
+                    foodName = food.name,
+                    quantity = quantity,
+                    unit = food.servingUnit.label,
+                    calories = food.caloriesPerBase * m,
+                    protein = food.proteinPerBase * m,
+                    carbs = food.carbsPerBase * m,
+                    fat = food.fatPerBase * m,
+                    fiber = food.fiberPerBase * m,
+                    vitaminA = food.vitAPerBase * m,
+                    vitaminB1 = food.vitB1PerBase * m,
+                    vitaminB2 = food.vitB2PerBase * m,
+                    vitaminB3 = food.vitB3PerBase * m,
+                    vitaminB6 = food.vitB6PerBase * m,
+                    vitaminB12 = food.vitB12PerBase * m,
+                    vitaminC = food.vitCPerBase * m,
+                    vitaminD = food.vitDPerBase * m,
+                    vitaminE = food.vitEPerBase * m,
+                    vitaminK = food.vitKPerBase * m,
+                    folate = food.folatePerBase * m,
+                    iron = food.ironPerBase * m,
+                    calcium = food.calciumPerBase * m
                 )
             )
 
             // Auto-add to nutrition categories
+            val calories = food.caloriesPerBase * m
+            val protein = food.proteinPerBase * m
             dao.insertEntry(NutritionEntry(date = date, category = NutritionCategory.CARBS.name, value = calories))
             dao.insertEntry(NutritionEntry(date = date, category = NutritionCategory.PROTEIN.name, value = protein))
         }

@@ -325,16 +325,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
         FoodLogDialog(
             onDismiss = { showFoodLogDialog = false },
             onLog = { food, qty ->
-                viewModel.logFood(
-                    date = selectedDate,
-                    foodName = food.name,
-                    quantityGrams = qty,
-                    caloriesPer100g = food.caloriesPer100g,
-                    proteinPer100g = food.proteinPer100g,
-                    carbsPer100g = food.carbsPer100g,
-                    fatPer100g = food.fatPer100g,
-                    fiberPer100g = food.fiberPer100g
-                )
+                viewModel.logFood(selectedDate, food, qty)
                 showFoodLogDialog = false
             }
         )
@@ -825,6 +816,22 @@ fun FoodLogSection(
     val totalProtein = foodLogs.sumOf { it.protein.toDouble() }.toFloat()
     val totalCarbs = foodLogs.sumOf { it.carbs.toDouble() }.toFloat()
     val totalFat = foodLogs.sumOf { it.fat.toDouble() }.toFloat()
+    // Build vitamin/mineral summary dynamically
+    val vitaminSummary = mutableListOf<Triple<String, Float, String>>()
+    fun addIfPositive(label: String, value: Float, unit: String) { if (value > 0) vitaminSummary.add(Triple(label, value, unit)) }
+    addIfPositive("Vit A", foodLogs.sumOf { it.vitaminA.toDouble() }.toFloat(), "mcg")
+    addIfPositive("B1", foodLogs.sumOf { it.vitaminB1.toDouble() }.toFloat(), "mg")
+    addIfPositive("B2", foodLogs.sumOf { it.vitaminB2.toDouble() }.toFloat(), "mg")
+    addIfPositive("B3", foodLogs.sumOf { it.vitaminB3.toDouble() }.toFloat(), "mg")
+    addIfPositive("B6", foodLogs.sumOf { it.vitaminB6.toDouble() }.toFloat(), "mg")
+    addIfPositive("B12", foodLogs.sumOf { it.vitaminB12.toDouble() }.toFloat(), "mcg")
+    addIfPositive("Vit C", foodLogs.sumOf { it.vitaminC.toDouble() }.toFloat(), "mg")
+    addIfPositive("Vit D", foodLogs.sumOf { it.vitaminD.toDouble() }.toFloat(), "mcg")
+    addIfPositive("Vit E", foodLogs.sumOf { it.vitaminE.toDouble() }.toFloat(), "mg")
+    addIfPositive("Vit K", foodLogs.sumOf { it.vitaminK.toDouble() }.toFloat(), "mcg")
+    addIfPositive("Folate", foodLogs.sumOf { it.folate.toDouble() }.toFloat(), "mcg")
+    addIfPositive("Iron", foodLogs.sumOf { it.iron.toDouble() }.toFloat(), "mg")
+    addIfPositive("Calcium", foodLogs.sumOf { it.calcium.toDouble() }.toFloat(), "mg")
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -878,7 +885,7 @@ fun FoodLogSection(
             if (foodLogs.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Summary row
+                // Macro summary
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -893,6 +900,27 @@ fun FoodLogSection(
                     NutrientSummaryChip("Protein", totalProtein, "g")
                     NutrientSummaryChip("Carbs", totalCarbs, "g")
                     NutrientSummaryChip("Fat", totalFat, "g")
+                }
+
+                // Vitamin & mineral summary rows (4 per row)
+                if (vitaminSummary.isNotEmpty()) {
+                    vitaminSummary.chunked(4).forEach { row ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            row.forEach { (label, value, unit) ->
+                                NutrientSummaryChip(label, value, unit)
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -911,8 +939,10 @@ fun FoodLogSection(
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium
                             )
+                            val qtyDisplay = if (log.unit == "pc") "${log.quantity.toInt()} pc"
+                                else "${log.quantity.toInt()} ${log.unit}"
                             Text(
-                                "${log.quantityGrams.toInt()}g  |  ${String.format("%.0f", log.calories)} cal  |  P: ${String.format("%.1f", log.protein)}g",
+                                "$qtyDisplay  |  ${String.format("%.0f", log.calories)} cal  |  P: ${String.format("%.1f", log.protein)}g",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -985,7 +1015,7 @@ fun AddObjectiveDialog(
                     value = unit,
                     onValueChange = { unit = it },
                     label = { Text("Unit") },
-                    placeholder = { Text("e.g. g, mg, ml") },
+                    placeholder = { Text("e.g. g, mg, ml, count") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

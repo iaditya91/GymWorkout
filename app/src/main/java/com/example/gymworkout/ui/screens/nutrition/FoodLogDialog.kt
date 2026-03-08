@@ -25,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.gymworkout.data.FoodDatabase
 import com.example.gymworkout.data.FoodItem
+import com.example.gymworkout.data.ServingUnit
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -53,7 +55,7 @@ fun FoodLogDialog(
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
-    var quantity by remember { mutableStateOf("100") }
+    var quantity by remember { mutableStateOf("") }
 
     val filteredFoods = remember(searchQuery, selectedCategory) {
         val bySearch = if (searchQuery.isBlank()) FoodDatabase.foods else FoodDatabase.search(searchQuery)
@@ -61,21 +63,25 @@ fun FoodLogDialog(
     }
 
     if (selectedFood != null) {
-        // Quantity input dialog
         val food = selectedFood!!
         val qty = quantity.toFloatOrNull() ?: 0f
-        val multiplier = qty / 100f
+        val multiplier = if (qty > 0) qty / food.baseAmount else 0f
 
         AlertDialog(
             onDismissRequest = { selectedFood = null },
             title = { Text(food.name) },
             text = {
                 Column {
+                    val unitLabel = when (food.servingUnit) {
+                        ServingUnit.PIECE -> "Quantity (pieces)"
+                        ServingUnit.ML -> "Quantity (ml)"
+                        ServingUnit.GRAMS -> "Quantity (grams)"
+                    }
                     OutlinedTextField(
                         value = quantity,
                         onValueChange = { quantity = it },
-                        label = { Text("Quantity (grams)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text(unitLabel) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -89,18 +95,48 @@ fun FoodLogDialog(
                             )
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
+                                val displayQty = when (food.servingUnit) {
+                                    ServingUnit.PIECE -> "${qty.toInt()} pc"
+                                    ServingUnit.ML -> "${qty.toInt()} ml"
+                                    ServingUnit.GRAMS -> "${qty.toInt()} g"
+                                }
                                 Text(
-                                    "Nutrition for ${qty.toInt()}g",
+                                    "Nutrition for $displayQty",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                NutrientRow("Calories", food.caloriesPer100g * multiplier, "cal")
-                                NutrientRow("Protein", food.proteinPer100g * multiplier, "g")
-                                NutrientRow("Carbs", food.carbsPer100g * multiplier, "g")
-                                NutrientRow("Fat", food.fatPer100g * multiplier, "g")
-                                NutrientRow("Fiber", food.fiberPer100g * multiplier, "g")
+                                NutrientRow("Calories", food.caloriesPerBase * multiplier, "cal")
+                                NutrientRow("Protein", food.proteinPerBase * multiplier, "g")
+                                NutrientRow("Carbs", food.carbsPerBase * multiplier, "g")
+                                NutrientRow("Fat", food.fatPerBase * multiplier, "g")
+                                NutrientRow("Fiber", food.fiberPerBase * multiplier, "g")
+
+                                // Vitamins & Minerals
+                                val vitaminRows = listOf(
+                                    Triple("Vitamin A", food.vitAPerBase, "mcg"),
+                                    Triple("Vitamin B1", food.vitB1PerBase, "mg"),
+                                    Triple("Vitamin B2", food.vitB2PerBase, "mg"),
+                                    Triple("Vitamin B3", food.vitB3PerBase, "mg"),
+                                    Triple("Vitamin B6", food.vitB6PerBase, "mg"),
+                                    Triple("Vitamin B12", food.vitB12PerBase, "mcg"),
+                                    Triple("Vitamin C", food.vitCPerBase, "mg"),
+                                    Triple("Vitamin D", food.vitDPerBase, "mcg"),
+                                    Triple("Vitamin E", food.vitEPerBase, "mg"),
+                                    Triple("Vitamin K", food.vitKPerBase, "mcg"),
+                                    Triple("Folate", food.folatePerBase, "mcg"),
+                                    Triple("Iron", food.ironPerBase, "mg"),
+                                    Triple("Calcium", food.calciumPerBase, "mg")
+                                ).filter { it.second > 0 }
+
+                                if (vitaminRows.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                    vitaminRows.forEach { (label, value, unit) ->
+                                        NutrientRow(label, value * multiplier, unit)
+                                    }
+                                }
                             }
                         }
                     }
@@ -108,11 +144,7 @@ fun FoodLogDialog(
             },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        if (qty > 0) {
-                            onLog(food, qty)
-                        }
-                    },
+                    onClick = { if (qty > 0) onLog(food, qty) },
                     enabled = qty > 0
                 ) { Text("Log") }
             },
@@ -121,7 +153,6 @@ fun FoodLogDialog(
             }
         )
     } else {
-        // Food search dialog
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text("Log Food") },
@@ -138,7 +169,6 @@ fun FoodLogDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Category chips
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -165,7 +195,6 @@ fun FoodLogDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Food list
                     LazyColumn(
                         modifier = Modifier.height(300.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -173,7 +202,9 @@ fun FoodLogDialog(
                         items(filteredFoods, key = { it.name }) { food ->
                             FoodItemRow(food = food, onClick = {
                                 selectedFood = food
-                                quantity = "100"
+                                quantity = food.defaultServing.let {
+                                    if (food.servingUnit == ServingUnit.PIECE) it.toInt().toString() else it.toInt().toString()
+                                }
                             })
                         }
 
@@ -199,6 +230,11 @@ fun FoodLogDialog(
 
 @Composable
 private fun FoodItemRow(food: FoodItem, onClick: () -> Unit) {
+    val servingLabel = when (food.servingUnit) {
+        ServingUnit.PIECE -> "per pc"
+        ServingUnit.ML -> "per 100ml"
+        ServingUnit.GRAMS -> "per 100g"
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -214,7 +250,6 @@ private fun FoodItemRow(food: FoodItem, onClick: () -> Unit) {
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Category badge
             Box(
                 modifier = Modifier
                     .background(
@@ -239,14 +274,14 @@ private fun FoodItemRow(food: FoodItem, onClick: () -> Unit) {
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    "P: ${food.proteinPer100g}g  C: ${food.carbsPer100g}g  F: ${food.fatPer100g}g",
+                    "P: ${fmt(food.proteinPerBase)}g  C: ${fmt(food.carbsPerBase)}g  F: ${fmt(food.fatPerBase)}g  ($servingLabel)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             Text(
-                "${food.caloriesPer100g.toInt()} cal",
+                "${food.caloriesPerBase.toInt()} cal",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary
@@ -265,9 +300,11 @@ private fun NutrientRow(label: String, value: Float, unit: String) {
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall)
         Text(
-            "${String.format("%.1f", value)} $unit",
+            "${fmt(value)} $unit",
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Medium
         )
     }
 }
+
+private fun fmt(v: Float): String = if (v == v.toInt().toFloat()) v.toInt().toString() else String.format("%.1f", v)
