@@ -2,11 +2,13 @@ package com.example.gymworkout.data.sync
 
 import com.example.gymworkout.data.ChecklistItem
 import com.example.gymworkout.data.DailyCheckIn
+import com.example.gymworkout.data.DayHeading
 import com.example.gymworkout.data.Exercise
 import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionReminder
 import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.data.UserProfile
+import com.example.gymworkout.data.WorkoutReminder
 
 data class BackupData(
     val version: Int = 1,
@@ -18,5 +20,7 @@ data class BackupData(
     val userProfiles: List<UserProfile> = emptyList(),
     val checklistItems: List<ChecklistItem> = emptyList(),
     val nutritionReminders: List<NutritionReminder> = emptyList(),
+    val dayHeadings: List<DayHeading> = emptyList(),
+    val workoutReminders: List<WorkoutReminder> = emptyList(),
     val themePreference: Boolean? = null
 )

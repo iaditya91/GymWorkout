@@ -34,6 +34,9 @@ interface UserDao {
     @Query("UPDATE checklist_items SET isChecked = :checked WHERE id = :id")
     suspend fun toggleChecklistItem(id: Int, checked: Boolean)
 
+    @Query("UPDATE checklist_items SET isChecked = 0")
+    suspend fun resetAllChecklistItems()
+
     // Bulk operations for backup/restore
     @Query("SELECT * FROM user_profile")
     suspend fun getAllProfilesSync(): List<UserProfile>
@@ -52,4 +55,24 @@ interface UserDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllChecklistItems(items: List<ChecklistItem>)
+
+    // Workout reminders
+    @Query("SELECT * FROM workout_reminders ORDER BY dayOfWeek ASC")
+    fun getAllWorkoutReminders(): Flow<List<WorkoutReminder>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertWorkoutReminder(reminder: WorkoutReminder)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAllWorkoutReminders(reminders: List<WorkoutReminder>)
+
+    @Query("SELECT * FROM workout_reminders WHERE enabled = 1")
+    suspend fun getEnabledWorkoutReminders(): List<WorkoutReminder>
+
+    // Bulk operations for backup/restore
+    @Query("SELECT * FROM workout_reminders")
+    suspend fun getAllWorkoutRemindersSync(): List<WorkoutReminder>
+
+    @Query("DELETE FROM workout_reminders")
+    suspend fun deleteAllWorkoutReminders()
 }

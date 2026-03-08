@@ -66,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.NutritionEntry
+import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.data.NutritionReminder
 import java.time.LocalDate
@@ -78,7 +79,10 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     val selectedDate by viewModel.selectedDate.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var showTargetDialog by remember { mutableStateOf(false) }
+    var showAddObjectiveDialog by remember { mutableStateOf(false) }
     var reminderCategory by remember { mutableStateOf<NutritionCategory?>(null) }
+    var deleteTargetCategory by remember { mutableStateOf<String?>(null) }
+    val allTargets by viewModel.getAllTargets().collectAsState(initial = emptyList())
     val displayFormatter = DateTimeFormatter.ofPattern("EEE, MMM d")
     val today = viewModel.todayString()
 
@@ -111,6 +115,9 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showAddObjectiveDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add objective")
+                    }
                     IconButton(onClick = { showTargetDialog = true }) {
                         Icon(Icons.Default.Settings, contentDescription = "Set targets")
                     }
@@ -176,14 +183,26 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                 }
             }
 
-            // Category cards
+            // Category cards (built-in)
             item { Spacer(modifier = Modifier.height(4.dp)) }
             items(NutritionCategory.entries) { category ->
                 NutritionCategoryCard(
                     category = category,
                     date = selectedDate,
                     viewModel = viewModel,
-                    onReminderClick = { reminderCategory = category }
+                    onReminderClick = { reminderCategory = category },
+                    onDelete = { deleteTargetCategory = category.name }
+                )
+            }
+
+            // Custom objective cards
+            val customTargets = allTargets.filter { it.isCustom }
+            items(customTargets, key = { it.category }) { target ->
+                CustomCategoryCard(
+                    target = target,
+                    date = selectedDate,
+                    viewModel = viewModel,
+                    onDelete = { deleteTargetCategory = target.category }
                 )
             }
 
@@ -207,7 +226,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                 }
             } else {
                 items(entries, key = { it.id }) { entry ->
-                    EntryRow(entry = entry, onDelete = { viewModel.deleteEntry(entry) })
+                    EntryRow(entry = entry, onDelete = { viewModel.deleteEntry(entry) }, allTargets = allTargets)
                 }
             }
 
@@ -217,9 +236,14 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
 
     if (showAddDialog) {
         AddNutritionDialog(
+            customTargets = allTargets.filter { it.isCustom },
             onDismiss = { showAddDialog = false },
-            onSave = { category, value ->
+            onSaveBuiltIn = { category, value ->
                 viewModel.addEntry(selectedDate, category, value)
+                showAddDialog = false
+            },
+            onSaveCustom = { categoryKey, value ->
+                viewModel.addEntryByKey(selectedDate, categoryKey, value)
                 showAddDialog = false
             }
         )
@@ -229,6 +253,35 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
         SetTargetsDialog(
             viewModel = viewModel,
             onDismiss = { showTargetDialog = false }
+        )
+    }
+
+    if (showAddObjectiveDialog) {
+        AddObjectiveDialog(
+            onDismiss = { showAddObjectiveDialog = false },
+            onSave = { name, unit, target ->
+                viewModel.addCustomObjective(name, unit, target)
+                showAddObjectiveDialog = false
+            }
+        )
+    }
+
+    if (deleteTargetCategory != null) {
+        AlertDialog(
+            onDismissRequest = { deleteTargetCategory = null },
+            title = { Text("Delete Objective?") },
+            text = { Text("This will remove this nutrition objective and all its logged entries. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteObjective(deleteTargetCategory!!)
+                    deleteTargetCategory = null
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTargetCategory = null }) { Text("Cancel") }
+            }
         )
     }
 
@@ -247,7 +300,8 @@ fun NutritionCategoryCard(
     category: NutritionCategory,
     date: String,
     viewModel: NutritionViewModel,
-    onReminderClick: () -> Unit = {}
+    onReminderClick: () -> Unit = {},
+    onDelete: () -> Unit = {}
 ) {
     val total by viewModel.getTotalForCategory(date, category.name).collectAsState(initial = 0f)
     val target by viewModel.getTarget(category.name).collectAsState(initial = null)
@@ -341,26 +395,44 @@ fun NutritionCategoryCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Reminder bell icon
-            IconButton(
-                onClick = onReminderClick,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.Notifications,
-                    contentDescription = "Set reminder for ${category.label}",
-                    tint = if (hasActiveReminders) color
-                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(22.dp)
-                )
+            Column {
+                // Reminder bell icon
+                IconButton(
+                    onClick = onReminderClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Notifications,
+                        contentDescription = "Set reminder for ${category.label}",
+                        tint = if (hasActiveReminders) color
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                // Delete icon
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete ${category.label}",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun EntryRow(entry: NutritionEntry, onDelete: () -> Unit) {
+fun EntryRow(entry: NutritionEntry, onDelete: () -> Unit, allTargets: List<NutritionTarget> = emptyList()) {
     val category = try { NutritionCategory.valueOf(entry.category) } catch (_: Exception) { null }
+    val customTarget = if (category == null) allTargets.find { it.category == entry.category } else null
+    val displayLabel = category?.label ?: customTarget?.label ?: entry.category
+    val displayUnit = category?.unit ?: customTarget?.unit ?: ""
+
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -379,16 +451,33 @@ fun EntryRow(entry: NutritionEntry, onDelete: () -> Unit) {
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
+            } else {
+                // Custom category indicator
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF78909C).copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        displayLabel.take(1).uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF78909C)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
             }
             Text(
-                text = category?.label ?: entry.category,
+                text = displayLabel,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${formatValue(entry.value)} ${category?.unit ?: ""}",
+                text = "${formatValue(entry.value)} $displayUnit",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -407,12 +496,20 @@ fun EntryRow(entry: NutritionEntry, onDelete: () -> Unit) {
 
 @Composable
 fun AddNutritionDialog(
+    customTargets: List<NutritionTarget> = emptyList(),
     onDismiss: () -> Unit,
-    onSave: (NutritionCategory, Float) -> Unit
+    onSaveBuiltIn: (NutritionCategory, Float) -> Unit,
+    onSaveCustom: (String, Float) -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf(NutritionCategory.WATER) }
+    var selectedBuiltIn by remember { mutableStateOf<NutritionCategory?>(NutritionCategory.WATER) }
+    var selectedCustomKey by remember { mutableStateOf<String?>(null) }
     var value by remember { mutableStateOf("") }
-    var showCategoryPicker by remember { mutableStateOf(false) }
+
+    val currentUnit = when {
+        selectedBuiltIn != null -> selectedBuiltIn!!.unit
+        selectedCustomKey != null -> customTargets.find { it.category == selectedCustomKey }?.unit ?: ""
+        else -> ""
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -421,7 +518,7 @@ fun AddNutritionDialog(
             Column {
                 Text("Category", style = MaterialTheme.typography.labelMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                // Category selector as chips
+                // Built-in category chips
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -429,8 +526,8 @@ fun AddNutritionDialog(
                     NutritionCategory.entries.take(3).forEach { cat ->
                         CategoryChip(
                             category = cat,
-                            selected = selectedCategory == cat,
-                            onClick = { selectedCategory = cat }
+                            selected = selectedBuiltIn == cat,
+                            onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
                         )
                     }
                 }
@@ -442,27 +539,50 @@ fun AddNutritionDialog(
                     NutritionCategory.entries.drop(3).forEach { cat ->
                         CategoryChip(
                             category = cat,
-                            selected = selectedCategory == cat,
-                            onClick = { selectedCategory = cat }
+                            selected = selectedBuiltIn == cat,
+                            onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
                         )
+                    }
+                }
+                // Custom category chips
+                if (customTargets.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        customTargets.forEach { t ->
+                            val isSelected = selectedCustomKey == t.category
+                            val color = Color(0xFF78909C)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (isSelected) color.copy(alpha = 0.2f)
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    .clickable {
+                                        selectedCustomKey = t.category
+                                        selectedBuiltIn = null
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    t.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) color else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = value,
                     onValueChange = { value = it },
-                    label = { Text("Value (${selectedCategory.unit})") },
-                    placeholder = {
-                        Text(
-                            when (selectedCategory) {
-                                NutritionCategory.WATER -> "e.g. 0.5"
-                                NutritionCategory.CARBS -> "e.g. 300"
-                                NutritionCategory.PROTEIN -> "e.g. 30"
-                                NutritionCategory.VITAMINS -> "e.g. 1"
-                                NutritionCategory.SLEEP -> "e.g. 7.5"
-                            }
-                        )
-                    },
+                    label = { Text("Value ($currentUnit)") },
+                    placeholder = { Text("e.g. 1") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -473,7 +593,13 @@ fun AddNutritionDialog(
             TextButton(
                 onClick = {
                     val v = value.toFloatOrNull()
-                    if (v != null && v > 0) onSave(selectedCategory, v)
+                    if (v != null && v > 0) {
+                        if (selectedBuiltIn != null) {
+                            onSaveBuiltIn(selectedBuiltIn!!, v)
+                        } else if (selectedCustomKey != null) {
+                            onSaveCustom(selectedCustomKey!!, v)
+                        }
+                    }
                 }
             ) { Text("Log") }
         },
@@ -519,16 +645,187 @@ fun CategoryChip(
 }
 
 @Composable
+fun CustomCategoryCard(
+    target: NutritionTarget,
+    date: String,
+    viewModel: NutritionViewModel,
+    onDelete: () -> Unit
+) {
+    val total by viewModel.getTotalForCategory(date, target.category).collectAsState(initial = 0f)
+    val targetVal = target.targetValue
+    val progress = if (targetVal > 0) (total / targetVal).coerceIn(0f, 1f) else 0f
+    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
+    val met = targetVal > 0 && total >= targetVal
+    val color = Color(0xFF78909C) // neutral color for custom
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (met) color.copy(alpha = 0.15f)
+            else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Circular progress
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.size(52.dp),
+                    color = if (met) color else color.copy(alpha = 0.7f),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeWidth = 5.dp,
+                    strokeCap = StrokeCap.Round
+                )
+                Text(
+                    target.label.take(1).uppercase(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = target.label,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (met) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                "Target Met",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = color,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${formatValue(total)} / ${formatValue(targetVal)} ${target.unit}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = color,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeCap = StrokeCap.Round
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete ${target.label}",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AddObjectiveDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String, Float) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var unit by remember { mutableStateOf("") }
+    var target by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Objective") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    placeholder = { Text("e.g. Creatine") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = unit,
+                    onValueChange = { unit = it },
+                    label = { Text("Unit") },
+                    placeholder = { Text("e.g. g, mg, ml") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = target,
+                    onValueChange = { target = it },
+                    label = { Text("Daily Target") },
+                    placeholder = { Text("e.g. 5") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val v = target.toFloatOrNull()
+                    if (name.isNotBlank() && unit.isNotBlank() && v != null && v > 0) {
+                        onSave(name.trim(), unit.trim(), v)
+                    }
+                }
+            ) { Text("Add") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
 fun SetTargetsDialog(
     viewModel: NutritionViewModel,
     onDismiss: () -> Unit
 ) {
     val targets by viewModel.getAllTargets().collectAsState(initial = emptyList())
     val targetMap = targets.associateBy { it.category }
+    val customTargets = targets.filter { it.isCustom }
 
-    val values = remember(targets) {
+    val builtInValues = remember(targets) {
         NutritionCategory.entries.associate { cat ->
-            cat to mutableStateOf(targetMap[cat.name]?.targetValue?.toString() ?: "0")
+            cat.name to mutableStateOf(targetMap[cat.name]?.targetValue?.toString() ?: "0")
+        }
+    }
+
+    val customValues = remember(targets) {
+        customTargets.associate { t ->
+            t.category to mutableStateOf(t.targetValue.toString())
         }
     }
 
@@ -538,22 +835,42 @@ fun SetTargetsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 NutritionCategory.entries.forEach { cat ->
-                    OutlinedTextField(
-                        value = values[cat]!!.value,
-                        onValueChange = { values[cat]!!.value = it },
-                        label = { Text("${cat.label} (${cat.unit})") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    val state = builtInValues[cat.name]
+                    if (state != null) {
+                        OutlinedTextField(
+                            value = state.value,
+                            onValueChange = { state.value = it },
+                            label = { Text("${cat.label} (${cat.unit})") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                customTargets.forEach { t ->
+                    val state = customValues[t.category]
+                    if (state != null) {
+                        OutlinedTextField(
+                            value = state.value,
+                            onValueChange = { state.value = it },
+                            label = { Text("${t.label} (${t.unit})") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 NutritionCategory.entries.forEach { cat ->
-                    val v = values[cat]!!.value.toFloatOrNull()
+                    val v = builtInValues[cat.name]?.value?.toFloatOrNull()
                     if (v != null && v > 0) viewModel.setTarget(cat, v)
+                }
+                customTargets.forEach { t ->
+                    val v = customValues[t.category]?.value?.toFloatOrNull()
+                    if (v != null && v > 0) viewModel.setTargetByKey(t.category, v)
                 }
                 onDismiss()
             }) { Text("Save") }

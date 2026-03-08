@@ -25,6 +25,8 @@ class BackupManager(
             userProfiles = userDao.getAllProfilesSync(),
             checklistItems = userDao.getAllChecklistItemsSync(),
             nutritionReminders = reminderDao.getAllSync(),
+            workoutReminders = userDao.getAllWorkoutRemindersSync(),
+            dayHeadings = exerciseDao.getAllDayHeadingsSync(),
             themePreference = ThemePreference.isDarkMode.value
         )
     }
@@ -32,21 +34,25 @@ class BackupManager(
     suspend fun restoreBackup(data: BackupData) = withContext(Dispatchers.IO) {
         // Delete all existing data
         exerciseDao.deleteAll()
+        exerciseDao.deleteAllDayHeadings()
         nutritionDao.deleteAllEntries()
         nutritionDao.deleteAllTargets()
         checkInDao.deleteAll()
         userDao.deleteAllProfiles()
         userDao.deleteAllChecklistItems()
+        userDao.deleteAllWorkoutReminders()
         reminderDao.deleteAll()
 
         // Insert backup data
         if (data.exercises.isNotEmpty()) exerciseDao.insertAll(data.exercises)
+        if (data.dayHeadings.isNotEmpty()) exerciseDao.insertAllDayHeadings(data.dayHeadings)
         if (data.nutritionEntries.isNotEmpty()) nutritionDao.insertAllEntries(data.nutritionEntries)
         if (data.nutritionTargets.isNotEmpty()) nutritionDao.insertAllTargets(data.nutritionTargets)
         if (data.dailyCheckIns.isNotEmpty()) checkInDao.insertAll(data.dailyCheckIns)
         if (data.userProfiles.isNotEmpty()) userDao.insertAllProfiles(data.userProfiles)
         if (data.checklistItems.isNotEmpty()) userDao.insertAllChecklistItems(data.checklistItems)
         if (data.nutritionReminders.isNotEmpty()) reminderDao.insertAll(data.nutritionReminders)
+        if (data.workoutReminders.isNotEmpty()) userDao.upsertAllWorkoutReminders(data.workoutReminders)
 
         // Restore theme preference
         ThemePreference.setDarkMode(context, data.themePreference)

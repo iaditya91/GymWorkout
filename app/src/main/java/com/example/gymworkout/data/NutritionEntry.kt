@@ -23,6 +23,9 @@ data class NutritionEntry(
 @Entity(tableName = "nutrition_targets")
 data class NutritionTarget(
     @PrimaryKey
-    val category: String = "", // NutritionCategory name
-    val targetValue: Float = 0f
+    val category: String = "", // NutritionCategory name or custom key
+    val targetValue: Float = 0f,
+    val label: String = "",    // Display name (e.g. "Water", "Creatine")
+    val unit: String = "",     // Unit (e.g. "L", "g", "mg")
+    val isCustom: Boolean = false // true for user-added objectives
 )

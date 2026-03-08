@@ -59,7 +59,52 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setTarget(category: NutritionCategory, value: Float) {
         viewModelScope.launch {
-            dao.insertTarget(NutritionTarget(category = category.name, targetValue = value))
+            dao.insertTarget(
+                NutritionTarget(
+                    category = category.name,
+                    targetValue = value,
+                    label = category.label,
+                    unit = category.unit,
+                    isCustom = false
+                )
+            )
+        }
+    }
+
+    fun setTargetByKey(category: String, value: Float) {
+        viewModelScope.launch {
+            val existing = dao.getTargetSync(category)
+            if (existing != null) {
+                dao.insertTarget(existing.copy(targetValue = value))
+            }
+        }
+    }
+
+    fun addCustomObjective(name: String, unit: String, target: Float) {
+        viewModelScope.launch {
+            val key = "CUSTOM_${name.uppercase().replace(" ", "_")}_${System.currentTimeMillis()}"
+            dao.insertTarget(
+                NutritionTarget(
+                    category = key,
+                    targetValue = target,
+                    label = name,
+                    unit = unit,
+                    isCustom = true
+                )
+            )
+        }
+    }
+
+    fun deleteObjective(category: String) {
+        viewModelScope.launch {
+            dao.deleteTarget(category)
+            dao.deleteEntriesForCategory(category)
+        }
+    }
+
+    fun addEntryByKey(date: String, category: String, value: Float) {
+        viewModelScope.launch {
+            dao.insertEntry(NutritionEntry(date = date, category = category, value = value))
         }
     }
 
@@ -73,7 +118,15 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
                 NutritionCategory.SLEEP to 8f
             )
             defaults.forEach { (cat, value) ->
-                dao.insertTarget(NutritionTarget(category = cat.name, targetValue = value))
+                dao.insertTarget(
+                    NutritionTarget(
+                        category = cat.name,
+                        targetValue = value,
+                        label = cat.label,
+                        unit = cat.unit,
+                        isCustom = false
+                    )
+                )
             }
         }
     }

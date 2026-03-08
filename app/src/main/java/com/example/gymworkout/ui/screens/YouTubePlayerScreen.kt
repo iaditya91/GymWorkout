@@ -31,7 +31,7 @@ fun YouTubePlayerScreen(
     youtubeUrl: String,
     onBack: () -> Unit
 ) {
-    val embedUrl = convertToEmbedUrl(youtubeUrl)
+    val videoId = extractYouTubeVideoId(youtubeUrl)
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -65,7 +65,33 @@ fun YouTubePlayerScreen(
                     settings.mediaPlaybackRequiresUserGesture = false
                     webChromeClient = WebChromeClient()
                     webViewClient = WebViewClient()
-                    loadUrl(embedUrl)
+
+                    val embedVideoId = videoId ?: ""
+                    val htmlContent = """
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <meta name="referrer" content="strict-origin-when-cross-origin">
+                            <style>
+                                * { margin: 0; padding: 0; }
+                                html, body { width: 100%; height: 100%; background: #000; }
+                                iframe { width: 100%; height: 100%; border: none; }
+                            </style>
+                        </head>
+                        <body>
+                            <iframe
+                                src="https://www.youtube.com/embed/$embedVideoId?autoplay=1&rel=0&playsinline=1"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowfullscreen
+                                referrerpolicy="strict-origin-when-cross-origin">
+                            </iframe>
+                        </body>
+                        </html>
+                    """.trimIndent()
+
+                    val baseUrl = "https://${context.packageName}/"
+                    loadDataWithBaseURL(baseUrl, htmlContent, "text/html", "UTF-8", null)
                 }
             },
             modifier = Modifier
@@ -73,12 +99,6 @@ fun YouTubePlayerScreen(
                 .weight(1f)
         )
     }
-}
-
-fun convertToEmbedUrl(url: String): String {
-    // Convert various YouTube URL formats to embed format
-    val videoId = extractYouTubeVideoId(url) ?: return url
-    return "https://www.youtube.com/embed/$videoId?autoplay=1&rel=0"
 }
 
 fun extractYouTubeVideoId(url: String): String? {

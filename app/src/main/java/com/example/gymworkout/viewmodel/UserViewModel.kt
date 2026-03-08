@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.gymworkout.data.ChecklistItem
 import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WorkoutDatabase
+import com.example.gymworkout.data.WorkoutReminder
+import com.example.gymworkout.notification.WorkoutReminderScheduler
 import com.example.gymworkout.data.sync.BackupData
 import com.example.gymworkout.data.sync.BackupManager
 import com.example.gymworkout.data.sync.GoogleDriveSync
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 sealed class SyncState {
     data object Idle : SyncState()
@@ -43,8 +46,40 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState
 
+    private val prefs = application.getSharedPreferences("checklist_reset", Context.MODE_PRIVATE)
+
     companion object {
         private const val DRIVE_APPDATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata"
+        private const val KEY_LAST_DAILY_RESET = "last_daily_reset"
+        private const val KEY_LAST_WEEKLY_RESET = "last_weekly_reset"
+    }
+
+    init {
+        checkAndAutoReset()
+    }
+
+    private fun checkAndAutoReset() {
+        viewModelScope.launch {
+            val today = Calendar.getInstance()
+            val todayDay = today.get(Calendar.DAY_OF_YEAR)
+            val todayYear = today.get(Calendar.YEAR)
+            val todayKey = todayYear * 1000 + todayDay
+
+            val lastDailyReset = prefs.getInt(KEY_LAST_DAILY_RESET, 0)
+            if (todayKey != lastDailyReset) {
+                dao.resetAllChecklistItems()
+                prefs.edit().putInt(KEY_LAST_DAILY_RESET, todayKey).apply()
+            }
+
+            val currentWeek = today.get(Calendar.WEEK_OF_YEAR)
+            val weekKey = todayYear * 100 + currentWeek
+            val lastWeeklyReset = prefs.getInt(KEY_LAST_WEEKLY_RESET, 0)
+            if (weekKey != lastWeeklyReset) {
+                // Weekly reset also resets all items (in case daily already ran, this is idempotent)
+                dao.resetAllChecklistItems()
+                prefs.edit().putInt(KEY_LAST_WEEKLY_RESET, weekKey).apply()
+            }
+        }
     }
 
     // --- Profile methods ---
@@ -68,6 +103,28 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteChecklistItem(item: ChecklistItem) {
         viewModelScope.launch { dao.deleteChecklistItem(item) }
+    }
+
+    fun resetDayChecklist() {
+        viewModelScope.launch {
+            dao.resetAllChecklistItems()
+            val today = Calendar.getInstance()
+            val todayKey = today.get(Calendar.YEAR) * 1000 + today.get(Calendar.DAY_OF_YEAR)
+            prefs.edit().putInt(KEY_LAST_DAILY_RESET, todayKey).apply()
+        }
+    }
+
+    fun resetWeekChecklist() {
+        viewModelScope.launch {
+            dao.resetAllChecklistItems()
+            val today = Calendar.getInstance()
+            val dayKey = today.get(Calendar.YEAR) * 1000 + today.get(Calendar.DAY_OF_YEAR)
+            val weekKey = today.get(Calendar.YEAR) * 100 + today.get(Calendar.WEEK_OF_YEAR)
+            prefs.edit()
+                .putInt(KEY_LAST_DAILY_RESET, dayKey)
+                .putInt(KEY_LAST_WEEKLY_RESET, weekKey)
+                .apply()
+        }
     }
 
     fun addPhotoUri(currentProfile: UserProfile?, uri: String) {
@@ -197,5 +254,33 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSyncState() {
         _syncState.value = SyncState.Idle
+    }
+
+    // --- Workout Reminders ---
+
+    fun getWorkoutReminders(): Flow<List<WorkoutReminder>> = dao.getAllWorkoutReminders()
+
+    fun saveWorkoutReminder(reminder: WorkoutReminder) {
+        viewModelScope.launch {
+            dao.upsertWorkoutReminder(reminder)
+            if (reminder.enabled && reminder.time.isNotBlank()) {
+                WorkoutReminderScheduler.scheduleForDay(getApplication(), reminder)
+            } else {
+                WorkoutReminderScheduler.cancelForDay(getApplication(), reminder.dayOfWeek)
+            }
+        }
+    }
+
+    fun saveAllWorkoutReminders(reminders: List<WorkoutReminder>) {
+        viewModelScope.launch {
+            dao.upsertAllWorkoutReminders(reminders)
+            reminders.forEach { reminder ->
+                if (reminder.enabled && reminder.time.isNotBlank()) {
+                    WorkoutReminderScheduler.scheduleForDay(getApplication(), reminder)
+                } else {
+                    WorkoutReminderScheduler.cancelForDay(getApplication(), reminder.dayOfWeek)
+                }
+            }
+        }
     }
 }

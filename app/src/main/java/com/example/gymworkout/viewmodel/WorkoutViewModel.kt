@@ -3,6 +3,7 @@ package com.example.gymworkout.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.gymworkout.data.DayHeading
 import com.example.gymworkout.data.Exercise
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.flow.Flow
@@ -67,6 +68,20 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun resetDay(day: Int) {
         viewModelScope.launch {
             dao.resetDay(day)
+        }
+    }
+
+    fun resetAllDays() {
+        viewModelScope.launch {
+            dao.resetAllDays()
+        }
+    }
+
+    fun getDayHeading(day: Int): Flow<DayHeading?> = dao.getDayHeading(day)
+
+    fun saveDayHeading(day: Int, heading: String) {
+        viewModelScope.launch {
+            dao.upsertDayHeading(DayHeading(dayOfWeek = day, heading = heading.trim()))
         }
     }
 }

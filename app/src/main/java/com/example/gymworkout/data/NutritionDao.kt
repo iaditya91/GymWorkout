@@ -33,8 +33,17 @@ interface NutritionDao {
     @Query("SELECT * FROM nutrition_targets WHERE category = :category")
     fun getTarget(category: String): Flow<NutritionTarget?>
 
+    @Query("SELECT * FROM nutrition_targets WHERE category = :category")
+    suspend fun getTargetSync(category: String): NutritionTarget?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTarget(target: NutritionTarget)
+
+    @Query("DELETE FROM nutrition_targets WHERE category = :category")
+    suspend fun deleteTarget(category: String)
+
+    @Query("DELETE FROM nutrition_entries WHERE category = :category")
+    suspend fun deleteEntriesForCategory(category: String)
 
     // For stats - check if date has any entries
     @Query("SELECT DISTINCT date FROM nutrition_entries ORDER BY date DESC")

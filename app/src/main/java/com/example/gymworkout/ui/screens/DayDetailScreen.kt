@@ -57,6 +57,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.example.gymworkout.data.Exercise
 import com.example.gymworkout.ui.components.AddExerciseDialog
 import com.example.gymworkout.ui.components.NotesDialog
@@ -105,7 +111,9 @@ fun DayDetailScreen(
 ) {
     val exercises by viewModel.getExercisesForDay(dayIndex).collectAsState(initial = emptyList())
     val groupedItems = remember(exercises) { groupExercises(exercises) }
+    val dayHeading by viewModel.getDayHeading(dayIndex).collectAsState(initial = null)
     var showAddDialog by remember { mutableStateOf(false) }
+    var showHeadingDialog by remember { mutableStateOf(false) }
     var editingExercise by remember { mutableStateOf<Exercise?>(null) }
     var notesExercise by remember { mutableStateOf<Exercise?>(null) }
     var restTimerExercise by remember { mutableStateOf<Exercise?>(null) }
@@ -114,12 +122,27 @@ fun DayDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
+                    Column(modifier = Modifier.clickable { showHeadingDialog = true }) {
                         Text(
                             "${dayEmojis[dayIndex]} - ${dayNames[dayIndex]}",
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleLarge
                         )
+                        val headingText = dayHeading?.heading.orEmpty()
+                        if (headingText.isNotBlank()) {
+                            Text(
+                                headingText,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Text(
+                                "Tap to add heading",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
                         if (exercises.isNotEmpty()) {
                             val done = exercises.count { it.isCompleted }
                             Text(
@@ -282,6 +305,50 @@ fun DayDetailScreen(
             onDismiss = { restTimerExercise = null }
         )
     }
+
+    if (showHeadingDialog) {
+        DayHeadingDialog(
+            currentHeading = dayHeading?.heading ?: "",
+            dayName = dayNames[dayIndex],
+            onDismiss = { showHeadingDialog = false },
+            onSave = { heading ->
+                viewModel.saveDayHeading(dayIndex, heading)
+                showHeadingDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun DayHeadingDialog(
+    currentHeading: String,
+    dayName: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(currentHeading) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("$dayName Heading") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Heading") },
+                placeholder = { Text("e.g. Shoulder + Legs") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(text.trim()) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 // --- Superset Card ---

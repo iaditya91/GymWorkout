@@ -1,5 +1,7 @@
 package com.example.gymworkout.ui.screens.user
 
+import android.app.TimePickerDialog
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MonitorWeight
@@ -38,6 +41,10 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -79,6 +86,7 @@ import coil.compose.AsyncImage
 import com.example.gymworkout.data.ChecklistItem
 import com.example.gymworkout.data.ThemePreference
 import com.example.gymworkout.data.UserProfile
+import com.example.gymworkout.data.WorkoutReminder
 import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.viewmodel.SyncState
 import com.example.gymworkout.viewmodel.UserViewModel
@@ -103,6 +111,9 @@ fun UserScreen(viewModel: UserViewModel) {
     val accountEmail by SyncPreference.accountEmail.collectAsState()
     val lastSyncTime by SyncPreference.lastSyncTime.collectAsState()
     var showRestoreConfirm by remember { mutableStateOf(false) }
+    var showFeedbackDialog by remember { mutableStateOf(false) }
+    var showWorkoutReminderDialog by remember { mutableStateOf(false) }
+    val workoutReminders by viewModel.getWorkoutReminders().collectAsState(initial = emptyList())
 
     // Auto-dismiss success/error after 3 seconds
     LaunchedEffect(syncState) {
@@ -172,6 +183,15 @@ fun UserScreen(viewModel: UserViewModel) {
             item { ThemeToggleCard() }
 
             item {
+                WorkoutNotificationCard(
+                    reminders = workoutReminders,
+                    onClick = { showWorkoutReminderDialog = true }
+                )
+            }
+
+            item { AIGoalsCard() }
+
+            item {
                 PhotosSection(
                     profile = profile,
                     onAddPhoto = { photoPickerLauncher.launch("image/*") },
@@ -203,8 +223,43 @@ fun UserScreen(viewModel: UserViewModel) {
                 )
             }
 
+            // Reset buttons for checklists
+            if (dos.isNotEmpty() || donts.isNotEmpty()) {
+                item {
+                    ChecklistResetCard(
+                        onResetDay = { viewModel.resetDayChecklist() },
+                        onResetWeek = { viewModel.resetWeekChecklist() }
+                    )
+                }
+            }
+
+            // Feedback card
+            item {
+                FeedbackCard(onSendFeedback = { showFeedbackDialog = true })
+            }
+
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
+    }
+
+    if (showFeedbackDialog) {
+        FeedbackDialog(
+            onDismiss = { showFeedbackDialog = false },
+            onSend = { subject, body ->
+                showFeedbackDialog = false
+                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:")
+                    putExtra(Intent.EXTRA_EMAIL, arrayOf("iaditya91@gmail.com"))
+                    putExtra(Intent.EXTRA_SUBJECT, subject)
+                    putExtra(Intent.EXTRA_TEXT, body)
+                }
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                } else {
+                    context.startActivity(Intent.createChooser(intent, "Send feedback"))
+                }
+            }
+        )
     }
 
     if (showEditProfile) {
@@ -236,6 +291,17 @@ fun UserScreen(viewModel: UserViewModel) {
             title = "Add Don't",
             onDismiss = { showAddDont = false },
             onSave = { text -> viewModel.addChecklistItem("DONT", text); showAddDont = false }
+        )
+    }
+
+    if (showWorkoutReminderDialog) {
+        WorkoutReminderDialog(
+            reminders = workoutReminders,
+            onDismiss = { showWorkoutReminderDialog = false },
+            onSave = { reminders ->
+                viewModel.saveAllWorkoutReminders(reminders)
+                showWorkoutReminderDialog = false
+            }
         )
     }
 
@@ -856,6 +922,578 @@ fun AddChecklistDialog(title: String, onDismiss: () -> Unit, onSave: (String) ->
             )
         },
         confirmButton = { TextButton(onClick = { if (text.isNotBlank()) onSave(text.trim()) }) { Text("Add") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+fun AIGoalsCard() {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFAB47BC).copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = Color(0xFFAB47BC),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "AI Goals",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Create workout and nutrition goals using AI",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFAB47BC).copy(alpha = 0.15f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    "Soon",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFAB47BC)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun WorkoutNotificationCard(reminders: List<WorkoutReminder>, onClick: () -> Unit) {
+    val dayShortNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    val enabledReminders = reminders.filter { it.enabled && it.time.isNotBlank() }
+    val enabledCount = enabledReminders.size
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (enabledCount > 0) Color(0xFF42A5F5).copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = if (enabledCount > 0) Color(0xFF42A5F5)
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Workout Reminders",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        if (enabledCount > 0) "$enabledCount day(s) active"
+                        else "Tap to set up reminders",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    Icons.Default.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Show scheduled times
+            if (enabledReminders.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                // Check if all have the same time
+                val allSameTime = enabledReminders.map { it.time }.distinct().size == 1
+                if (allSameTime && enabledCount == 7) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = Color(0xFF42A5F5),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "Every day at ${formatTime12h(enabledReminders.first().time)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF42A5F5)
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        enabledReminders.forEach { r ->
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF42A5F5).copy(alpha = 0.1f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        dayShortNames.getOrElse(r.dayOfWeek) { "" },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF42A5F5)
+                                    )
+                                    Text(
+                                        formatTime12h(r.time),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatTime12h(time: String): String {
+    return try {
+        val parts = time.split(":")
+        val h = parts[0].toInt()
+        val m = parts[1].toInt()
+        val amPm = if (h < 12) "AM" else "PM"
+        val h12 = if (h == 0) 12 else if (h > 12) h - 12 else h
+        String.format("%d:%02d %s", h12, m, amPm)
+    } catch (_: Exception) {
+        time
+    }
+}
+
+@Composable
+fun WorkoutReminderDialog(
+    reminders: List<WorkoutReminder>,
+    onDismiss: () -> Unit,
+    onSave: (List<WorkoutReminder>) -> Unit
+) {
+    val context = LocalContext.current
+    val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    val reminderMap = reminders.associateBy { it.dayOfWeek }
+
+    // State for each day
+    val dayStates = remember(reminders) {
+        (0..6).map { day ->
+            val existing = reminderMap[day]
+            Triple(
+                mutableStateOf(existing?.enabled ?: false),
+                mutableStateOf(existing?.time ?: ""),
+                day
+            )
+        }
+    }
+
+    // Single time mode
+    var singleTimeMode by remember { mutableStateOf(false) }
+    var singleTime by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Workout Reminders") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Mode toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Same time for all days",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = singleTimeMode,
+                        onCheckedChange = { singleTimeMode = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    )
+                }
+
+                if (singleTimeMode) {
+                    // Single time picker
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF42A5F5).copy(alpha = 0.1f))
+                            .clickable {
+                                val parts = singleTime.split(":")
+                                val h = parts.getOrNull(0)?.toIntOrNull() ?: 7
+                                val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                                TimePickerDialog(context, { _, hour, minute ->
+                                    singleTime = String.format("%02d:%02d", hour, minute)
+                                }, h, m, false).show()
+                            }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = null,
+                                tint = Color(0xFF42A5F5),
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                if (singleTime.isNotBlank()) formatTime12h(singleTime) else "Tap to set time",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (singleTime.isNotBlank()) Color(0xFF42A5F5)
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Text(
+                        "This will set the same time for all 7 days",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    dayStates.forEach { (enabledState, timeState, day) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Switch(
+                                checked = enabledState.value,
+                                onCheckedChange = { enabledState.value = it },
+                                modifier = Modifier.size(36.dp),
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                dayNames[day].take(3),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.width(36.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            // Time picker button
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (enabledState.value) Color(0xFF42A5F5).copy(alpha = 0.1f)
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                    .clickable(enabled = enabledState.value) {
+                                        val parts = timeState.value.split(":")
+                                        val h = parts.getOrNull(0)?.toIntOrNull() ?: 7
+                                        val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                                        TimePickerDialog(context, { _, hour, minute ->
+                                            timeState.value = String.format("%02d:%02d", hour, minute)
+                                        }, h, m, false).show()
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        tint = if (enabledState.value && timeState.value.isNotBlank())
+                                            Color(0xFF42A5F5)
+                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        if (timeState.value.isNotBlank()) formatTime12h(timeState.value)
+                                        else "Set time",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = if (timeState.value.isNotBlank()) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = if (enabledState.value && timeState.value.isNotBlank())
+                                            Color(0xFF42A5F5)
+                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val result = if (singleTimeMode && singleTime.isNotBlank()) {
+                    (0..6).map { day ->
+                        WorkoutReminder(dayOfWeek = day, time = singleTime.trim(), enabled = true)
+                    }
+                } else {
+                    dayStates.map { (enabledState, timeState, day) ->
+                        WorkoutReminder(
+                            dayOfWeek = day,
+                            time = timeState.value.trim(),
+                            enabled = enabledState.value && timeState.value.isNotBlank()
+                        )
+                    }
+                }
+                onSave(result)
+            }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun ChecklistResetCard(onResetDay: () -> Unit, onResetWeek: () -> Unit) {
+    var showResetDayConfirm by remember { mutableStateOf(false) }
+    var showResetWeekConfirm by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        "Reset Checklists",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Uncheck all Do's & Don'ts",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                        .clickable { showResetDayConfirm = true }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Reset Day",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                        .clickable { showResetWeekConfirm = true }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Reset Week",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    }
+
+    if (showResetDayConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetDayConfirm = false },
+            title = { Text("Reset Day?") },
+            text = { Text("This will uncheck all Do's and Don'ts for today.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResetDayConfirm = false
+                    onResetDay()
+                }) {
+                    Text("Reset", color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDayConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showResetWeekConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetWeekConfirm = false },
+            title = { Text("Reset Week?") },
+            text = { Text("This will uncheck all Do's and Don'ts and reset the weekly tracker.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResetWeekConfirm = false
+                    onResetWeek()
+                }) {
+                    Text("Reset", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetWeekConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+fun FeedbackCard(onSendFeedback: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clickable { onSendFeedback() },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Feedback,
+                contentDescription = "Feedback",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Send Feedback",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Help us improve by sharing your thoughts",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                "›",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun FeedbackDialog(onDismiss: () -> Unit, onSend: (String, String) -> Unit) {
+    var subject by remember { mutableStateOf("Gym Workout App Feedback") }
+    var message by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Send Feedback") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = subject,
+                    onValueChange = { subject = it },
+                    label = { Text("Subject") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it },
+                    label = { Text("Message") },
+                    placeholder = { Text("Tell us what you think...") },
+                    minLines = 4,
+                    maxLines = 8,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (message.isNotBlank()) onSend(subject.trim(), message.trim()) },
+                enabled = message.isNotBlank()
+            ) { Text("Send") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }

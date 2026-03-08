@@ -38,11 +38,21 @@ interface ExerciseDao {
     @Query("UPDATE exercises SET isCompleted = 0 WHERE dayOfWeek = :day")
     suspend fun resetDay(day: Int)
 
+    @Query("UPDATE exercises SET isCompleted = 0")
+    suspend fun resetAllDays()
+
     @Query("SELECT * FROM exercises WHERE supersetGroupId = :groupId")
     suspend fun getExercisesByGroupId(groupId: String): List<Exercise>
 
     @Query("UPDATE exercises SET supersetGroupId = '' WHERE id = :id")
     suspend fun clearSupersetGroupId(id: Int)
+
+    // Day headings
+    @Query("SELECT * FROM day_headings WHERE dayOfWeek = :day")
+    fun getDayHeading(day: Int): Flow<DayHeading?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertDayHeading(heading: DayHeading)
 
     // Bulk operations for backup/restore
     @Query("SELECT * FROM exercises")
@@ -53,4 +63,13 @@ interface ExerciseDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<Exercise>)
+
+    @Query("SELECT * FROM day_headings")
+    suspend fun getAllDayHeadingsSync(): List<DayHeading>
+
+    @Query("DELETE FROM day_headings")
+    suspend fun deleteAllDayHeadings()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllDayHeadings(items: List<DayHeading>)
 }
