@@ -1,6 +1,7 @@
 package com.example.gymworkout.data.sync
 
 import android.content.Context
+import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.ThemePreference
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,10 @@ class BackupManager(
             dayHeadings = exerciseDao.getAllDayHeadingsSync(),
             foodLogEntries = nutritionDao.getAllFoodLogSync(),
             themePreference = ThemePreference.isDarkMode.value,
-            customQuotes = userDao.getAllCustomQuotesSync()
+            customQuotes = userDao.getAllCustomQuotesSync(),
+            quoteEnabled = QuotePreference.getEnabled(context),
+            quoteSource = QuotePreference.getSource(context),
+            quoteTime = QuotePreference.getTime(context)
         )
     }
 
@@ -62,5 +66,10 @@ class BackupManager(
 
         // Restore theme preference
         ThemePreference.setDarkMode(context, data.themePreference)
+
+        // Restore quote preferences
+        QuotePreference.setEnabled(context, data.quoteEnabled)
+        QuotePreference.setSource(context, data.quoteSource)
+        QuotePreference.setTime(context, data.quoteTime)
     }
 }

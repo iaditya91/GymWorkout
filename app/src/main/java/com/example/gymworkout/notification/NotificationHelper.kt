@@ -24,6 +24,10 @@ object NotificationHelper {
     private const val QUOTE_CHANNEL_NAME = "Motivational Quotes"
     private const val QUOTE_CHANNEL_DESC = "Daily motivational workout quotes"
 
+    private const val AUTO_BACKUP_CHANNEL_ID = "auto_backup"
+    private const val AUTO_BACKUP_CHANNEL_NAME = "Auto Backup"
+    private const val AUTO_BACKUP_CHANNEL_DESC = "Daily automatic backup notifications"
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -60,6 +64,20 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = QUOTE_CHANNEL_DESC
+            }
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    fun createAutoBackupNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                AUTO_BACKUP_CHANNEL_ID,
+                AUTO_BACKUP_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = AUTO_BACKUP_CHANNEL_DESC
             }
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)

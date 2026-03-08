@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
         NotificationHelper.createNotificationChannel(this)
         NotificationHelper.createWorkoutNotificationChannel(this)
         NotificationHelper.createQuoteNotificationChannel(this)
+        NotificationHelper.createAutoBackupNotificationChannel(this)
         requestNotificationPermission()
         QuotePreference.init(this)
         SyncPreference.init(this)

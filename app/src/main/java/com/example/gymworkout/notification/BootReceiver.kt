@@ -32,6 +32,11 @@ class BootReceiver : BroadcastReceiver() {
                     val time = QuotePreference.getTime(context)
                     QuoteReminderScheduler.schedule(context, time)
                 }
+
+                // Reschedule auto backup
+                if (AutoBackupScheduler.isEnabled(context)) {
+                    AutoBackupScheduler.schedule(context)
+                }
             }
         }
     }

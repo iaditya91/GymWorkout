@@ -11,6 +11,7 @@ import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WorkoutDatabase
 import com.example.gymworkout.data.WorkoutReminder
+import com.example.gymworkout.notification.AutoBackupScheduler
 import com.example.gymworkout.notification.QuoteReminderScheduler
 import com.example.gymworkout.notification.WorkoutReminderScheduler
 import com.example.gymworkout.data.sync.BackupData
@@ -171,6 +172,8 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
                     account?.email,
                     account?.displayName
                 )
+                // Auto-enable daily backup on sign-in
+                AutoBackupScheduler.schedule(getApplication())
                 _syncState.value = SyncState.Success("Signed in as ${account?.email}")
             } catch (e: ApiException) {
                 _syncState.value = SyncState.Error("Sign-in failed (code ${e.statusCode})")
@@ -185,7 +188,20 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
     fun signOut(context: Context) {
         getGoogleSignInClient(context).signOut().addOnCompleteListener {
             SyncPreference.clear(context)
+            AutoBackupScheduler.cancel(context)
             _syncState.value = SyncState.Idle
+        }
+    }
+
+    fun isAutoBackupEnabled(): Boolean {
+        return AutoBackupScheduler.isEnabled(getApplication())
+    }
+
+    fun setAutoBackupEnabled(enabled: Boolean) {
+        if (enabled) {
+            AutoBackupScheduler.schedule(getApplication())
+        } else {
+            AutoBackupScheduler.cancel(getApplication())
         }
     }
 

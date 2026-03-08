@@ -122,6 +122,9 @@ fun UserScreen(viewModel: UserViewModel) {
     var showWorkoutReminderDialog by remember { mutableStateOf(false) }
     val workoutReminders by viewModel.getWorkoutReminders().collectAsState(initial = emptyList())
 
+    // Auto backup state
+    var autoBackupEnabled by remember { mutableStateOf(viewModel.isAutoBackupEnabled()) }
+
     // Motivational quotes state
     var showQuoteDialog by remember { mutableStateOf(false) }
     val quoteEnabled by QuotePreference.enabled.collectAsState()
@@ -185,12 +188,20 @@ fun UserScreen(viewModel: UserViewModel) {
                     accountEmail = accountEmail,
                     lastSyncTime = lastSyncTime,
                     syncState = syncState,
+                    autoBackupEnabled = autoBackupEnabled,
                     onSignIn = {
                         signInLauncher.launch(viewModel.getGoogleSignInClient(context).signInIntent)
                     },
                     onBackup = { viewModel.backupToGoogleDrive() },
                     onRestore = { showRestoreConfirm = true },
-                    onSignOut = { viewModel.signOut(context) }
+                    onSignOut = {
+                        viewModel.signOut(context)
+                        autoBackupEnabled = false
+                    },
+                    onAutoBackupToggle = {
+                        viewModel.setAutoBackupEnabled(it)
+                        autoBackupEnabled = it
+                    }
                 )
             }
 
@@ -373,10 +384,12 @@ fun GoogleSyncCard(
     accountEmail: String?,
     lastSyncTime: Long,
     syncState: SyncState,
+    autoBackupEnabled: Boolean,
     onSignIn: () -> Unit,
     onBackup: () -> Unit,
     onRestore: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onAutoBackupToggle: (Boolean) -> Unit
 ) {
     val isSignedIn = accountEmail != null
     val googleBlue = Color(0xFF4285F4)
@@ -606,6 +619,51 @@ fun GoogleSyncCard(
                             )
                         }
                     }
+                }
+
+                // Auto backup toggle
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (autoBackupEnabled) googleBlue.copy(alpha = 0.08f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        )
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = if (autoBackupEnabled) googleBlue
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Auto Backup",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            if (autoBackupEnabled) "Daily at 2:00 AM"
+                            else "Disabled",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = autoBackupEnabled,
+                        onCheckedChange = onAutoBackupToggle,
+                        modifier = Modifier.height(24.dp),
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = googleBlue,
+                            checkedTrackColor = googleBlue.copy(alpha = 0.3f)
+                        )
+                    )
                 }
             }
         }

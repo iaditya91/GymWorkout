@@ -26,5 +26,8 @@ data class BackupData(
     val workoutReminders: List<WorkoutReminder> = emptyList(),
     val foodLogEntries: List<FoodLogEntry> = emptyList(),
     val themePreference: Boolean? = null,
-    val customQuotes: List<MotivationalQuote> = emptyList()
+    val customQuotes: List<MotivationalQuote> = emptyList(),
+    val quoteEnabled: Boolean = false,
+    val quoteSource: String = "APP",
+    val quoteTime: String = "08:00"
 )
