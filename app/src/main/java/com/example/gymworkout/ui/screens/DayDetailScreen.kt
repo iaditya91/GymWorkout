@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Card
@@ -226,7 +227,7 @@ fun DayDetailScreen(
                                 index = item.displayIndex,
                                 exercise = item.exercise,
                                 onToggleCompleted = { viewModel.toggleCompleted(item.exercise.id, !item.exercise.isCompleted) },
-                                onPlayVideo = { if (item.exercise.youtubeUrl.isNotBlank()) onPlayVideo(item.exercise.name, item.exercise.youtubeUrl) },
+                                onPlayVideo = { onPlayVideo(item.exercise.name, item.exercise.youtubeUrl) },
                                 onEditNotes = { notesExercise = item.exercise },
                                 onEdit = { editingExercise = item.exercise },
                                 onDelete = { viewModel.deleteExercise(item.exercise) },
@@ -238,7 +239,7 @@ fun DayDetailScreen(
                                 displayIndex = item.displayIndex,
                                 exercises = item.exercises,
                                 onToggleCompleted = { ex -> viewModel.toggleCompleted(ex.id, !ex.isCompleted) },
-                                onPlayVideo = { ex -> if (ex.youtubeUrl.isNotBlank()) onPlayVideo(ex.name, ex.youtubeUrl) },
+                                onPlayVideo = { ex -> onPlayVideo(ex.name, ex.youtubeUrl) },
                                 onEditNotes = { ex -> notesExercise = ex },
                                 onEdit = { ex -> editingExercise = ex },
                                 onDelete = { ex -> viewModel.deleteExercise(ex) },
@@ -525,15 +526,13 @@ fun SupersetExerciseRow(
                 )
             }
 
-            if (exercise.youtubeUrl.isNotBlank()) {
-                IconButton(onClick = onPlayVideo, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        Icons.Default.PlayCircle,
-                        contentDescription = "Play video",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+            IconButton(onClick = onPlayVideo, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    if (exercise.youtubeUrl.isNotBlank()) Icons.Default.PlayCircle else Icons.Default.Search,
+                    contentDescription = if (exercise.youtubeUrl.isNotBlank()) "Play video" else "Search YouTube",
+                    tint = if (exercise.youtubeUrl.isNotBlank()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
 
@@ -669,10 +668,13 @@ fun ExerciseCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                if (exercise.youtubeUrl.isNotBlank()) {
-                    IconButton(onClick = onPlayVideo, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.PlayCircle, contentDescription = "Play YouTube video", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(28.dp))
-                    }
+                IconButton(onClick = onPlayVideo, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        if (exercise.youtubeUrl.isNotBlank()) Icons.Default.PlayCircle else Icons.Default.Search,
+                        contentDescription = if (exercise.youtubeUrl.isNotBlank()) "Play YouTube video" else "Search YouTube",
+                        tint = if (exercise.youtubeUrl.isNotBlank()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
             }
 
