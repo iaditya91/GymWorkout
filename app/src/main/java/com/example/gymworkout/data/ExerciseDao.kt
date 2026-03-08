@@ -1,0 +1,40 @@
+package com.example.gymworkout.data
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ExerciseDao {
+
+    @Query("SELECT * FROM exercises WHERE dayOfWeek = :day ORDER BY orderIndex ASC")
+    fun getExercisesForDay(day: Int): Flow<List<Exercise>>
+
+    @Query("SELECT COUNT(*) FROM exercises WHERE dayOfWeek = :day")
+    fun getExerciseCountForDay(day: Int): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM exercises WHERE dayOfWeek = :day AND isCompleted = 1")
+    fun getCompletedCountForDay(day: Int): Flow<Int>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(exercise: Exercise)
+
+    @Update
+    suspend fun update(exercise: Exercise)
+
+    @Delete
+    suspend fun delete(exercise: Exercise)
+
+    @Query("UPDATE exercises SET isCompleted = :completed WHERE id = :id")
+    suspend fun updateCompleted(id: Int, completed: Boolean)
+
+    @Query("UPDATE exercises SET notes = :notes WHERE id = :id")
+    suspend fun updateNotes(id: Int, notes: String)
+
+    @Query("UPDATE exercises SET isCompleted = 0 WHERE dayOfWeek = :day")
+    suspend fun resetDay(day: Int)
+}
