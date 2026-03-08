@@ -1,9 +1,14 @@
 package com.example.gymworkout
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.unit.dp
@@ -57,11 +62,27 @@ import com.example.gymworkout.viewmodel.UserViewModel
 import com.example.gymworkout.viewmodel.WorkoutViewModel
 
 class MainActivity : ComponentActivity() {
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ThemePreference.init(this)
         NotificationHelper.createNotificationChannel(this)
+        NotificationHelper.createWorkoutNotificationChannel(this)
+        requestNotificationPermission()
         SyncPreference.init(this)
         setContent {
             val darkMode by ThemePreference.isDarkMode.collectAsState()

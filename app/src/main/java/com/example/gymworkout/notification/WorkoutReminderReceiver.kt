@@ -22,7 +22,8 @@ class WorkoutReminderReceiver : BroadcastReceiver() {
         NotificationHelper.showNotification(
             context, notificationId,
             "Workout Reminder",
-            "Time to workout! It's $dayName - let's go!"
+            "Time to workout! It's $dayName - let's go!",
+            channelId = "workout_reminders"
         )
 
         // Reschedule for next week

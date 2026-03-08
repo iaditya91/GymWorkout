@@ -48,7 +48,7 @@ object NotificationHelper {
         }
     }
 
-    fun showNotification(context: Context, notificationId: Int, title: String, text: String) {
+    fun showNotification(context: Context, notificationId: Int, title: String, text: String, channelId: String = CHANNEL_ID) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -57,7 +57,7 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(text)
