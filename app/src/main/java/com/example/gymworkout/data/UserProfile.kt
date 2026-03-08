@@ -12,7 +12,11 @@ data class UserProfile(
     val weightUnit: String = "kg", // "kg" or "lb"
     val height: Float = 0f,
     val heightUnit: String = "cm", // "cm" or "ft"
-    val photoUris: String = "" // comma-separated URIs
+    val photoUris: String = "", // comma-separated URIs
+    val targetWeight: Float = 0f,
+    val startingWeight: Float = 0f,
+    val fitnessLevel: String = "beginner", // "beginner", "intermediate", "advanced"
+    val journeyStartDate: String = "" // yyyy-MM-dd
 )
 
 @Entity(tableName = "checklist_items")

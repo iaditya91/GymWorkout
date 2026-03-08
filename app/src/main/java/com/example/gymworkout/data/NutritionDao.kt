@@ -52,6 +52,9 @@ interface NutritionDao {
     @Query("SELECT COALESCE(SUM(value), 0) FROM nutrition_entries WHERE date = :date AND category = 'SLEEP'")
     fun getSleepForDate(date: String): Flow<Float>
 
+    @Query("SELECT COALESCE(SUM(value), 0) FROM nutrition_entries WHERE date = :date AND category = :category")
+    suspend fun getTotalForDateAndCategorySync(date: String, category: String): Float
+
     // Bulk operations for backup/restore
     @Query("SELECT * FROM nutrition_entries")
     suspend fun getAllEntriesSync(): List<NutritionEntry>
