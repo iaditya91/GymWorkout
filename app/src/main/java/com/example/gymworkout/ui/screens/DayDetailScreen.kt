@@ -1,6 +1,6 @@
 package com.example.gymworkout.ui.screens
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -366,18 +366,13 @@ fun SupersetCard(
     onStartRest: (Exercise) -> Unit
 ) {
     val allDone = exercises.all { it.isCompleted }
-    val bgColor by animateColorAsState(
-        targetValue = if (allDone)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        else MaterialTheme.colorScheme.surface,
-        label = "supersetBg"
-    )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = if (allDone) BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer) else null
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             // Superset header
@@ -609,18 +604,12 @@ fun ExerciseCard(
     onDelete: () -> Unit,
     onStartRest: () -> Unit = {}
 ) {
-    val bgColor by animateColorAsState(
-        targetValue = if (exercise.isCompleted)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        else MaterialTheme.colorScheme.surface,
-        label = "cardBg"
-    )
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = if (exercise.isCompleted) BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer) else null
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(

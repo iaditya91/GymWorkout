@@ -1,6 +1,7 @@
 package com.example.gymworkout.ui.screens.nutrition
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -359,11 +360,9 @@ fun NutritionCategoryCard(
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (met)
-                color.copy(alpha = 0.15f)
-            else
-                MaterialTheme.colorScheme.surface
-        )
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = if (met) BorderStroke(1.dp, color) else null
     ) {
         Row(
             modifier = Modifier
@@ -705,9 +704,9 @@ fun CustomCategoryCard(
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (met) color.copy(alpha = 0.15f)
-            else MaterialTheme.colorScheme.surface
-        )
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = if (met) BorderStroke(1.dp, color) else null
     ) {
         Row(
             modifier = Modifier
