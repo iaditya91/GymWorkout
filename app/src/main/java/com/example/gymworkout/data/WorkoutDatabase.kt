@@ -12,9 +12,10 @@ import androidx.room.RoomDatabase
         NutritionTarget::class,
         DailyCheckIn::class,
         UserProfile::class,
-        ChecklistItem::class
+        ChecklistItem::class,
+        NutritionReminder::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -23,6 +24,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
     abstract fun nutritionDao(): NutritionDao
     abstract fun dailyCheckInDao(): DailyCheckInDao
     abstract fun userDao(): UserDao
+    abstract fun reminderDao(): ReminderDao
 
     companion object {
         @Volatile

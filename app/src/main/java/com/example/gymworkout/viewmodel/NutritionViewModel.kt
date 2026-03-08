@@ -5,8 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.NutritionEntry
+import com.example.gymworkout.data.NutritionReminder
 import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.data.WorkoutDatabase
+import com.example.gymworkout.notification.ReminderScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +19,7 @@ import java.time.format.DateTimeFormatter
 class NutritionViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = WorkoutDatabase.getDatabase(application).nutritionDao()
+    private val reminderDao = WorkoutDatabase.getDatabase(application).reminderDao()
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
     private val _selectedDate = MutableStateFlow(LocalDate.now().format(formatter))
@@ -62,7 +65,6 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun initDefaultTargets() {
         viewModelScope.launch {
-            // Only set if no targets exist
             val defaults = mapOf(
                 NutritionCategory.WATER to 3f,
                 NutritionCategory.CARBS to 2000f,
@@ -77,4 +79,40 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun todayString(): String = LocalDate.now().format(formatter)
+
+    // --- Reminder methods ---
+
+    fun getRemindersForCategory(category: String): Flow<List<NutritionReminder>> =
+        reminderDao.getRemindersForCategory(category)
+
+    fun saveReminder(reminder: NutritionReminder) {
+        viewModelScope.launch {
+            val id = reminderDao.insertReminder(reminder)
+            val saved = reminder.copy(id = id.toInt())
+            ReminderScheduler.scheduleReminder(getApplication(), saved)
+        }
+    }
+
+    fun updateReminder(reminder: NutritionReminder) {
+        viewModelScope.launch {
+            reminderDao.updateReminder(reminder)
+            if (reminder.enabled) {
+                ReminderScheduler.scheduleReminder(getApplication(), reminder)
+            } else {
+                ReminderScheduler.cancelReminder(getApplication(), reminder)
+            }
+        }
+    }
+
+    fun deleteReminder(reminder: NutritionReminder) {
+        viewModelScope.launch {
+            ReminderScheduler.cancelReminder(getApplication(), reminder)
+            reminderDao.deleteReminder(reminder)
+        }
+    }
+
+    fun toggleReminderEnabled(reminder: NutritionReminder) {
+        val updated = reminder.copy(enabled = !reminder.enabled)
+        updateReminder(updated)
+    }
 }

@@ -32,7 +32,23 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun deleteExercise(exercise: Exercise) {
         viewModelScope.launch {
+            val groupId = exercise.supersetGroupId
             dao.delete(exercise)
+            // If deleted exercise was in a superset, check if only 1 remains
+            if (groupId.isNotBlank()) {
+                val remaining = dao.getExercisesByGroupId(groupId)
+                if (remaining.size == 1) {
+                    dao.clearSupersetGroupId(remaining[0].id)
+                }
+            }
+        }
+    }
+
+    fun convertToSuperset(existingExercise: Exercise, newExercise: Exercise) {
+        viewModelScope.launch {
+            val groupId = java.util.UUID.randomUUID().toString()
+            dao.update(existingExercise.copy(supersetGroupId = groupId))
+            dao.insert(newExercise.copy(supersetGroupId = groupId))
         }
     }
 

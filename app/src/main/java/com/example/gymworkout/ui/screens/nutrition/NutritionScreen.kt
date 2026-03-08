@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Egg
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
@@ -66,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.viewmodel.NutritionViewModel
+import com.example.gymworkout.data.NutritionReminder
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -76,6 +78,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     val selectedDate by viewModel.selectedDate.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var showTargetDialog by remember { mutableStateOf(false) }
+    var reminderCategory by remember { mutableStateOf<NutritionCategory?>(null) }
     val displayFormatter = DateTimeFormatter.ofPattern("EEE, MMM d")
     val today = viewModel.todayString()
 
@@ -179,7 +182,8 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                 NutritionCategoryCard(
                     category = category,
                     date = selectedDate,
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    onReminderClick = { reminderCategory = category }
                 )
             }
 
@@ -227,16 +231,28 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
             onDismiss = { showTargetDialog = false }
         )
     }
+
+    if (reminderCategory != null) {
+        ReminderListDialog(
+            category = reminderCategory!!,
+            color = getCategoryColor(reminderCategory!!),
+            viewModel = viewModel,
+            onDismiss = { reminderCategory = null }
+        )
+    }
 }
 
 @Composable
 fun NutritionCategoryCard(
     category: NutritionCategory,
     date: String,
-    viewModel: NutritionViewModel
+    viewModel: NutritionViewModel,
+    onReminderClick: () -> Unit = {}
 ) {
     val total by viewModel.getTotalForCategory(date, category.name).collectAsState(initial = 0f)
     val target by viewModel.getTarget(category.name).collectAsState(initial = null)
+    val reminders by viewModel.getRemindersForCategory(category.name).collectAsState(initial = emptyList())
+    val hasActiveReminders = reminders.any { it.enabled }
     val targetVal = target?.targetValue ?: 0f
     val progress = if (targetVal > 0) (total / targetVal).coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
@@ -320,6 +336,22 @@ fun NutritionCategoryCard(
                     color = color,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     strokeCap = StrokeCap.Round
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Reminder bell icon
+            IconButton(
+                onClick = onReminderClick,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.Notifications,
+                    contentDescription = "Set reminder for ${category.label}",
+                    tint = if (hasActiveReminders) color
+                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }

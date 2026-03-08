@@ -255,6 +255,10 @@ fun DayDetailScreen(
             onSave = { exercise ->
                 viewModel.updateExercise(exercise)
                 editingExercise = null
+            },
+            onConvertToSuperset = { existing, newEx ->
+                viewModel.convertToSuperset(existing, newEx)
+                editingExercise = null
             }
         )
     }

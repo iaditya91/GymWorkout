@@ -48,6 +48,7 @@ import com.example.gymworkout.ui.screens.nutrition.NutritionScreen
 import com.example.gymworkout.ui.screens.stats.StatsScreen
 import com.example.gymworkout.ui.screens.user.UserScreen
 import com.example.gymworkout.data.ThemePreference
+import com.example.gymworkout.notification.NotificationHelper
 import com.example.gymworkout.ui.theme.GymWorkoutTheme
 import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.viewmodel.StatsViewModel
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ThemePreference.init(this)
+        NotificationHelper.createNotificationChannel(this)
         setContent {
             val darkMode by ThemePreference.isDarkMode.collectAsState()
             GymWorkoutTheme(
@@ -173,12 +175,12 @@ fun WorkoutApp() {
                     onPlayVideo = { name, url ->
                         val encodedName = URLEncoder.encode(name, "UTF-8")
                         val encodedUrl = URLEncoder.encode(url, "UTF-8")
-                        navController.navigate("youtube/$encodedName/$encodedUrl")
+                        navController.navigate("youtube/$encodedName?url=$encodedUrl")
                     }
                 )
             }
             composable(
-                route = "youtube/{name}/{url}",
+                route = "youtube/{name}?url={url}",
                 arguments = listOf(
                     navArgument("name") { type = NavType.StringType },
                     navArgument("url") { type = NavType.StringType }

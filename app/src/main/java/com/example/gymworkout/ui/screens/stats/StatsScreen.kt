@@ -270,9 +270,11 @@ fun MonthlyBarChart(
                     .fillMaxWidth()
                     .height(140.dp)
             ) {
-                val barWidth = size.width / 5
                 val maxHeight = size.height - 30f
-                val gap = barWidth * 0.3f
+                val barCount = 3
+                // Match SpaceEvenly: centers at width/(barCount+1), 2*width/(barCount+1), ...
+                val spacing = size.width / (barCount + 1)
+                val actualBarWidth = spacing * 0.6f
 
                 data class BarData(val label: String, val value: Int, val color: Color)
                 val bars = listOf(
@@ -283,8 +285,8 @@ fun MonthlyBarChart(
 
                 bars.forEachIndexed { i, bar ->
                     val barHeight = if (totalDays > 0) (bar.value.toFloat() / totalDays) * maxHeight else 0f
-                    val x = (i + 1) * barWidth - barWidth / 2 + gap / 2
-                    val actualBarWidth = barWidth - gap
+                    val centerX = spacing * (i + 1)
+                    val x = centerX - actualBarWidth / 2
 
                     // Background bar
                     drawRoundRect(

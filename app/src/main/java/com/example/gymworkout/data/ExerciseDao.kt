@@ -37,4 +37,10 @@ interface ExerciseDao {
 
     @Query("UPDATE exercises SET isCompleted = 0 WHERE dayOfWeek = :day")
     suspend fun resetDay(day: Int)
+
+    @Query("SELECT * FROM exercises WHERE supersetGroupId = :groupId")
+    suspend fun getExercisesByGroupId(groupId: String): List<Exercise>
+
+    @Query("UPDATE exercises SET supersetGroupId = '' WHERE id = :id")
+    suspend fun clearSupersetGroupId(id: Int)
 }

@@ -38,9 +38,11 @@ fun AddExerciseDialog(
     existingExercise: Exercise? = null,
     onDismiss: () -> Unit,
     onSave: (Exercise) -> Unit,
-    onSaveSuperset: (Exercise, Exercise) -> Unit = { _, _ -> }
+    onSaveSuperset: (Exercise, Exercise) -> Unit = { _, _ -> },
+    onConvertToSuperset: (Exercise, Exercise) -> Unit = { _, _ -> }
 ) {
     val isEditing = existingExercise != null
+    val isAlreadyInSuperset = existingExercise?.supersetGroupId?.isNotBlank() == true
     var isSuperset by remember { mutableStateOf(false) }
 
     // Exercise 1
@@ -62,11 +64,15 @@ fun AddExerciseDialog(
     var sets2 by remember { mutableStateOf("3") }
     var reps2 by remember { mutableStateOf("10-12") }
 
+    // Show superset checkbox for: new exercises OR editing a single (non-superset) exercise
+    val showSupersetCheckbox = !isAlreadyInSuperset
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
                 when {
+                    isEditing && isSuperset -> "Convert to Superset"
                     isEditing -> "Edit Exercise"
                     isSuperset -> "Add Superset"
                     else -> "Add Exercise"
@@ -75,8 +81,8 @@ fun AddExerciseDialog(
         },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                // Superset checkbox (only for new exercises)
-                if (!isEditing) {
+                // Superset checkbox
+                if (showSupersetCheckbox) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -86,7 +92,8 @@ fun AddExerciseDialog(
                             onCheckedChange = { isSuperset = it }
                         )
                         Text(
-                            "Superset (2 exercises back-to-back)",
+                            if (isEditing) "Add second exercise (superset)"
+                            else "Superset (2 exercises back-to-back)",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -96,7 +103,7 @@ fun AddExerciseDialog(
                 // Exercise 1 label for superset
                 if (isSuperset) {
                     Text(
-                        "Exercise 1",
+                        if (isEditing) "Current Exercise" else "Exercise 1",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -121,7 +128,7 @@ fun AddExerciseDialog(
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Exercise 2",
+                        if (isEditing) "New Exercise" else "Exercise 2",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.secondary
@@ -160,7 +167,29 @@ fun AddExerciseDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (isSuperset && !isEditing) {
+                    if (isSuperset && isEditing && !isAlreadyInSuperset) {
+                        // Converting existing single exercise to superset
+                        if (name.isNotBlank() && name2.isNotBlank()) {
+                            val rest = restTime.toIntOrNull() ?: 0
+                            val updatedExisting = existingExercise!!.copy(
+                                name = name.trim(),
+                                youtubeUrl = youtubeUrl.trim(),
+                                sets = sets.toIntOrNull() ?: 3,
+                                reps = reps.ifBlank { "10-12" },
+                                restTimeSeconds = 0
+                            )
+                            val newExercise = Exercise(
+                                dayOfWeek = dayOfWeek,
+                                name = name2.trim(),
+                                youtubeUrl = youtubeUrl2.trim(),
+                                sets = sets2.toIntOrNull() ?: 3,
+                                reps = reps2.ifBlank { "10-12" },
+                                restTimeSeconds = rest,
+                                orderIndex = existingExercise.orderIndex + 1
+                            )
+                            onConvertToSuperset(updatedExisting, newExercise)
+                        }
+                    } else if (isSuperset && !isEditing) {
                         if (name.isNotBlank() && name2.isNotBlank()) {
                             val groupId = UUID.randomUUID().toString()
                             val rest = restTime.toIntOrNull() ?: 0
