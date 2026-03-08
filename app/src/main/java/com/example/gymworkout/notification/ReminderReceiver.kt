@@ -38,9 +38,9 @@ class ReminderReceiver : BroadcastReceiver() {
                 val text = customText.ifBlank {
                     when (categoryEnum) {
                         NutritionCategory.WATER -> "Time to drink water!"
+                        NutritionCategory.CALORIES -> "Don't forget your calorie intake!"
                         NutritionCategory.CARBS -> "Don't forget your carbs intake!"
                         NutritionCategory.PROTEIN -> "Time for your protein!"
-                        NutritionCategory.VITAMINS -> "Remember to take your vitamins!"
                         NutritionCategory.SLEEP -> "Time to prepare for sleep!"
                         null -> "Don't forget your $label!"
                     }

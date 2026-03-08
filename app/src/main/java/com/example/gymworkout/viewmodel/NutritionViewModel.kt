@@ -113,11 +113,11 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun initDefaultTargets() {
         viewModelScope.launch {
-            val defaults = mapOf(
+            val defaults = mapOf<NutritionCategory, Float>(
                 NutritionCategory.WATER to 3f,
-                NutritionCategory.CARBS to 2000f,
+                NutritionCategory.CALORIES to 2000f,
+                NutritionCategory.CARBS to 200f,
                 NutritionCategory.PROTEIN to 120f,
-                NutritionCategory.VITAMINS to 3f,
                 NutritionCategory.SLEEP to 8f
             )
             defaults.forEach { (cat, value) ->

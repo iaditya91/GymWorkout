@@ -5,9 +5,9 @@ import androidx.room.PrimaryKey
 
 enum class NutritionCategory(val label: String, val unit: String) {
     WATER("Water", "L"),
-    CARBS("Carbs", "cal"),
+    CARBS("Carbs", "g"),
+    CALORIES("Calories", "cal"),
     PROTEIN("Protein", "g"),
-    VITAMINS("Vitamins", "count"),
     SLEEP("Sleep", "hrs")
 }
 

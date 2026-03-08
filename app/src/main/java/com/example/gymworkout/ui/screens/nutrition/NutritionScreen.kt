@@ -35,7 +35,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -989,36 +992,116 @@ private fun NutrientSummaryChip(label: String, value: Float, unit: String) {
     }
 }
 
+private val objectivePresets = listOf(
+    "Calories" to "cal",
+    "Protein" to "g",
+    "Carbs" to "g",
+    "Fat" to "g",
+    "Fiber" to "g",
+    "Vitamin A" to "mcg",
+    "Vitamin B1" to "mg",
+    "Vitamin B2" to "mg",
+    "Vitamin B3" to "mg",
+    "Vitamin B6" to "mg",
+    "Vitamin B12" to "mcg",
+    "Vitamin C" to "mg",
+    "Vitamin D" to "mcg",
+    "Vitamin E" to "mg",
+    "Vitamin K" to "mcg",
+    "Folate" to "mcg",
+    "Iron" to "mg",
+    "Calcium" to "mg",
+    "Water" to "L",
+    "Sleep" to "hrs"
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddObjectiveDialog(
     onDismiss: () -> Unit,
     onSave: (String, String, Float) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
+    var selectedName by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf("") }
     var target by remember { mutableStateOf("") }
+    var isCustom by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Objective") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    placeholder = { Text("e.g. Creatine") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = unit,
-                    onValueChange = { unit = it },
-                    label = { Text("Unit") },
-                    placeholder = { Text("e.g. g, mg, ml, count") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = selectedName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Name") },
+                        placeholder = { Text("Select nutrition") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        objectivePresets.forEach { (name, presetUnit) ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                onClick = {
+                                    selectedName = name
+                                    unit = presetUnit
+                                    isCustom = false
+                                    expanded = false
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = {
+                                Text("Custom...", fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary)
+                            },
+                            onClick = {
+                                selectedName = ""
+                                unit = ""
+                                isCustom = true
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+
+                if (isCustom) {
+                    OutlinedTextField(
+                        value = selectedName,
+                        onValueChange = { selectedName = it },
+                        label = { Text("Custom Name") },
+                        placeholder = { Text("e.g. Creatine") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = unit,
+                        onValueChange = { unit = it },
+                        label = { Text("Unit") },
+                        placeholder = { Text("e.g. g, mg, ml") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else if (unit.isNotBlank()) {
+                    Text(
+                        "Unit: $unit",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 OutlinedTextField(
                     value = target,
                     onValueChange = { target = it },
@@ -1034,8 +1117,8 @@ fun AddObjectiveDialog(
             TextButton(
                 onClick = {
                     val v = target.toFloatOrNull()
-                    if (name.isNotBlank() && unit.isNotBlank() && v != null && v > 0) {
-                        onSave(name.trim(), unit.trim(), v)
+                    if (selectedName.isNotBlank() && unit.isNotBlank() && v != null && v > 0) {
+                        onSave(selectedName.trim(), unit.trim(), v)
                     }
                 }
             ) { Text("Add") }
@@ -1122,16 +1205,16 @@ fun SetTargetsDialog(
 fun getCategoryIcon(category: NutritionCategory): ImageVector = when (category) {
     NutritionCategory.WATER -> Icons.Default.WaterDrop
     NutritionCategory.CARBS -> Icons.Default.LocalFireDepartment
+    NutritionCategory.CALORIES -> Icons.Default.LocalFireDepartment
     NutritionCategory.PROTEIN -> Icons.Default.Egg
-    NutritionCategory.VITAMINS -> Icons.Default.Medication
     NutritionCategory.SLEEP -> Icons.Default.BedtimeOff
 }
 
 fun getCategoryColor(category: NutritionCategory): Color = when (category) {
     NutritionCategory.WATER -> Color(0xFF42A5F5)
     NutritionCategory.CARBS -> Color(0xFFFF8A65)
+    NutritionCategory.CALORIES -> Color(0xFFFF8A65)
     NutritionCategory.PROTEIN -> Color(0xFFEF5350)
-    NutritionCategory.VITAMINS -> Color(0xFF66BB6A)
     NutritionCategory.SLEEP -> Color(0xFFAB47BC)
 }
 
