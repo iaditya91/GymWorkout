@@ -362,7 +362,7 @@ fun NutritionCategoryCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = if (met) BorderStroke(1.dp, color) else null
+        border = if (met) BorderStroke(2.dp, color) else null
     ) {
         Row(
             modifier = Modifier
@@ -706,7 +706,7 @@ fun CustomCategoryCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = if (met) BorderStroke(1.dp, color) else null
+        border = if (met) BorderStroke(2.dp, color) else null
     ) {
         Row(
             modifier = Modifier
