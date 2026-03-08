@@ -184,9 +184,12 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                 }
             }
 
-            // Category cards (built-in)
+            // Category cards (built-in) - only show if target exists in DB
             item { Spacer(modifier = Modifier.height(4.dp)) }
-            items(NutritionCategory.entries) { category ->
+            val activeBuiltIn = NutritionCategory.entries.filter { cat ->
+                allTargets.any { it.category == cat.name }
+            }
+            items(activeBuiltIn) { category ->
                 NutritionCategoryCard(
                     category = category,
                     date = selectedDate,
