@@ -70,4 +70,23 @@ interface NutritionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllTargets(items: List<NutritionTarget>)
+
+    // Food log
+    @Query("SELECT * FROM food_log WHERE date = :date ORDER BY id DESC")
+    fun getFoodLogForDate(date: String): Flow<List<FoodLogEntry>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFoodLog(entry: FoodLogEntry)
+
+    @Delete
+    suspend fun deleteFoodLog(entry: FoodLogEntry)
+
+    @Query("SELECT * FROM food_log")
+    suspend fun getAllFoodLogSync(): List<FoodLogEntry>
+
+    @Query("DELETE FROM food_log")
+    suspend fun deleteAllFoodLog()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllFoodLog(items: List<FoodLogEntry>)
 }

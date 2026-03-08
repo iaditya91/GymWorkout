@@ -3,6 +3,7 @@ package com.example.gymworkout.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.gymworkout.data.FoodLogEntry
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionReminder
@@ -169,5 +170,44 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleReminderEnabled(reminder: NutritionReminder) {
         val updated = reminder.copy(enabled = !reminder.enabled)
         updateReminder(updated)
+    }
+
+    // --- Food log methods ---
+
+    fun getFoodLogForDate(date: String): Flow<List<FoodLogEntry>> =
+        dao.getFoodLogForDate(date)
+
+    fun logFood(date: String, foodName: String, quantityGrams: Float, caloriesPer100g: Float, proteinPer100g: Float, carbsPer100g: Float, fatPer100g: Float, fiberPer100g: Float) {
+        viewModelScope.launch {
+            val multiplier = quantityGrams / 100f
+            val calories = caloriesPer100g * multiplier
+            val protein = proteinPer100g * multiplier
+            val carbs = carbsPer100g * multiplier
+            val fat = fatPer100g * multiplier
+            val fiber = fiberPer100g * multiplier
+
+            dao.insertFoodLog(
+                FoodLogEntry(
+                    date = date,
+                    foodName = foodName,
+                    quantityGrams = quantityGrams,
+                    calories = calories,
+                    protein = protein,
+                    carbs = carbs,
+                    fat = fat,
+                    fiber = fiber
+                )
+            )
+
+            // Auto-add to nutrition categories
+            dao.insertEntry(NutritionEntry(date = date, category = NutritionCategory.CARBS.name, value = calories))
+            dao.insertEntry(NutritionEntry(date = date, category = NutritionCategory.PROTEIN.name, value = protein))
+        }
+    }
+
+    fun deleteFoodLog(entry: FoodLogEntry) {
+        viewModelScope.launch {
+            dao.deleteFoodLog(entry)
+        }
     }
 }

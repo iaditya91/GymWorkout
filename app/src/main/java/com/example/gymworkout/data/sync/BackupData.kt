@@ -4,6 +4,7 @@ import com.example.gymworkout.data.ChecklistItem
 import com.example.gymworkout.data.DailyCheckIn
 import com.example.gymworkout.data.DayHeading
 import com.example.gymworkout.data.Exercise
+import com.example.gymworkout.data.FoodLogEntry
 import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionReminder
 import com.example.gymworkout.data.NutritionTarget
@@ -22,5 +23,6 @@ data class BackupData(
     val nutritionReminders: List<NutritionReminder> = emptyList(),
     val dayHeadings: List<DayHeading> = emptyList(),
     val workoutReminders: List<WorkoutReminder> = emptyList(),
+    val foodLogEntries: List<FoodLogEntry> = emptyList(),
     val themePreference: Boolean? = null
 )

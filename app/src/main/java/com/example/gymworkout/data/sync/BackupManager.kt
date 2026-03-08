@@ -27,6 +27,7 @@ class BackupManager(
             nutritionReminders = reminderDao.getAllSync(),
             workoutReminders = userDao.getAllWorkoutRemindersSync(),
             dayHeadings = exerciseDao.getAllDayHeadingsSync(),
+            foodLogEntries = nutritionDao.getAllFoodLogSync(),
             themePreference = ThemePreference.isDarkMode.value
         )
     }
@@ -37,6 +38,7 @@ class BackupManager(
         exerciseDao.deleteAllDayHeadings()
         nutritionDao.deleteAllEntries()
         nutritionDao.deleteAllTargets()
+        nutritionDao.deleteAllFoodLog()
         checkInDao.deleteAll()
         userDao.deleteAllProfiles()
         userDao.deleteAllChecklistItems()
@@ -53,6 +55,7 @@ class BackupManager(
         if (data.checklistItems.isNotEmpty()) userDao.insertAllChecklistItems(data.checklistItems)
         if (data.nutritionReminders.isNotEmpty()) reminderDao.insertAll(data.nutritionReminders)
         if (data.workoutReminders.isNotEmpty()) userDao.upsertAllWorkoutReminders(data.workoutReminders)
+        if (data.foodLogEntries.isNotEmpty()) nutritionDao.insertAllFoodLog(data.foodLogEntries)
 
         // Restore theme preference
         ThemePreference.setDarkMode(context, data.themePreference)

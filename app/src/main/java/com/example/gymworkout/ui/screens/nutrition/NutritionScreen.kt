@@ -64,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.gymworkout.data.FoodLogEntry
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionTarget
@@ -83,6 +84,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     var reminderCategory by remember { mutableStateOf<NutritionCategory?>(null) }
     var customReminderTarget by remember { mutableStateOf<NutritionTarget?>(null) }
     var deleteTargetCategory by remember { mutableStateOf<String?>(null) }
+    var showFoodLogDialog by remember { mutableStateOf(false) }
     val allTargets by viewModel.getAllTargets().collectAsState(initial = emptyList())
     val displayFormatter = DateTimeFormatter.ofPattern("EEE, MMM d")
     val today = viewModel.todayString()
@@ -211,6 +213,16 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                 )
             }
 
+            // Food log section
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                FoodLogSection(
+                    date = selectedDate,
+                    viewModel = viewModel,
+                    onLogFood = { showFoodLogDialog = true }
+                )
+            }
+
             // Recent entries for today
             item {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -306,6 +318,25 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
             color = Color(0xFF78909C),
             viewModel = viewModel,
             onDismiss = { customReminderTarget = null }
+        )
+    }
+
+    if (showFoodLogDialog) {
+        FoodLogDialog(
+            onDismiss = { showFoodLogDialog = false },
+            onLog = { food, qty ->
+                viewModel.logFood(
+                    date = selectedDate,
+                    foodName = food.name,
+                    quantityGrams = qty,
+                    caloriesPer100g = food.caloriesPer100g,
+                    proteinPer100g = food.proteinPer100g,
+                    carbsPer100g = food.carbsPer100g,
+                    fatPer100g = food.fatPer100g,
+                    fiberPer100g = food.fiberPer100g
+                )
+                showFoodLogDialog = false
+            }
         )
     }
 }
@@ -780,6 +811,151 @@ fun CustomCategoryCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun FoodLogSection(
+    date: String,
+    viewModel: NutritionViewModel,
+    onLogFood: () -> Unit
+) {
+    val foodLogs by viewModel.getFoodLogForDate(date).collectAsState(initial = emptyList())
+    val totalCalories = foodLogs.sumOf { it.calories.toDouble() }.toFloat()
+    val totalProtein = foodLogs.sumOf { it.protein.toDouble() }.toFloat()
+    val totalCarbs = foodLogs.sumOf { it.carbs.toDouble() }.toFloat()
+    val totalFat = foodLogs.sumOf { it.fat.toDouble() }.toFloat()
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Egg,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Food Log",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (foodLogs.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                "${foodLogs.size} items",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+                TextButton(onClick = onLogFood) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add Food")
+                }
+            }
+
+            if (foodLogs.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Summary row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    NutrientSummaryChip("Cal", totalCalories, "cal")
+                    NutrientSummaryChip("Protein", totalProtein, "g")
+                    NutrientSummaryChip("Carbs", totalCarbs, "g")
+                    NutrientSummaryChip("Fat", totalFat, "g")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Food entries
+                foodLogs.forEach { log ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                log.foodName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "${log.quantityGrams.toInt()}g  |  ${String.format("%.0f", log.calories)} cal  |  P: ${String.format("%.1f", log.protein)}g",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.deleteFoodLog(log) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    "Tap + to log what you ate",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NutrientSummaryChip(label: String, value: Float, unit: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            String.format("%.0f", value),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            "$label ($unit)",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
