@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.example.gymworkout.data.MotivationalQuote
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -75,4 +76,23 @@ interface UserDao {
 
     @Query("DELETE FROM workout_reminders")
     suspend fun deleteAllWorkoutReminders()
+
+    // Motivational quotes
+    @Query("SELECT * FROM motivational_quotes ORDER BY id ASC")
+    fun getAllCustomQuotes(): Flow<List<MotivationalQuote>>
+
+    @Query("SELECT * FROM motivational_quotes ORDER BY id ASC")
+    suspend fun getAllCustomQuotesSync(): List<MotivationalQuote>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCustomQuote(quote: MotivationalQuote)
+
+    @Delete
+    suspend fun deleteCustomQuote(quote: MotivationalQuote)
+
+    @Query("DELETE FROM motivational_quotes")
+    suspend fun deleteAllCustomQuotes()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllCustomQuotes(quotes: List<MotivationalQuote>)
 }

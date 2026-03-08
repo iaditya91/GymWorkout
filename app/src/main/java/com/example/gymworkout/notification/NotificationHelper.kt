@@ -20,6 +20,10 @@ object NotificationHelper {
     private const val WORKOUT_CHANNEL_NAME = "Workout Reminders"
     private const val WORKOUT_CHANNEL_DESC = "Daily workout reminders"
 
+    private const val QUOTE_CHANNEL_ID = "quote_reminders"
+    private const val QUOTE_CHANNEL_NAME = "Motivational Quotes"
+    private const val QUOTE_CHANNEL_DESC = "Daily motivational workout quotes"
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -42,6 +46,20 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = WORKOUT_CHANNEL_DESC
+            }
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    fun createQuoteNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                QUOTE_CHANNEL_ID,
+                QUOTE_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = QUOTE_CHANNEL_DESC
             }
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)

@@ -10,6 +10,7 @@ import com.example.gymworkout.data.NutritionReminder
 import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WorkoutReminder
+import com.example.gymworkout.data.MotivationalQuote
 
 data class BackupData(
     val version: Int = 1,
@@ -24,5 +25,6 @@ data class BackupData(
     val dayHeadings: List<DayHeading> = emptyList(),
     val workoutReminders: List<WorkoutReminder> = emptyList(),
     val foodLogEntries: List<FoodLogEntry> = emptyList(),
-    val themePreference: Boolean? = null
+    val themePreference: Boolean? = null,
+    val customQuotes: List<MotivationalQuote> = emptyList()
 )

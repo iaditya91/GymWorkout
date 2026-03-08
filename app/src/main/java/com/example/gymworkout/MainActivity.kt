@@ -52,6 +52,7 @@ import java.net.URLEncoder
 import com.example.gymworkout.ui.screens.nutrition.NutritionScreen
 import com.example.gymworkout.ui.screens.stats.StatsScreen
 import com.example.gymworkout.ui.screens.user.UserScreen
+import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.ThemePreference
 import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.notification.NotificationHelper
@@ -82,7 +83,9 @@ class MainActivity : ComponentActivity() {
         ThemePreference.init(this)
         NotificationHelper.createNotificationChannel(this)
         NotificationHelper.createWorkoutNotificationChannel(this)
+        NotificationHelper.createQuoteNotificationChannel(this)
         requestNotificationPermission()
+        QuotePreference.init(this)
         SyncPreference.init(this)
         setContent {
             val darkMode by ThemePreference.isDarkMode.collectAsState()

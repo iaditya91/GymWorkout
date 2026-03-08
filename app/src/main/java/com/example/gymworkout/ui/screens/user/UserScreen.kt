@@ -40,7 +40,11 @@ import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
@@ -87,6 +91,9 @@ import com.example.gymworkout.data.ChecklistItem
 import com.example.gymworkout.data.ThemePreference
 import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WorkoutReminder
+import com.example.gymworkout.data.MotivationalQuote
+import com.example.gymworkout.data.MotivationalQuotes
+import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.viewmodel.SyncState
 import com.example.gymworkout.viewmodel.UserViewModel
@@ -114,6 +121,13 @@ fun UserScreen(viewModel: UserViewModel) {
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var showWorkoutReminderDialog by remember { mutableStateOf(false) }
     val workoutReminders by viewModel.getWorkoutReminders().collectAsState(initial = emptyList())
+
+    // Motivational quotes state
+    var showQuoteDialog by remember { mutableStateOf(false) }
+    val quoteEnabled by QuotePreference.enabled.collectAsState()
+    val quoteSource by QuotePreference.source.collectAsState()
+    val quoteTime by QuotePreference.time.collectAsState()
+    val customQuotes by viewModel.getCustomQuotes().collectAsState(initial = emptyList())
 
     // Auto-dismiss success/error after 3 seconds
     LaunchedEffect(syncState) {
@@ -223,6 +237,16 @@ fun UserScreen(viewModel: UserViewModel) {
                 )
             }
 
+            item {
+                MotivationalQuotesCard(
+                    enabled = quoteEnabled,
+                    source = quoteSource,
+                    time = quoteTime,
+                    customQuoteCount = customQuotes.size,
+                    onClick = { showQuoteDialog = true }
+                )
+            }
+
             // Reset buttons for checklists
             if (dos.isNotEmpty() || donts.isNotEmpty()) {
                 item {
@@ -323,6 +347,21 @@ fun UserScreen(viewModel: UserViewModel) {
             dismissButton = {
                 TextButton(onClick = { showRestoreConfirm = false }) { Text("Cancel") }
             }
+        )
+    }
+
+    if (showQuoteDialog) {
+        MotivationalQuotesDialog(
+            enabled = quoteEnabled,
+            source = quoteSource,
+            time = quoteTime,
+            customQuotes = customQuotes,
+            onDismiss = { showQuoteDialog = false },
+            onToggleEnabled = { viewModel.setQuoteEnabled(it) },
+            onSourceChange = { viewModel.setQuoteSource(it) },
+            onTimeChange = { viewModel.setQuoteTime(it) },
+            onAddCustomQuote = { viewModel.addCustomQuote(it) },
+            onDeleteCustomQuote = { viewModel.deleteCustomQuote(it) }
         )
     }
 }
@@ -1289,6 +1328,461 @@ fun WorkoutReminderDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+fun MotivationalQuotesCard(
+    enabled: Boolean,
+    source: String,
+    time: String,
+    customQuoteCount: Int,
+    onClick: () -> Unit
+) {
+    val sourceLabel = when (source) {
+        "APP" -> "App quotes"
+        "CUSTOM" -> "Custom quotes ($customQuoteCount)"
+        "BOTH" -> "App + Custom ($customQuoteCount)"
+        else -> "App quotes"
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (enabled) Color(0xFFFF7043).copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.FormatQuote,
+                        contentDescription = null,
+                        tint = if (enabled) Color(0xFFFF7043)
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Motivational Quotes",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        if (enabled) "Daily at ${formatTime12h(time)}"
+                        else "Tap to set up daily quotes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            if (enabled) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFFF7043).copy(alpha = 0.1f))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            sourceLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFFF7043)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFFF7043).copy(alpha = 0.1f))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = null,
+                                tint = Color(0xFFFF7043),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                formatTime12h(time),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFFF7043)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MotivationalQuotesDialog(
+    enabled: Boolean,
+    source: String,
+    time: String,
+    customQuotes: List<MotivationalQuote>,
+    onDismiss: () -> Unit,
+    onToggleEnabled: (Boolean) -> Unit,
+    onSourceChange: (String) -> Unit,
+    onTimeChange: (String) -> Unit,
+    onAddCustomQuote: (String) -> Unit,
+    onDeleteCustomQuote: (MotivationalQuote) -> Unit
+) {
+    val context = LocalContext.current
+    var newQuoteText by remember { mutableStateOf("") }
+    var showPreview by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.FormatQuote,
+                    contentDescription = null,
+                    tint = Color(0xFFFF7043),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Motivational Quotes")
+            }
+        },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Enable/Disable toggle
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Daily Quote Notification",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "Get inspired every day",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = enabled,
+                            onCheckedChange = { onToggleEnabled(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFFFF7043),
+                                checkedTrackColor = Color(0xFFFF7043).copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+                }
+
+                if (enabled) {
+                    // Notification time
+                    item {
+                        Text(
+                            "Notification Time",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFFF7043).copy(alpha = 0.1f))
+                                .clickable {
+                                    val parts = time.split(":")
+                                    val h = parts.getOrNull(0)?.toIntOrNull() ?: 8
+                                    val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                                    TimePickerDialog(context, { _, hour, minute ->
+                                        onTimeChange(String.format("%02d:%02d", hour, minute))
+                                    }, h, m, false).show()
+                                }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF7043),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    formatTime12h(time),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFFF7043)
+                                )
+                            }
+                        }
+                    }
+
+                    // Quote source
+                    item {
+                        Text(
+                            "Quote Source",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            QuoteSourceOption(
+                                label = "App's Dictionary",
+                                description = "${MotivationalQuotes.quotes.size} curated quotes",
+                                selected = source == "APP",
+                                onClick = { onSourceChange("APP") }
+                            )
+                            QuoteSourceOption(
+                                label = "Custom Only",
+                                description = "${customQuotes.size} quote(s) added",
+                                selected = source == "CUSTOM",
+                                onClick = { onSourceChange("CUSTOM") }
+                            )
+                            QuoteSourceOption(
+                                label = "App's Dictionary + Custom",
+                                description = "${MotivationalQuotes.quotes.size + customQuotes.size} total quotes",
+                                selected = source == "BOTH",
+                                onClick = { onSourceChange("BOTH") }
+                            )
+                        }
+                    }
+
+                    // Custom quotes section
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Custom Quotes",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "${customQuotes.size} added",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        // Add new quote input
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = newQuoteText,
+                                onValueChange = { newQuoteText = it },
+                                placeholder = { Text("Enter your quote...", style = MaterialTheme.typography.bodySmall) },
+                                modifier = Modifier.weight(1f),
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                maxLines = 3,
+                                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (newQuoteText.isNotBlank()) Color(0xFFFF7043)
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    .clickable(enabled = newQuoteText.isNotBlank()) {
+                                        onAddCustomQuote(newQuoteText.trim())
+                                        newQuoteText = ""
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Add quote",
+                                    tint = if (newQuoteText.isNotBlank()) Color.White
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // List custom quotes
+                    if (customQuotes.isNotEmpty()) {
+                        items(customQuotes, key = { "cq_${it.id}" }) { quote ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.FormatQuote,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF7043).copy(alpha = 0.6f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    quote.text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clickable { onDeleteCustomQuote(quote) }
+                                )
+                            }
+                        }
+                    }
+
+                    // Preview a random quote
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                                .clickable { showPreview = !showPreview }
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Visibility,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "Preview Random Quote",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                if (showPreview) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    val previewQuote = remember(showPreview) {
+                                        when (source) {
+                                            "APP" -> MotivationalQuotes.getRandomQuote()
+                                            "CUSTOM" -> customQuotes.randomOrNull()?.text ?: MotivationalQuotes.getRandomQuote()
+                                            "BOTH" -> {
+                                                val all = MotivationalQuotes.quotes + customQuotes.map { it.text }
+                                                all.randomOrNull() ?: MotivationalQuotes.getRandomQuote()
+                                            }
+                                            else -> MotivationalQuotes.getRandomQuote()
+                                        }
+                                    }
+                                    Text(
+                                        "\"$previewQuote\"",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
+        }
+    )
+}
+
+@Composable
+private fun QuoteSourceOption(
+    label: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (selected) Color(0xFFFF7043).copy(alpha = 0.12f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            )
+            .border(
+                width = if (selected) 1.5.dp else 0.dp,
+                color = if (selected) Color(0xFFFF7043).copy(alpha = 0.5f) else Color.Transparent,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            if (selected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
+            contentDescription = null,
+            tint = if (selected) Color(0xFFFF7043) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) Color(0xFFFF7043) else MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                description,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable

@@ -6,9 +6,12 @@ import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gymworkout.data.ChecklistItem
+import com.example.gymworkout.data.MotivationalQuote
+import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WorkoutDatabase
 import com.example.gymworkout.data.WorkoutReminder
+import com.example.gymworkout.notification.QuoteReminderScheduler
 import com.example.gymworkout.notification.WorkoutReminderScheduler
 import com.example.gymworkout.data.sync.BackupData
 import com.example.gymworkout.data.sync.BackupManager
@@ -56,6 +59,7 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         checkAndAutoReset()
+        QuotePreference.init(application)
     }
 
     private fun checkAndAutoReset() {
@@ -281,6 +285,41 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
                     WorkoutReminderScheduler.cancelForDay(getApplication(), reminder.dayOfWeek)
                 }
             }
+        }
+    }
+
+    // --- Motivational Quotes ---
+
+    fun getCustomQuotes(): Flow<List<MotivationalQuote>> = dao.getAllCustomQuotes()
+
+    fun addCustomQuote(text: String) {
+        viewModelScope.launch { dao.insertCustomQuote(MotivationalQuote(text = text)) }
+    }
+
+    fun deleteCustomQuote(quote: MotivationalQuote) {
+        viewModelScope.launch { dao.deleteCustomQuote(quote) }
+    }
+
+    fun setQuoteEnabled(enabled: Boolean) {
+        val app = getApplication<Application>()
+        QuotePreference.setEnabled(app, enabled)
+        if (enabled) {
+            val time = QuotePreference.getTime(app)
+            QuoteReminderScheduler.schedule(app, time)
+        } else {
+            QuoteReminderScheduler.cancel(app)
+        }
+    }
+
+    fun setQuoteSource(source: String) {
+        QuotePreference.setSource(getApplication(), source)
+    }
+
+    fun setQuoteTime(time: String) {
+        val app = getApplication<Application>()
+        QuotePreference.setTime(app, time)
+        if (QuotePreference.getEnabled(app)) {
+            QuoteReminderScheduler.schedule(app, time)
         }
     }
 }

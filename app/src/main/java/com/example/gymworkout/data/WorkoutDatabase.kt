@@ -16,9 +16,10 @@ import androidx.room.RoomDatabase
         NutritionReminder::class,
         DayHeading::class,
         WorkoutReminder::class,
-        FoodLogEntry::class
+        FoodLogEntry::class,
+        MotivationalQuote::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {

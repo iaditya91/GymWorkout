@@ -218,7 +218,7 @@ fun DayDetailScreen(
                 items(groupedItems, key = { item ->
                     when (item) {
                         is ExerciseItem.Single -> "s_${item.exercise.id}"
-                        is ExerciseItem.Superset -> "ss_${item.exercises.first().supersetGroupId}"
+                        is ExerciseItem.Superset -> "ss_${item.exercises.first().id}"
                     }
                 }) { item ->
                     when (item) {
