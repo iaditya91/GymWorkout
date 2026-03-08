@@ -33,4 +33,23 @@ interface UserDao {
 
     @Query("UPDATE checklist_items SET isChecked = :checked WHERE id = :id")
     suspend fun toggleChecklistItem(id: Int, checked: Boolean)
+
+    // Bulk operations for backup/restore
+    @Query("SELECT * FROM user_profile")
+    suspend fun getAllProfilesSync(): List<UserProfile>
+
+    @Query("SELECT * FROM checklist_items")
+    suspend fun getAllChecklistItemsSync(): List<ChecklistItem>
+
+    @Query("DELETE FROM user_profile")
+    suspend fun deleteAllProfiles()
+
+    @Query("DELETE FROM checklist_items")
+    suspend fun deleteAllChecklistItems()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllProfiles(items: List<UserProfile>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllChecklistItems(items: List<ChecklistItem>)
 }

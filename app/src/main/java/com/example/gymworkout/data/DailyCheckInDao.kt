@@ -29,4 +29,14 @@ interface DailyCheckInDao {
 
     @Query("SELECT COUNT(*) FROM daily_checkins WHERE sleepDone = 1 AND date BETWEEN :startDate AND :endDate")
     fun getSleepDaysCount(startDate: String, endDate: String): Flow<Int>
+
+    // Bulk operations for backup/restore
+    @Query("SELECT * FROM daily_checkins")
+    suspend fun getAllSync(): List<DailyCheckIn>
+
+    @Query("DELETE FROM daily_checkins")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<DailyCheckIn>)
 }

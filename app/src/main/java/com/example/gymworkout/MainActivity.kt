@@ -48,6 +48,7 @@ import com.example.gymworkout.ui.screens.nutrition.NutritionScreen
 import com.example.gymworkout.ui.screens.stats.StatsScreen
 import com.example.gymworkout.ui.screens.user.UserScreen
 import com.example.gymworkout.data.ThemePreference
+import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.notification.NotificationHelper
 import com.example.gymworkout.ui.theme.GymWorkoutTheme
 import com.example.gymworkout.viewmodel.NutritionViewModel
@@ -61,6 +62,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         ThemePreference.init(this)
         NotificationHelper.createNotificationChannel(this)
+        SyncPreference.init(this)
         setContent {
             val darkMode by ThemePreference.isDarkMode.collectAsState()
             GymWorkoutTheme(

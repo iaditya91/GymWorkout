@@ -43,4 +43,14 @@ interface ExerciseDao {
 
     @Query("UPDATE exercises SET supersetGroupId = '' WHERE id = :id")
     suspend fun clearSupersetGroupId(id: Int)
+
+    // Bulk operations for backup/restore
+    @Query("SELECT * FROM exercises")
+    suspend fun getAllSync(): List<Exercise>
+
+    @Query("DELETE FROM exercises")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<Exercise>)
 }

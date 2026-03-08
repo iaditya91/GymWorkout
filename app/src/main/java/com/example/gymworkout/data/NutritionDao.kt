@@ -42,4 +42,23 @@ interface NutritionDao {
 
     @Query("SELECT COALESCE(SUM(value), 0) FROM nutrition_entries WHERE date = :date AND category = 'SLEEP'")
     fun getSleepForDate(date: String): Flow<Float>
+
+    // Bulk operations for backup/restore
+    @Query("SELECT * FROM nutrition_entries")
+    suspend fun getAllEntriesSync(): List<NutritionEntry>
+
+    @Query("SELECT * FROM nutrition_targets")
+    suspend fun getAllTargetsSync(): List<NutritionTarget>
+
+    @Query("DELETE FROM nutrition_entries")
+    suspend fun deleteAllEntries()
+
+    @Query("DELETE FROM nutrition_targets")
+    suspend fun deleteAllTargets()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllEntries(items: List<NutritionEntry>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllTargets(items: List<NutritionTarget>)
 }

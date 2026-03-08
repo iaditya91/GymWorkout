@@ -34,4 +34,14 @@ interface ReminderDao {
 
     @Query("DELETE FROM nutrition_reminders WHERE category = :category")
     suspend fun deleteRemindersForCategory(category: String)
+
+    // Bulk operations for backup/restore
+    @Query("SELECT * FROM nutrition_reminders")
+    suspend fun getAllSync(): List<NutritionReminder>
+
+    @Query("DELETE FROM nutrition_reminders")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<NutritionReminder>)
 }
