@@ -729,6 +729,20 @@ fun CustomCategoryCard(
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
     val met = targetVal > 0 && total >= targetVal
     val color = Color(0xFF78909C) // neutral color for custom
+    var showFoodSuggestions by remember { mutableStateOf(false) }
+
+    val foodFieldKey = getCustomFoodFieldKey(target.label)
+
+    if (showFoodSuggestions && foodFieldKey != null) {
+        CustomFoodSuggestionsDialog(
+            label = target.label,
+            unit = target.unit,
+            fieldKey = foodFieldKey,
+            targetValue = targetVal,
+            color = color,
+            onDismiss = { showFoodSuggestions = false }
+        )
+    }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -809,6 +823,19 @@ fun CustomCategoryCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             Column {
+                if (foodFieldKey != null) {
+                    IconButton(
+                        onClick = { showFoodSuggestions = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = "Food sources for ${target.label}",
+                            tint = color.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
                 IconButton(
                     onClick = onReminderClick,
                     modifier = Modifier.size(36.dp)
@@ -1227,6 +1254,164 @@ fun SetTargetsDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+// Maps custom objective labels to FoodItem field extractors
+fun getCustomFoodFieldKey(label: String): String? {
+    return when (label.lowercase().trim()) {
+        "fat", "fats" -> "fat"
+        "fiber", "fibre" -> "fiber"
+        "vitamin a", "vit a" -> "vitA"
+        "vitamin b1", "vit b1", "thiamine" -> "vitB1"
+        "vitamin b2", "vit b2", "riboflavin" -> "vitB2"
+        "vitamin b3", "vit b3", "niacin" -> "vitB3"
+        "vitamin b6", "vit b6" -> "vitB6"
+        "vitamin b12", "vit b12" -> "vitB12"
+        "vitamin c", "vit c" -> "vitC"
+        "vitamin d", "vit d" -> "vitD"
+        "vitamin e", "vit e" -> "vitE"
+        "vitamin k", "vit k" -> "vitK"
+        "folate", "folic acid" -> "folate"
+        "iron" -> "iron"
+        "calcium" -> "calcium"
+        "calories", "calorie", "cal" -> "calories"
+        "protein" -> "protein"
+        "carbs", "carbohydrates" -> "carbs"
+        else -> null
+    }
+}
+
+fun getFoodFieldValue(food: FoodItem, fieldKey: String): Float {
+    return when (fieldKey) {
+        "fat" -> food.fatPerBase
+        "fiber" -> food.fiberPerBase
+        "vitA" -> food.vitAPerBase
+        "vitB1" -> food.vitB1PerBase
+        "vitB2" -> food.vitB2PerBase
+        "vitB3" -> food.vitB3PerBase
+        "vitB6" -> food.vitB6PerBase
+        "vitB12" -> food.vitB12PerBase
+        "vitC" -> food.vitCPerBase
+        "vitD" -> food.vitDPerBase
+        "vitE" -> food.vitEPerBase
+        "vitK" -> food.vitKPerBase
+        "folate" -> food.folatePerBase
+        "iron" -> food.ironPerBase
+        "calcium" -> food.calciumPerBase
+        "calories" -> food.caloriesPerBase
+        "protein" -> food.proteinPerBase
+        "carbs" -> food.carbsPerBase
+        else -> 0f
+    }
+}
+
+@Composable
+fun CustomFoodSuggestionsDialog(
+    label: String,
+    unit: String,
+    fieldKey: String,
+    targetValue: Float,
+    color: Color,
+    onDismiss: () -> Unit
+) {
+    data class FoodNutrient(val food: FoodItem, val value: Float)
+
+    val sortedFoods = remember(fieldKey) {
+        FoodDatabase.foods.map { food ->
+            FoodNutrient(food, getFoodFieldValue(food, fieldKey))
+        }
+            .filter { it.value > 0f }
+            .sortedByDescending { it.value }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Top $label Foods",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            if (sortedFoods.isEmpty()) {
+                Text(
+                    "No food data available for $label.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.height(400.dp)
+                ) {
+                    items(sortedFoods) { item ->
+                        val perLabel = if (item.food.servingUnit == com.example.gymworkout.data.ServingUnit.PIECE) {
+                            "per piece"
+                        } else {
+                            "per 100${item.food.servingUnit.label}"
+                        }
+                        val dvPercent = if (targetValue > 0f) {
+                            ((item.value / targetValue) * 100).toInt()
+                        } else 0
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    item.food.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    "${formatValue(item.value)}$unit $perLabel",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (dvPercent > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            color.copy(alpha = 0.15f),
+                                            RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        "${dvPercent}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = color
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
         }
     )
 }
