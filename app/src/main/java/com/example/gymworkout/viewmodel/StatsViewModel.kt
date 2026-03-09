@@ -30,9 +30,11 @@ data class JourneyData(
     val isSetup: Boolean = false,
     val todayScore: DailyScoreBreakdown = DailyScoreBreakdown(),
     val weeklyAverage: Float = 0f,
+    val idealDays: Int = 90,
     val estimatedDays: Int = 90,
     val daysElapsed: Int = 0,
-    val weightProgress: Float = 0f // 0-1 progress from starting to target
+    val requiredShape: String = "",
+    val shapeProgress: Float = 0f // 0-1 progress: daysElapsed / estimatedDays
 )
 
 class StatsViewModel(application: Application) : AndroidViewModel(application) {
@@ -114,15 +116,13 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getProfile(): Flow<UserProfile?> = userDao.getProfile()
 
-    fun saveJourneySetup(targetWeight: Float, startingWeight: Float, fitnessLevel: String) {
+    fun saveJourneySetup(requiredShape: String, idealDays: Int) {
         viewModelScope.launch {
             val existing = userDao.getAllProfilesSync().firstOrNull() ?: UserProfile()
-            val startWeight = if (startingWeight > 0f) startingWeight else existing.weight
             userDao.upsertProfile(
                 existing.copy(
-                    targetWeight = targetWeight,
-                    startingWeight = startWeight,
-                    fitnessLevel = fitnessLevel,
+                    requiredShape = requiredShape,
+                    idealDays = idealDays,
                     journeyStartDate = if (existing.journeyStartDate.isEmpty())
                         LocalDate.now().format(formatter) else existing.journeyStartDate
                 )
@@ -134,7 +134,7 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
     fun loadJourneyData() {
         viewModelScope.launch {
             val profile = userDao.getAllProfilesSync().firstOrNull()
-            if (profile == null || profile.targetWeight <= 0f) {
+            if (profile == null || profile.requiredShape.isEmpty()) {
                 _journeyData.value = JourneyData(profile = profile, isSetup = false)
                 return@launch
             }
@@ -158,16 +158,10 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
             }
             val weeklyAvg = if (weekDays > 0) weekTotal / weekDays else 0f
 
-            // Base transformation days based on fitness level
-            val baseDays = when (profile.fitnessLevel) {
-                "beginner" -> 90
-                "intermediate" -> 120
-                "advanced" -> 180
-                else -> 90
-            }
+            val idealDays = profile.idealDays
 
-            // Adjusted days
-            val adjustedDays = if (weeklyAvg > 0f) (baseDays / weeklyAvg).toInt() else baseDays
+            // Estimated Days = Ideal Days / Average Progress Score
+            val estimatedDays = if (weeklyAvg > 0f) (idealDays / weeklyAvg).toInt() else idealDays
 
             // Days elapsed since journey start
             val daysElapsed = if (profile.journeyStartDate.isNotEmpty()) {
@@ -175,11 +169,9 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
                 ChronoUnit.DAYS.between(startDate, today).toInt().coerceAtLeast(0)
             } else 0
 
-            // Weight progress (0-1)
-            val weightDiff = profile.targetWeight - profile.startingWeight
-            val currentDiff = profile.weight - profile.startingWeight
-            val weightProgress = if (weightDiff != 0f) {
-                (currentDiff / weightDiff).coerceIn(0f, 1f)
+            // Shape progress: how far along vs estimated days
+            val shapeProgress = if (estimatedDays > 0) {
+                (daysElapsed.toFloat() / estimatedDays).coerceIn(0f, 1f)
             } else 0f
 
             _journeyData.value = JourneyData(
@@ -187,9 +179,11 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
                 isSetup = true,
                 todayScore = todayScore,
                 weeklyAverage = weeklyAvg,
-                estimatedDays = adjustedDays,
+                idealDays = idealDays,
+                estimatedDays = estimatedDays,
                 daysElapsed = daysElapsed,
-                weightProgress = weightProgress
+                requiredShape = profile.requiredShape,
+                shapeProgress = shapeProgress
             )
         }
     }

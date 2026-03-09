@@ -16,7 +16,9 @@ data class UserProfile(
     val targetWeight: Float = 0f,
     val startingWeight: Float = 0f,
     val fitnessLevel: String = "beginner", // "beginner", "intermediate", "advanced"
-    val journeyStartDate: String = "" // yyyy-MM-dd
+    val journeyStartDate: String = "", // yyyy-MM-dd
+    val requiredShape: String = "", // "lean", "athletic", "muscular", "bodybuilder"
+    val idealDays: Int = 90 // ideal number of days to achieve required shape
 )
 
 @Entity(tableName = "checklist_items")

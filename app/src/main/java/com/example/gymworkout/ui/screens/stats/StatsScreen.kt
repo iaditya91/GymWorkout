@@ -236,8 +236,8 @@ fun JourneyTab(viewModel: StatsViewModel) {
         JourneySetupDialog(
             currentProfile = journeyData.profile,
             onDismiss = { showSetupDialog = false },
-            onSave = { targetWeight, startingWeight, fitnessLevel ->
-                viewModel.saveJourneySetup(targetWeight, startingWeight, fitnessLevel)
+            onSave = { requiredShape, idealDays ->
+                viewModel.saveJourneySetup(requiredShape, idealDays)
                 showSetupDialog = false
             }
         )
@@ -311,7 +311,7 @@ fun JourneySetupCard(onSetup: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Set your target body weight and track your transformation progress with daily scoring.",
+                "Set your required body shape and track your transformation progress with daily scoring.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -334,9 +334,12 @@ fun JourneySetupCard(onSetup: () -> Unit) {
 fun JourneyProgressCard(journeyData: JourneyData, onEdit: () -> Unit) {
     val profile = journeyData.profile ?: return
     val animatedProgress by animateFloatAsState(
-        targetValue = journeyData.weightProgress,
+        targetValue = journeyData.shapeProgress,
         label = "progress"
     )
+
+    val shapeLabel = journeyData.requiredShape.replaceFirstChar { it.uppercase() }
+    val remaining = (journeyData.estimatedDays - journeyData.daysElapsed).coerceAtLeast(0)
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -350,7 +353,7 @@ fun JourneyProgressCard(journeyData: JourneyData, onEdit: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Transformation Progress",
+                    "Shape Journey",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -363,53 +366,62 @@ fun JourneyProgressCard(journeyData: JourneyData, onEdit: () -> Unit) {
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Target shape badge
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(JourneyColor.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.FitnessCenter,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = JourneyColor
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    "Target: $shapeLabel",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = JourneyColor
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Progress bar with labels
+            // Progress bar with day labels
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
-                        "Start",
+                        "Day 1",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        "${profile.startingWeight} ${profile.weightUnit}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "Current",
+                        "Day ${journeyData.daysElapsed}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        "${profile.weight} ${profile.weightUnit}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        "Target",
+                        "Day ${journeyData.estimatedDays}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = JourneyColor
-                    )
-                    Text(
-                        "${profile.targetWeight} ${profile.weightUnit}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
                         color = JourneyColor
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             LinearProgressIndicator(
                 progress = { animatedProgress },
@@ -423,19 +435,39 @@ fun JourneyProgressCard(journeyData: JourneyData, onEdit: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                "${(journeyData.weightProgress * 100).toInt()}% complete",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-
-            if (journeyData.daysElapsed > 0) {
-                Spacer(modifier = Modifier.height(4.dp))
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    "Day ${journeyData.daysElapsed} of your journey",
-                    style = MaterialTheme.typography.labelSmall,
+                    "${journeyData.daysElapsed} days done",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "$remaining days left",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = JourneyColor
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Ideal vs Estimated comparison
+            if (journeyData.idealDays != journeyData.estimatedDays) {
+                Text(
+                    "Ideal: ${journeyData.idealDays} days  |  Your pace: ~${journeyData.estimatedDays} days",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    "Target: ${journeyData.idealDays} days",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
@@ -619,6 +651,20 @@ fun TimelineCard(journeyData: JourneyData) {
     val profile = journeyData.profile ?: return
     val weeklyPercent = (journeyData.weeklyAverage * 100).toInt()
 
+    val progressMeaning = when {
+        weeklyPercent >= 95 -> "Optimal growth"
+        weeklyPercent >= 85 -> "Very good"
+        weeklyPercent >= 75 -> "Moderate progress"
+        weeklyPercent > 0 -> "Slow progress"
+        else -> "No data yet"
+    }
+    val progressColor = when {
+        weeklyPercent >= 85 -> Color(0xFF2E7D32)
+        weeklyPercent >= 75 -> Color(0xFFF9A825)
+        weeklyPercent >= 60 -> JourneyColor
+        else -> Color(0xFFE53935)
+    }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(1.dp),
@@ -626,7 +672,7 @@ fun TimelineCard(journeyData: JourneyData) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                "Estimated Timeline",
+                "Progress Analysis",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -639,66 +685,33 @@ fun TimelineCard(journeyData: JourneyData) {
                 TimelineStat(
                     label = "Weekly Avg",
                     value = "$weeklyPercent%",
-                    subtitle = "efficiency",
-                    color = when {
-                        weeklyPercent >= 80 -> Color(0xFF2E7D32)
-                        weeklyPercent >= 60 -> Color(0xFFF9A825)
-                        else -> JourneyColor
-                    }
+                    subtitle = progressMeaning,
+                    color = progressColor
                 )
                 TimelineStat(
-                    label = "Est. Days",
-                    value = "${journeyData.estimatedDays}",
-                    subtitle = "to target",
-                    color = MaterialTheme.colorScheme.primary
-                )
-                TimelineStat(
-                    label = "Elapsed",
-                    value = "${journeyData.daysElapsed}",
+                    label = "Ideal",
+                    value = "${journeyData.idealDays}",
                     subtitle = "days",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = Color(0xFF2E7D32)
                 )
-            }
-
-            if (journeyData.daysElapsed > 0 && journeyData.estimatedDays > 0) {
-                Spacer(modifier = Modifier.height(16.dp))
-                val timeProgress = (journeyData.daysElapsed.toFloat() / journeyData.estimatedDays).coerceIn(0f, 1f)
-                val animatedTimeProgress by animateFloatAsState(targetValue = timeProgress, label = "time")
-
-                LinearProgressIndicator(
-                    progress = { animatedTimeProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    strokeCap = StrokeCap.Round
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-
-                val remaining = (journeyData.estimatedDays - journeyData.daysElapsed).coerceAtLeast(0)
-                Text(
-                    if (remaining > 0) "$remaining days remaining (estimated)"
-                    else "You've passed your estimated timeline!",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
+                TimelineStat(
+                    label = "Your Pace",
+                    value = "${journeyData.estimatedDays}",
+                    subtitle = "days",
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
             if (weeklyPercent > 0) {
-                Spacer(modifier = Modifier.height(12.dp))
-                val baseDays = when (profile.fitnessLevel) {
-                    "beginner" -> 90
-                    "intermediate" -> 120
-                    "advanced" -> 180
-                    else -> 90
-                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                val delay = journeyData.estimatedDays - journeyData.idealDays
                 Text(
-                    "Base time: $baseDays days (${profile.fitnessLevel}). " +
-                            "At $weeklyPercent% efficiency, adjusted to ~${journeyData.estimatedDays} days.",
+                    if (delay > 0) {
+                        "At $weeklyPercent% consistency, you need ~$delay extra days beyond the ideal ${journeyData.idealDays} days."
+                    } else {
+                        "You're on track! At $weeklyPercent% consistency, you'll hit your goal in ${journeyData.idealDays} days or sooner."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -735,57 +748,45 @@ fun TimelineStat(label: String, value: String, subtitle: String, color: Color) {
 fun JourneySetupDialog(
     currentProfile: com.example.gymworkout.data.UserProfile?,
     onDismiss: () -> Unit,
-    onSave: (targetWeight: Float, startingWeight: Float, fitnessLevel: String) -> Unit
+    onSave: (requiredShape: String, idealDays: Int) -> Unit
 ) {
-    var targetWeight by remember {
+    var requiredShape by remember {
         mutableStateOf(
-            if ((currentProfile?.targetWeight ?: 0f) > 0f) currentProfile?.targetWeight.toString() else ""
+            if ((currentProfile?.requiredShape ?: "").isNotEmpty()) currentProfile?.requiredShape ?: "lean"
+            else "lean"
         )
     }
-    var startingWeight by remember {
+    var idealDays by remember {
         mutableStateOf(
-            if ((currentProfile?.startingWeight ?: 0f) > 0f) currentProfile?.startingWeight.toString()
-            else if ((currentProfile?.weight ?: 0f) > 0f) currentProfile?.weight.toString()
-            else ""
+            if ((currentProfile?.idealDays ?: 90) > 0) currentProfile?.idealDays?.toString() ?: "90"
+            else "90"
         )
-    }
-    var fitnessLevel by remember {
-        mutableStateOf(currentProfile?.fitnessLevel ?: "beginner")
     }
     var expanded by remember { mutableStateOf(false) }
-    val levels = listOf("beginner", "intermediate", "advanced")
-    val weightUnit = currentProfile?.weightUnit ?: "kg"
+
+    data class ShapeOption(val key: String, val label: String, val description: String, val suggestedDays: Int)
+    val shapes = listOf(
+        ShapeOption("lean", "Lean", "Low body fat, toned muscles. Good for cutting.", 60),
+        ShapeOption("athletic", "Athletic", "Balanced muscle and definition. Fit look.", 90),
+        ShapeOption("muscular", "Muscular", "Noticeable muscle mass. Gym-built physique.", 120),
+        ShapeOption("bodybuilder", "Bodybuilder", "Maximum muscle size and definition.", 180)
+    )
+    val selectedShape = shapes.find { it.key == requiredShape } ?: shapes[0]
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Journey Setup") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = startingWeight,
-                    onValueChange = { startingWeight = it },
-                    label = { Text("Starting Weight ($weightUnit)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = targetWeight,
-                    onValueChange = { targetWeight = it },
-                    label = { Text("Target Weight ($weightUnit)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded }
                 ) {
                     OutlinedTextField(
-                        value = fitnessLevel.replaceFirstChar { it.uppercase() },
+                        value = selectedShape.label,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Fitness Level") },
+                        label = { Text("Required Shape") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -795,36 +796,53 @@ fun JourneySetupDialog(
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
                     ) {
-                        levels.forEach { level ->
+                        shapes.forEach { shape ->
                             DropdownMenuItem(
-                                text = { Text(level.replaceFirstChar { it.uppercase() }) },
+                                text = {
+                                    Column {
+                                        Text(shape.label, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            shape.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
                                 onClick = {
-                                    fitnessLevel = level
+                                    requiredShape = shape.key
+                                    idealDays = shape.suggestedDays.toString()
                                     expanded = false
                                 }
                             )
                         }
                     }
                 }
+
                 Text(
-                    when (fitnessLevel) {
-                        "beginner" -> "0-1 year training. ~1-1.5% bodyweight muscle gain/month. Base: 90 days."
-                        "intermediate" -> "1-3 years training. ~0.5-1% gain/month. Base: 120 days."
-                        "advanced" -> "3+ years training. ~0.25-0.5% gain/month. Base: 180 days."
-                        else -> ""
-                    },
+                    selectedShape.description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = idealDays,
+                    onValueChange = { idealDays = it },
+                    label = { Text("Ideal Days to Achieve") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {
+                        Text("Suggested: ${selectedShape.suggestedDays} days for ${selectedShape.label}")
+                    }
                 )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val tw = targetWeight.toFloatOrNull() ?: 0f
-                    val sw = startingWeight.toFloatOrNull() ?: 0f
-                    if (tw > 0f && sw > 0f) {
-                        onSave(tw, sw, fitnessLevel)
+                    val days = idealDays.toIntOrNull() ?: 90
+                    if (requiredShape.isNotEmpty() && days > 0) {
+                        onSave(requiredShape, days)
                     }
                 }
             ) {
