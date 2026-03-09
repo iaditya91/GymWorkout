@@ -103,14 +103,11 @@ fun FoodLogDialog(
     }
 
     if (showCustomForm) {
-        val qty = customQuantity.toFloatOrNull() ?: 0f
-        val baseAmount = if (customServingUnit == ServingUnit.PIECE) 1f else 100f
         val cal = customCalories.toFloatOrNull() ?: 0f
         val pro = customProtein.toFloatOrNull() ?: 0f
         val carb = customCarbs.toFloatOrNull() ?: 0f
         val fat = customFat.toFloatOrNull() ?: 0f
         val fib = customFiber.toFloatOrNull() ?: 0f
-        val multiplier = if (qty > 0) qty / baseAmount else 0f
 
         AlertDialog(
             onDismissRequest = { showCustomForm = false },
@@ -165,9 +162,9 @@ fun FoodLogDialog(
                         label = {
                             Text(
                                 when (customServingUnit) {
-                                    ServingUnit.PIECE -> "Quantity (pieces)"
-                                    ServingUnit.ML -> "Quantity (ml)"
-                                    ServingUnit.GRAMS -> "Quantity (grams)"
+                                    ServingUnit.PIECE -> "Default serving (pieces)"
+                                    ServingUnit.ML -> "Default serving (ml)"
+                                    ServingUnit.GRAMS -> "Default serving (grams)"
                                 }
                             )
                         },
@@ -382,113 +379,44 @@ fun FoodLogDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Preview
-                    if (qty > 0 && cal > 0) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                val displayQty = when (customServingUnit) {
-                                    ServingUnit.PIECE -> "${qty.toInt()} pc"
-                                    ServingUnit.ML -> "${qty.toInt()} ml"
-                                    ServingUnit.GRAMS -> "${qty.toInt()} g"
-                                }
-                                Text(
-                                    "Total for $displayQty",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                NutrientRow("Calories", cal * multiplier, "cal")
-                                NutrientRow("Protein", pro * multiplier, "g")
-                                NutrientRow("Carbs", carb * multiplier, "g")
-                                NutrientRow("Fat", fat * multiplier, "g")
-                                if (fib > 0) NutrientRow("Fiber", fib * multiplier, "g")
-                            }
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (customName.isNotBlank() && qty > 0 && cal > 0) {
-                            val vA = customVitA.toFloatOrNull() ?: 0f
-                            val vB1 = customVitB1.toFloatOrNull() ?: 0f
-                            val vB2 = customVitB2.toFloatOrNull() ?: 0f
-                            val vB3 = customVitB3.toFloatOrNull() ?: 0f
-                            val vB6 = customVitB6.toFloatOrNull() ?: 0f
-                            val vB12 = customVitB12.toFloatOrNull() ?: 0f
-                            val vC = customVitC.toFloatOrNull() ?: 0f
-                            val vD = customVitD.toFloatOrNull() ?: 0f
-                            val vE = customVitE.toFloatOrNull() ?: 0f
-                            val vK = customVitK.toFloatOrNull() ?: 0f
-                            val fol = customFolate.toFloatOrNull() ?: 0f
-                            val ir = customIron.toFloatOrNull() ?: 0f
-                            val ca = customCalcium.toFloatOrNull() ?: 0f
-
-                            // Save to custom foods DB
+                        if (customName.isNotBlank() && cal > 0) {
+                            val defaultQty = if (customServingUnit == ServingUnit.PIECE) 1f else 100f
                             onSaveCustomFood(
                                 CustomFoodItem(
                                     name = customName.trim(),
                                     servingUnit = customServingUnit.label,
-                                    defaultServing = qty,
+                                    defaultServing = customQuantity.toFloatOrNull() ?: defaultQty,
                                     caloriesPerBase = cal,
                                     proteinPerBase = pro,
                                     carbsPerBase = carb,
                                     fatPerBase = fat,
                                     fiberPerBase = fib,
-                                    vitAPerBase = vA,
-                                    vitB1PerBase = vB1,
-                                    vitB2PerBase = vB2,
-                                    vitB3PerBase = vB3,
-                                    vitB6PerBase = vB6,
-                                    vitB12PerBase = vB12,
-                                    vitCPerBase = vC,
-                                    vitDPerBase = vD,
-                                    vitEPerBase = vE,
-                                    vitKPerBase = vK,
-                                    folatePerBase = fol,
-                                    ironPerBase = ir,
-                                    calciumPerBase = ca
+                                    vitAPerBase = customVitA.toFloatOrNull() ?: 0f,
+                                    vitB1PerBase = customVitB1.toFloatOrNull() ?: 0f,
+                                    vitB2PerBase = customVitB2.toFloatOrNull() ?: 0f,
+                                    vitB3PerBase = customVitB3.toFloatOrNull() ?: 0f,
+                                    vitB6PerBase = customVitB6.toFloatOrNull() ?: 0f,
+                                    vitB12PerBase = customVitB12.toFloatOrNull() ?: 0f,
+                                    vitCPerBase = customVitC.toFloatOrNull() ?: 0f,
+                                    vitDPerBase = customVitD.toFloatOrNull() ?: 0f,
+                                    vitEPerBase = customVitE.toFloatOrNull() ?: 0f,
+                                    vitKPerBase = customVitK.toFloatOrNull() ?: 0f,
+                                    folatePerBase = customFolate.toFloatOrNull() ?: 0f,
+                                    ironPerBase = customIron.toFloatOrNull() ?: 0f,
+                                    calciumPerBase = customCalcium.toFloatOrNull() ?: 0f
                                 )
                             )
-
-                            // Also log it immediately
-                            val food = FoodItem(
-                                name = customName.trim(),
-                                category = "Custom",
-                                servingUnit = customServingUnit,
-                                defaultServing = qty,
-                                caloriesPerBase = cal,
-                                proteinPerBase = pro,
-                                carbsPerBase = carb,
-                                fatPerBase = fat,
-                                fiberPerBase = fib,
-                                vitAPerBase = vA,
-                                vitB1PerBase = vB1,
-                                vitB2PerBase = vB2,
-                                vitB3PerBase = vB3,
-                                vitB6PerBase = vB6,
-                                vitB12PerBase = vB12,
-                                vitCPerBase = vC,
-                                vitDPerBase = vD,
-                                vitEPerBase = vE,
-                                vitKPerBase = vK,
-                                folatePerBase = fol,
-                                ironPerBase = ir,
-                                calciumPerBase = ca
-                            )
-                            onLog(food, qty)
+                            showCustomForm = false
                         }
                     },
-                    enabled = customName.isNotBlank() && qty > 0 && cal > 0
-                ) { Text("Log") }
+                    enabled = customName.isNotBlank() && cal > 0
+                ) { Text("Save") }
             },
             dismissButton = {
                 TextButton(onClick = { showCustomForm = false }) { Text("Back") }

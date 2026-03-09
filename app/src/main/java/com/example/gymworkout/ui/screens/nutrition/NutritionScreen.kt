@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -56,7 +59,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,6 +97,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     var customReminderTarget by remember { mutableStateOf<NutritionTarget?>(null) }
     var deleteTargetCategory by remember { mutableStateOf<String?>(null) }
     var showFoodLogDialog by remember { mutableStateOf(false) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Nutrition, 1 = Habits
     val customFoodItems by viewModel.customFoods.collectAsState(initial = emptyList())
     val customFoodsAsFoodItems = remember(customFoodItems) { customFoodItems.map { it.toFoodItem() } }
     val allTargets by viewModel.getAllTargets().collectAsState(initial = emptyList())
@@ -195,64 +201,160 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                 }
             }
 
-            // Category cards (built-in) - only show if target exists in DB
+            // Tab switcher
+            item {
+                val tabOptions = listOf("Nutrition", "Habits")
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    tabOptions.forEachIndexed { index, label ->
+                        SegmentedButton(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = tabOptions.size
+                            )
+                        ) {
+                            Text(label)
+                        }
+                    }
+                }
+            }
+
             item { Spacer(modifier = Modifier.height(4.dp)) }
-            val activeBuiltIn = NutritionCategory.entries.filter { cat ->
-                allTargets.any { it.category == cat.name }
+
+            // Split custom objectives into nutrition vs habits
+            val customNutritionTargets = allTargets.filter {
+                it.isCustom && it.label.lowercase() in nutritionRelatedNames
             }
-            items(activeBuiltIn) { category ->
-                NutritionCategoryCard(
-                    category = category,
-                    date = selectedDate,
-                    viewModel = viewModel,
-                    onReminderClick = { reminderCategory = category },
-                    onDelete = { deleteTargetCategory = category.name }
-                )
+            val customHabitTargets = allTargets.filter {
+                it.isCustom && it.label.lowercase() !in nutritionRelatedNames
             }
 
-            // Custom objective cards
-            val customTargets = allTargets.filter { it.isCustom }
-            items(customTargets, key = { it.category }) { target ->
-                CustomCategoryCard(
-                    target = target,
-                    date = selectedDate,
-                    viewModel = viewModel,
-                    onReminderClick = { customReminderTarget = target },
-                    onDelete = { deleteTargetCategory = target.category }
-                )
-            }
+            // Collect all nutrition-related category keys for entry filtering
+            val nutritionCategoryNames = setOf(
+                NutritionCategory.CALORIES.name,
+                NutritionCategory.PROTEIN.name,
+                NutritionCategory.CARBS.name
+            ) + customNutritionTargets.map { it.category }.toSet()
 
-            // Food log section
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                FoodLogSection(
-                    date = selectedDate,
-                    viewModel = viewModel,
-                    onLogFood = { showFoodLogDialog = true }
-                )
-            }
+            if (selectedTab == 0) {
+                // === NUTRITION TAB ===
+                val nutritionCategories = listOf(
+                    NutritionCategory.CALORIES,
+                    NutritionCategory.PROTEIN,
+                    NutritionCategory.CARBS
+                ).filter { cat -> allTargets.any { it.category == cat.name } }
 
-            // Recent entries for today
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Today's Log",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            if (entries.isEmpty()) {
-                item {
-                    Text(
-                        "No entries yet. Tap + to log.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                items(nutritionCategories) { category ->
+                    NutritionCategoryCard(
+                        category = category,
+                        date = selectedDate,
+                        viewModel = viewModel,
+                        onReminderClick = { reminderCategory = category },
+                        onDelete = { deleteTargetCategory = category.name }
                     )
                 }
+
+                // Nutrition-related custom objectives (vitamins, minerals, etc.)
+                items(customNutritionTargets, key = { it.category }) { target ->
+                    CustomCategoryCard(
+                        target = target,
+                        date = selectedDate,
+                        viewModel = viewModel,
+                        onReminderClick = { customReminderTarget = target },
+                        onDelete = { deleteTargetCategory = target.category }
+                    )
+                }
+
+                // Food log section
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FoodLogSection(
+                        date = selectedDate,
+                        viewModel = viewModel,
+                        onLogFood = { showFoodLogDialog = true }
+                    )
+                }
+
+                // Recent entries for today (nutrition only)
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Today's Log",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                val nutritionEntries = entries.filter { it.category in nutritionCategoryNames }
+
+                if (nutritionEntries.isEmpty()) {
+                    item {
+                        Text(
+                            "No entries yet. Tap + to log.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    items(nutritionEntries, key = { it.id }) { entry ->
+                        EntryRow(entry = entry, onDelete = { viewModel.deleteEntry(entry) }, allTargets = allTargets)
+                    }
+                }
             } else {
-                items(entries, key = { it.id }) { entry ->
-                    EntryRow(entry = entry, onDelete = { viewModel.deleteEntry(entry) }, allTargets = allTargets)
+                // === HABITS TAB ===
+                val habitCategories = listOf(
+                    NutritionCategory.WATER,
+                    NutritionCategory.SLEEP
+                ).filter { cat -> allTargets.any { it.category == cat.name } }
+
+                items(habitCategories) { category ->
+                    NutritionCategoryCard(
+                        category = category,
+                        date = selectedDate,
+                        viewModel = viewModel,
+                        onReminderClick = { reminderCategory = category },
+                        onDelete = { deleteTargetCategory = category.name }
+                    )
+                }
+
+                // Non-nutrition custom objectives (habits only)
+                items(customHabitTargets, key = { it.category }) { target ->
+                    CustomCategoryCard(
+                        target = target,
+                        date = selectedDate,
+                        viewModel = viewModel,
+                        onReminderClick = { customReminderTarget = target },
+                        onDelete = { deleteTargetCategory = target.category }
+                    )
+                }
+
+                // Recent entries for today (habits only)
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Today's Log",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                val habitEntries = entries.filter { it.category !in nutritionCategoryNames }
+
+                if (habitEntries.isEmpty()) {
+                    item {
+                        Text(
+                            "No entries yet. Tap + to log.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    items(habitEntries, key = { it.id }) { entry ->
+                        EntryRow(entry = entry, onDelete = { viewModel.deleteEntry(entry) }, allTargets = allTargets)
+                    }
                 }
             }
 
@@ -1075,6 +1177,15 @@ private val objectivePresets = listOf(
     "Calcium" to "mg",
     "Water" to "L",
     "Sleep" to "hrs"
+)
+
+// Nutrition-related custom objective names (shown under Nutrition tab)
+private val nutritionRelatedNames = setOf(
+    "fat", "fiber",
+    "vitamin a", "vitamin b1", "vitamin b2", "vitamin b3",
+    "vitamin b6", "vitamin b12", "vitamin c", "vitamin d",
+    "vitamin e", "vitamin k",
+    "folate", "iron", "calcium"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
