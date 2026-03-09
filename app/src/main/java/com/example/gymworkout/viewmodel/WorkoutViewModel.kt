@@ -65,6 +65,14 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun reorderExercises(orderedExercises: List<Exercise>) {
+        viewModelScope.launch {
+            orderedExercises.forEachIndexed { index, exercise ->
+                dao.updateOrderIndex(exercise.id, index)
+            }
+        }
+    }
+
     fun resetDay(day: Int) {
         viewModelScope.launch {
             dao.resetDay(day)

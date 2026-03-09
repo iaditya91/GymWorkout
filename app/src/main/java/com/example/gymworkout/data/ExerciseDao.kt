@@ -47,6 +47,9 @@ interface ExerciseDao {
     @Query("UPDATE exercises SET supersetGroupId = '' WHERE id = :id")
     suspend fun clearSupersetGroupId(id: Int)
 
+    @Query("UPDATE exercises SET orderIndex = :orderIndex WHERE id = :id")
+    suspend fun updateOrderIndex(id: Int, orderIndex: Int)
+
     // Day headings
     @Query("SELECT * FROM day_headings WHERE dayOfWeek = :day")
     fun getDayHeading(day: Int): Flow<DayHeading?>

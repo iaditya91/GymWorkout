@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,8 +47,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,6 +60,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.zIndex
+import android.view.HapticFeedbackConstants
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +86,11 @@ import com.example.gymworkout.viewmodel.WorkoutViewModel
 sealed class ExerciseItem {
     data class Single(val exercise: Exercise, val displayIndex: Int) : ExerciseItem()
     data class Superset(val exercises: List<Exercise>, val displayIndex: Int) : ExerciseItem()
+
+    val stableKey: String get() = when (this) {
+        is Single -> "s_${exercise.id}"
+        is Superset -> "ss_${exercises.first().id}"
+    }
 }
 
 fun groupExercises(exercises: List<Exercise>): List<ExerciseItem> {
@@ -119,6 +136,23 @@ fun DayDetailScreen(
     var editingExercise by remember { mutableStateOf<Exercise?>(null) }
     var notesExercise by remember { mutableStateOf<Exercise?>(null) }
     var restTimerExercise by remember { mutableStateOf<Exercise?>(null) }
+
+    // Drag-and-drop state
+    val listState = rememberLazyListState()
+    val reorderableItems = remember { mutableStateListOf<ExerciseItem>() }
+    var draggedIndex by remember { mutableIntStateOf(-1) }
+    var draggedOffset by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val spacingPx = with(density) { 10.dp.toPx() }
+    val view = LocalView.current
+
+    // Sync items from DB when not dragging
+    LaunchedEffect(groupedItems, draggedIndex) {
+        if (draggedIndex < 0) {
+            reorderableItems.clear()
+            reorderableItems.addAll(groupedItems)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -210,48 +244,115 @@ fun DayDetailScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(groupedItems, key = { item ->
-                    when (item) {
-                        is ExerciseItem.Single -> "s_${item.exercise.id}"
-                        is ExerciseItem.Superset -> "ss_${item.exercises.first().id}"
-                    }
-                }) { item ->
-                    when (item) {
-                        is ExerciseItem.Single -> {
-                            ExerciseCard(
-                                index = item.displayIndex,
-                                exercise = item.exercise,
-                                onToggleCompleted = { viewModel.toggleCompleted(item.exercise.id, !item.exercise.isCompleted) },
-                                onPlayVideo = { onPlayVideo(item.exercise.name, item.exercise.youtubeUrl) },
-                                onExerciseClick = {
-                                    onViewExerciseDetail(item.exercise.name)
-                                },
-                                onEditNotes = { notesExercise = item.exercise },
-                                onEdit = { editingExercise = item.exercise },
-                                onDelete = { viewModel.deleteExercise(item.exercise) },
-                                onStartRest = { restTimerExercise = item.exercise }
-                            )
-                        }
-                        is ExerciseItem.Superset -> {
-                            SupersetCard(
-                                displayIndex = item.displayIndex,
-                                exercises = item.exercises,
-                                onToggleCompleted = { ex -> viewModel.toggleCompleted(ex.id, !ex.isCompleted) },
-                                onPlayVideo = { ex -> onPlayVideo(ex.name, ex.youtubeUrl) },
-                                onExerciseClick = { ex ->
-                                    onViewExerciseDetail(ex.name)
-                                },
-                                onEditNotes = { ex -> notesExercise = ex },
-                                onEdit = { ex -> editingExercise = ex },
-                                onDelete = { ex -> viewModel.deleteExercise(ex) },
-                                onStartRest = { ex -> restTimerExercise = ex }
-                            )
+                itemsIndexed(reorderableItems, key = { _, item -> item.stableKey }) { index, item ->
+                    val isDragged = index == draggedIndex
+
+                    Box(
+                        modifier = Modifier
+                            .zIndex(if (isDragged) 1f else 0f)
+                            .graphicsLayer {
+                                translationY = if (isDragged) draggedOffset else 0f
+                                scaleX = if (isDragged) 1.03f else 1f
+                                scaleY = if (isDragged) 1.03f else 1f
+                                alpha = if (isDragged) 0.92f else 1f
+                                shadowElevation = if (isDragged) 8f else 0f
+                                shape = RoundedCornerShape(16.dp)
+                                clip = isDragged
+                            }
+                            .then(if (!isDragged) Modifier.animateItem() else Modifier)
+                            .pointerInput(item.stableKey) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        val currentIdx = reorderableItems.indexOfFirst { it.stableKey == item.stableKey }
+                                        if (currentIdx >= 0) {
+                                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                            draggedIndex = currentIdx
+                                            draggedOffset = 0f
+                                        }
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        draggedOffset += dragAmount.y
+
+                                        val layoutInfo = listState.layoutInfo
+                                        val draggedItemInfo = layoutInfo.visibleItemsInfo
+                                            .find { it.index == draggedIndex }
+                                            ?: return@detectDragGesturesAfterLongPress
+                                        val draggedCenter = draggedItemInfo.offset + draggedItemInfo.size / 2 + draggedOffset.toInt()
+
+                                        // Check swap with item above
+                                        if (draggedIndex > 0) {
+                                            val above = layoutInfo.visibleItemsInfo.find { it.index == draggedIndex - 1 }
+                                            if (above != null && draggedCenter < above.offset + above.size / 2) {
+                                                reorderableItems.add(draggedIndex - 1, reorderableItems.removeAt(draggedIndex))
+                                                draggedOffset += above.size.toFloat() + spacingPx
+                                                draggedIndex--
+                                                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                                            }
+                                        }
+                                        // Check swap with item below
+                                        if (draggedIndex < reorderableItems.size - 1) {
+                                            val below = layoutInfo.visibleItemsInfo.find { it.index == draggedIndex + 1 }
+                                            if (below != null && draggedCenter > below.offset + below.size / 2) {
+                                                reorderableItems.add(draggedIndex + 1, reorderableItems.removeAt(draggedIndex))
+                                                draggedOffset -= below.size.toFloat() + spacingPx
+                                                draggedIndex++
+                                                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                                            }
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        val orderedExercises = reorderableItems.flatMap { reorderItem ->
+                                            when (reorderItem) {
+                                                is ExerciseItem.Single -> listOf(reorderItem.exercise)
+                                                is ExerciseItem.Superset -> reorderItem.exercises
+                                            }
+                                        }
+                                        viewModel.reorderExercises(orderedExercises)
+                                        draggedIndex = -1
+                                        draggedOffset = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggedIndex = -1
+                                        draggedOffset = 0f
+                                    }
+                                )
+                            }
+                    ) {
+                        when (item) {
+                            is ExerciseItem.Single -> {
+                                ExerciseCard(
+                                    index = item.displayIndex,
+                                    exercise = item.exercise,
+                                    onToggleCompleted = { viewModel.toggleCompleted(item.exercise.id, !item.exercise.isCompleted) },
+                                    onPlayVideo = { onPlayVideo(item.exercise.name, item.exercise.youtubeUrl) },
+                                    onExerciseClick = { onViewExerciseDetail(item.exercise.name) },
+                                    onEditNotes = { notesExercise = item.exercise },
+                                    onEdit = { editingExercise = item.exercise },
+                                    onDelete = { viewModel.deleteExercise(item.exercise) },
+                                    onStartRest = { restTimerExercise = item.exercise }
+                                )
+                            }
+                            is ExerciseItem.Superset -> {
+                                SupersetCard(
+                                    displayIndex = item.displayIndex,
+                                    exercises = item.exercises,
+                                    onToggleCompleted = { ex -> viewModel.toggleCompleted(ex.id, !ex.isCompleted) },
+                                    onPlayVideo = { ex -> onPlayVideo(ex.name, ex.youtubeUrl) },
+                                    onExerciseClick = { ex -> onViewExerciseDetail(ex.name) },
+                                    onEditNotes = { ex -> notesExercise = ex },
+                                    onEdit = { ex -> editingExercise = ex },
+                                    onDelete = { ex -> viewModel.deleteExercise(ex) },
+                                    onStartRest = { ex -> restTimerExercise = ex }
+                                )
+                            }
                         }
                     }
                 }
