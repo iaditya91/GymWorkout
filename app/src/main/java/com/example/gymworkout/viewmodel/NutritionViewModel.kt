@@ -213,8 +213,10 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
             // Auto-add to nutrition categories
             val calories = food.caloriesPerBase * m
             val protein = food.proteinPerBase * m
-            dao.insertEntry(NutritionEntry(date = date, category = NutritionCategory.CARBS.name, value = calories))
+            val carbs = food.carbsPerBase * m
+            dao.insertEntry(NutritionEntry(date = date, category = NutritionCategory.CALORIES.name, value = calories))
             dao.insertEntry(NutritionEntry(date = date, category = NutritionCategory.PROTEIN.name, value = protein))
+            dao.insertEntry(NutritionEntry(date = date, category = NutritionCategory.CARBS.name, value = carbs))
         }
     }
 
