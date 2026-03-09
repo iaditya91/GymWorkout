@@ -99,6 +99,12 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun updateNotes(category: String, notes: String) {
+        viewModelScope.launch {
+            dao.updateTargetNotes(category, notes)
+        }
+    }
+
     fun deleteObjective(category: String) {
         viewModelScope.launch {
             dao.deleteTarget(category)

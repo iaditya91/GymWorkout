@@ -27,5 +27,6 @@ data class NutritionTarget(
     val targetValue: Float = 0f,
     val label: String = "",    // Display name (e.g. "Water", "Creatine")
     val unit: String = "",     // Unit (e.g. "L", "g", "mg")
-    val isCustom: Boolean = false // true for user-added objectives
+    val isCustom: Boolean = false, // true for user-added objectives
+    val notes: String = ""     // User notes for this objective
 )

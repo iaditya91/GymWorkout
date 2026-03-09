@@ -45,6 +45,9 @@ interface NutritionDao {
     @Query("DELETE FROM nutrition_entries WHERE category = :category")
     suspend fun deleteEntriesForCategory(category: String)
 
+    @Query("UPDATE nutrition_targets SET notes = :notes WHERE category = :category")
+    suspend fun updateTargetNotes(category: String, notes: String)
+
     // For stats - check if date has any entries
     @Query("SELECT DISTINCT date FROM nutrition_entries ORDER BY date DESC")
     fun getAllEntryDates(): Flow<List<String>>

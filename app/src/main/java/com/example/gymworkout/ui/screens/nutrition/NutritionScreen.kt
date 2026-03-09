@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BedtimeOff
 import androidx.compose.material.icons.filled.Delete
@@ -460,10 +461,12 @@ fun NutritionCategoryCard(
     val reminders by viewModel.getRemindersForCategory(category.name).collectAsState(initial = emptyList())
     val hasActiveReminders = reminders.any { it.enabled }
     val targetVal = target?.targetValue ?: 0f
+    val currentNotes = target?.notes ?: ""
     val progress = if (targetVal > 0) (total / targetVal).coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
     val met = targetVal > 0 && total >= targetVal
     var showFoodSuggestions by remember { mutableStateOf(false) }
+    var showNotesDialog by remember { mutableStateOf(false) }
 
     val icon = getCategoryIcon(category)
     val color = getCategoryColor(category)
@@ -480,6 +483,18 @@ fun NutritionCategoryCard(
         )
     }
 
+    if (showNotesDialog) {
+        NotesDialog(
+            title = category.label,
+            currentNotes = currentNotes,
+            onDismiss = { showNotesDialog = false },
+            onSave = { notes ->
+                viewModel.updateNotes(category.name, notes)
+                showNotesDialog = false
+            }
+        )
+    }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -488,116 +503,143 @@ fun NutritionCategoryCard(
         ),
         border = if (met) BorderStroke(2.dp, color) else null
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            // Circular progress
-            Box(contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier.size(52.dp),
-                    color = if (met) color else color.copy(alpha = 0.7f),
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    strokeWidth = 5.dp,
-                    strokeCap = StrokeCap.Round
-                )
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = category.label,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Circular progress
+                Box(contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.size(52.dp),
+                        color = if (met) color else color.copy(alpha = 0.7f),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        strokeWidth = 5.dp,
+                        strokeCap = StrokeCap.Round
                     )
-                    if (met) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                "Target Met",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = color,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${formatValue(total)} / ${formatValue(targetVal)} ${category.unit}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = color,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    strokeCap = StrokeCap.Round
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column {
-                // Food suggestions icon (only for food-related categories)
-                if (hasFoodSuggestions) {
-                    IconButton(
-                        onClick = { showFoodSuggestions = true },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = "Food sources for ${category.label}",
-                            tint = color.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                // Reminder bell icon
-                IconButton(
-                    onClick = onReminderClick,
-                    modifier = Modifier.size(36.dp)
-                ) {
                     Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = "Set reminder for ${category.label}",
-                        tint = if (hasActiveReminders) color
-                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = color,
                         modifier = Modifier.size(22.dp)
                     )
                 }
-                // Delete icon
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete ${category.label}",
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
-                        modifier = Modifier.size(18.dp)
-                    )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Name + target met badge
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = category.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (met) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    "Target Met",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = color,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
+
+                // Action icons in horizontal row
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { showNotesDialog = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Note,
+                            contentDescription = "Notes for ${category.label}",
+                            tint = if (currentNotes.isNotBlank()) color
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    if (hasFoodSuggestions) {
+                        IconButton(
+                            onClick = { showFoodSuggestions = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Food sources for ${category.label}",
+                                tint = color.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onReminderClick,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = "Set reminder for ${category.label}",
+                            tint = if (hasActiveReminders) color
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete ${category.label}",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            // Progress info below
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${formatValue(total)} / ${formatValue(targetVal)} ${category.unit}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = color,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap = StrokeCap.Round
+            )
+
+            // Show notes preview if present
+            if (currentNotes.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = currentNotes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -833,11 +875,13 @@ fun CustomCategoryCard(
     val reminders by viewModel.getRemindersForCategory(target.category).collectAsState(initial = emptyList())
     val hasActiveReminders = reminders.any { it.enabled }
     val targetVal = target.targetValue
+    val currentNotes = target.notes
     val progress = if (targetVal > 0) (total / targetVal).coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
     val met = targetVal > 0 && total >= targetVal
     val color = Color(0xFF78909C) // neutral color for custom
     var showFoodSuggestions by remember { mutableStateOf(false) }
+    var showNotesDialog by remember { mutableStateOf(false) }
 
     val foodFieldKey = getCustomFoodFieldKey(target.label)
 
@@ -852,6 +896,18 @@ fun CustomCategoryCard(
         )
     }
 
+    if (showNotesDialog) {
+        NotesDialog(
+            title = target.label,
+            currentNotes = currentNotes,
+            onDismiss = { showNotesDialog = false },
+            onSave = { notes ->
+                viewModel.updateNotes(target.category, notes)
+                showNotesDialog = false
+            }
+        )
+    }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -860,113 +916,143 @@ fun CustomCategoryCard(
         ),
         border = if (met) BorderStroke(2.dp, color) else null
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            // Circular progress
-            Box(contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier.size(52.dp),
-                    color = if (met) color else color.copy(alpha = 0.7f),
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    strokeWidth = 5.dp,
-                    strokeCap = StrokeCap.Round
-                )
-                Text(
-                    target.label.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = color
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = target.label,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Circular progress
+                Box(contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.size(52.dp),
+                        color = if (met) color else color.copy(alpha = 0.7f),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        strokeWidth = 5.dp,
+                        strokeCap = StrokeCap.Round
                     )
-                    if (met) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                "Target Met",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = color,
-                                fontWeight = FontWeight.Bold
-                            )
+                    Text(
+                        target.label.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = color
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Name + target met badge
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = target.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (met) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    "Target Met",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = color,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${formatValue(total)} / ${formatValue(targetVal)} ${target.unit}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = color,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    strokeCap = StrokeCap.Round
-                )
-            }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column {
-                if (foodFieldKey != null) {
+                // Action icons in horizontal row
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = { showFoodSuggestions = true },
-                        modifier = Modifier.size(36.dp)
+                        onClick = { showNotesDialog = true },
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            Icons.Default.Info,
-                            contentDescription = "Food sources for ${target.label}",
-                            tint = color.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
+                            Icons.AutoMirrored.Filled.Note,
+                            contentDescription = "Notes for ${target.label}",
+                            tint = if (currentNotes.isNotBlank()) color
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    if (foodFieldKey != null) {
+                        IconButton(
+                            onClick = { showFoodSuggestions = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Food sources for ${target.label}",
+                                tint = color.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onReminderClick,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = "Set reminder for ${target.label}",
+                            tint = if (hasActiveReminders) color
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete ${target.label}",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
-                IconButton(
-                    onClick = onReminderClick,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = "Set reminder for ${target.label}",
-                        tint = if (hasActiveReminders) color
-                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete ${target.label}",
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            }
+
+            // Progress info below
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${formatValue(total)} / ${formatValue(targetVal)} ${target.unit}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = color,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap = StrokeCap.Round
+            )
+
+            // Show notes preview if present
+            if (currentNotes.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = currentNotes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -1154,6 +1240,39 @@ private fun NutrientSummaryChip(label: String, value: Float, unit: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Composable
+fun NotesDialog(
+    title: String,
+    currentNotes: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var notes by remember { mutableStateOf(currentNotes) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Notes - $title") },
+        text = {
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("Notes") },
+                placeholder = { Text("Add notes...") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp),
+                maxLines = 6
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(notes.trim()) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 private val objectivePresets = listOf(
