@@ -26,12 +26,15 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import android.net.Uri
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.Calendar
+import java.util.UUID
 
 sealed class SyncState {
     data object Idle : SyncState()
@@ -135,9 +138,28 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
     fun addPhotoUri(currentProfile: UserProfile?, uri: String) {
         viewModelScope.launch {
             val profile = currentProfile ?: UserProfile()
+            // Copy the photo to internal storage so it persists across app restarts and backup/restore
+            val internalPath = withContext(Dispatchers.IO) {
+                try {
+                    val context = getApplication<Application>()
+                    val photosDir = File(context.filesDir, "progress_photos")
+                    if (!photosDir.exists()) photosDir.mkdirs()
+                    val fileName = "photo_${UUID.randomUUID()}.jpg"
+                    val destFile = File(photosDir, fileName)
+                    context.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
+                        destFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    destFile.absolutePath
+                } catch (e: Exception) {
+                    null
+                }
+            } ?: return@launch
+
             val existing = if (profile.photoUris.isBlank()) emptyList()
             else profile.photoUris.split(",")
-            val updated = (existing + uri).joinToString(",")
+            val updated = (existing + internalPath).joinToString(",")
             dao.upsertProfile(profile.copy(photoUris = updated))
         }
     }
@@ -145,6 +167,13 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
     fun removePhotoUri(currentProfile: UserProfile?, uri: String) {
         viewModelScope.launch {
             val profile = currentProfile ?: return@launch
+            // Delete the file from internal storage
+            withContext(Dispatchers.IO) {
+                try {
+                    val file = File(uri)
+                    if (file.exists()) file.delete()
+                } catch (_: Exception) {}
+            }
             val updated = profile.photoUris.split(",")
                 .filter { it != uri }
                 .joinToString(",")

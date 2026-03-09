@@ -831,7 +831,7 @@ fun PhotosSection(
                     items(photos) { uri ->
                         Box {
                             AsyncImage(
-                                model = Uri.parse(uri), contentDescription = "Progress photo",
+                                model = java.io.File(uri), contentDescription = "Progress photo",
                                 modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)),
                                 contentScale = ContentScale.Crop
                             )

@@ -12,6 +12,11 @@ import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WorkoutReminder
 import com.example.gymworkout.data.MotivationalQuote
 
+data class BackupPhoto(
+    val fileName: String = "",
+    val base64Data: String = ""
+)
+
 data class BackupData(
     val version: Int = 1,
     val timestamp: Long = System.currentTimeMillis(),
@@ -29,5 +34,6 @@ data class BackupData(
     val customQuotes: List<MotivationalQuote> = emptyList(),
     val quoteEnabled: Boolean = false,
     val quoteSource: String = "APP",
-    val quoteTime: String = "08:00"
+    val quoteTime: String = "08:00",
+    val progressPhotos: List<BackupPhoto> = emptyList()
 )
