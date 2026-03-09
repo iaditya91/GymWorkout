@@ -72,6 +72,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import com.example.gymworkout.data.ExerciseInfo
 import com.example.gymworkout.data.ExerciseRepository
 import com.example.gymworkout.data.MuscleTarget
+import com.example.gymworkout.ui.components.MuscleBodyMapCard
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -193,6 +194,14 @@ fun ExerciseDetailScreen(
                 )
             } else {
                 QuickStatsRow(force = force, level = level, mechanic = mechanic)
+            }
+
+            // Muscle body map visualization
+            if (!isEditing) {
+                MuscleBodyMapCard(
+                    primaryMuscles = foundExercise?.primaryMuscles ?: primaryMuscleNames.map { MuscleTarget(target = it) },
+                    secondaryMuscles = foundExercise?.secondaryMuscles ?: secondaryMuscleNames.map { MuscleTarget(target = it) }
+                )
             }
 
             // Muscles
