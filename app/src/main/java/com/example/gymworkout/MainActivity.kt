@@ -44,7 +44,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.gymworkout.data.ExerciseRepository
 import com.example.gymworkout.ui.screens.DayDetailScreen
+import com.example.gymworkout.ui.screens.ExerciseDetailScreen
 import com.example.gymworkout.ui.screens.WeeklyPlanScreen
 import com.example.gymworkout.ui.screens.YouTubePlayerScreen
 import java.net.URLDecoder
@@ -86,6 +88,7 @@ class MainActivity : ComponentActivity() {
         NotificationHelper.createQuoteNotificationChannel(this)
         NotificationHelper.createAutoBackupNotificationChannel(this)
         requestNotificationPermission()
+        ExerciseRepository.load(this)
         QuotePreference.init(this)
         SyncPreference.init(this)
         setContent {
@@ -203,6 +206,10 @@ fun WorkoutApp() {
                         val encodedName = URLEncoder.encode(name, "UTF-8")
                         val encodedUrl = URLEncoder.encode(url, "UTF-8")
                         navController.navigate("youtube/$encodedName?url=$encodedUrl")
+                    },
+                    onViewExerciseDetail = { exerciseName ->
+                        val encodedName = URLEncoder.encode(exerciseName, "UTF-8")
+                        navController.navigate("exercise_detail/$encodedName")
                     }
                 )
             }
@@ -222,6 +229,18 @@ fun WorkoutApp() {
                 YouTubePlayerScreen(
                     exerciseName = name,
                     youtubeUrl = url,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = "exercise_detail/{exerciseName}",
+                arguments = listOf(navArgument("exerciseName") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val exerciseName = URLDecoder.decode(
+                    backStackEntry.arguments?.getString("exerciseName") ?: "", "UTF-8"
+                )
+                ExerciseDetailScreen(
+                    exerciseName = exerciseName,
                     onBack = { navController.popBackStack() }
                 )
             }

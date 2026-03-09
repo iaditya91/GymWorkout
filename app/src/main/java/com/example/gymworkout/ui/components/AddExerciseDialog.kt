@@ -1,19 +1,30 @@
 package com.example.gymworkout.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -25,10 +36,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.gymworkout.data.Exercise
+import com.example.gymworkout.data.ExerciseInfo
+import com.example.gymworkout.data.ExerciseRepository
 import java.util.UUID
 
 @Composable
@@ -39,7 +55,8 @@ fun AddExerciseDialog(
     onDismiss: () -> Unit,
     onSave: (Exercise) -> Unit,
     onSaveSuperset: (Exercise, Exercise) -> Unit = { _, _ -> },
-    onConvertToSuperset: (Exercise, Exercise) -> Unit = { _, _ -> }
+    onConvertToSuperset: (Exercise, Exercise) -> Unit = { _, _ -> },
+    onViewExerciseDetail: (String) -> Unit = {}
 ) {
     val isEditing = existingExercise != null
     val isAlreadyInSuperset = existingExercise?.supersetGroupId?.isNotBlank() == true
@@ -119,7 +136,8 @@ fun AddExerciseDialog(
                     sets = sets,
                     onSetsChange = { sets = it },
                     reps = reps,
-                    onRepsChange = { reps = it }
+                    onRepsChange = { reps = it },
+                    onViewExerciseDetail = onViewExerciseDetail
                 )
 
                 // Exercise 2 fields for superset
@@ -142,7 +160,8 @@ fun AddExerciseDialog(
                         sets = sets2,
                         onSetsChange = { sets2 = it },
                         reps = reps2,
-                        onRepsChange = { reps2 = it }
+                        onRepsChange = { reps2 = it },
+                        onViewExerciseDetail = onViewExerciseDetail
                     )
                 }
 
@@ -253,17 +272,94 @@ private fun ExerciseFields(
     sets: String,
     onSetsChange: (String) -> Unit,
     reps: String,
-    onRepsChange: (String) -> Unit
+    onRepsChange: (String) -> Unit,
+    onViewExerciseDetail: (String) -> Unit = {}
 ) {
-    OutlinedTextField(
-        value = name,
-        onValueChange = onNameChange,
-        label = { Text("Exercise Name") },
-        placeholder = { Text("e.g. Dumbbell Shoulder Press") },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-        modifier = Modifier.fillMaxWidth()
-    )
+    var suggestions by remember { mutableStateOf<List<ExerciseInfo>>(emptyList()) }
+    var showSuggestions by remember { mutableStateOf(false) }
+
+    Column {
+        OutlinedTextField(
+            value = name,
+            onValueChange = { newValue ->
+                onNameChange(newValue)
+                if (newValue.length >= 2) {
+                    suggestions = ExerciseRepository.search(newValue)
+                    showSuggestions = suggestions.isNotEmpty()
+                } else {
+                    showSuggestions = false
+                    suggestions = emptyList()
+                }
+            },
+            label = { Text("Exercise Name") },
+            placeholder = { Text("e.g. Dumbbell Shoulder Press") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Autocomplete suggestions dropdown
+        if (showSuggestions && suggestions.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp)
+                    .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            ) {
+                LazyColumn {
+                    items(suggestions) { exercise ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onNameChange(exercise.name)
+                                    showSuggestions = false
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    exercise.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    buildString {
+                                        append(exercise.category.replaceFirstChar { it.uppercase() })
+                                        exercise.equipment?.let { append(" · $it") }
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    showSuggestions = false
+                                    onViewExerciseDetail(exercise.name)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Info,
+                                    contentDescription = "View details",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     Spacer(modifier = Modifier.height(8.dp))
     OutlinedTextField(
         value = youtubeUrl,

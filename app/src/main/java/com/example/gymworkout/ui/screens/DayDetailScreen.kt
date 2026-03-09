@@ -108,7 +108,8 @@ fun DayDetailScreen(
     dayIndex: Int,
     viewModel: WorkoutViewModel,
     onBack: () -> Unit,
-    onPlayVideo: (exerciseName: String, youtubeUrl: String) -> Unit = { _, _ -> }
+    onPlayVideo: (exerciseName: String, youtubeUrl: String) -> Unit = { _, _ -> },
+    onViewExerciseDetail: (String) -> Unit = {}
 ) {
     val exercises by viewModel.getExercisesForDay(dayIndex).collectAsState(initial = emptyList())
     val groupedItems = remember(exercises) { groupExercises(exercises) }
@@ -228,6 +229,9 @@ fun DayDetailScreen(
                                 exercise = item.exercise,
                                 onToggleCompleted = { viewModel.toggleCompleted(item.exercise.id, !item.exercise.isCompleted) },
                                 onPlayVideo = { onPlayVideo(item.exercise.name, item.exercise.youtubeUrl) },
+                                onExerciseClick = {
+                                    onViewExerciseDetail(item.exercise.name)
+                                },
                                 onEditNotes = { notesExercise = item.exercise },
                                 onEdit = { editingExercise = item.exercise },
                                 onDelete = { viewModel.deleteExercise(item.exercise) },
@@ -240,6 +244,9 @@ fun DayDetailScreen(
                                 exercises = item.exercises,
                                 onToggleCompleted = { ex -> viewModel.toggleCompleted(ex.id, !ex.isCompleted) },
                                 onPlayVideo = { ex -> onPlayVideo(ex.name, ex.youtubeUrl) },
+                                onExerciseClick = { ex ->
+                                    onViewExerciseDetail(ex.name)
+                                },
                                 onEditNotes = { ex -> notesExercise = ex },
                                 onEdit = { ex -> editingExercise = ex },
                                 onDelete = { ex -> viewModel.deleteExercise(ex) },
@@ -266,6 +273,10 @@ fun DayDetailScreen(
                 viewModel.addExercise(ex1)
                 viewModel.addExercise(ex2)
                 showAddDialog = false
+            },
+            onViewExerciseDetail = { exerciseId ->
+                showAddDialog = false
+                onViewExerciseDetail(exerciseId)
             }
         )
     }
@@ -283,6 +294,10 @@ fun DayDetailScreen(
             onConvertToSuperset = { existing, newEx ->
                 viewModel.convertToSuperset(existing, newEx)
                 editingExercise = null
+            },
+            onViewExerciseDetail = { exerciseId ->
+                editingExercise = null
+                onViewExerciseDetail(exerciseId)
             }
         )
     }
@@ -360,6 +375,7 @@ fun SupersetCard(
     exercises: List<Exercise>,
     onToggleCompleted: (Exercise) -> Unit,
     onPlayVideo: (Exercise) -> Unit,
+    onExerciseClick: (Exercise) -> Unit,
     onEditNotes: (Exercise) -> Unit,
     onEdit: (Exercise) -> Unit,
     onDelete: (Exercise) -> Unit,
@@ -414,6 +430,7 @@ fun SupersetCard(
                     label = if (exercises.size > 1) "${('A' + idx)}" else null,
                     onToggleCompleted = { onToggleCompleted(exercise) },
                     onPlayVideo = { onPlayVideo(exercise) },
+                    onExerciseClick = { onExerciseClick(exercise) },
                     onEditNotes = { onEditNotes(exercise) },
                     onEdit = { onEdit(exercise) },
                     onDelete = { onDelete(exercise) }
@@ -469,6 +486,7 @@ fun SupersetExerciseRow(
     label: String?,
     onToggleCompleted: () -> Unit,
     onPlayVideo: () -> Unit,
+    onExerciseClick: () -> Unit,
     onEditNotes: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -509,7 +527,7 @@ fun SupersetExerciseRow(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onPlayVideo() }
+                    .clickable { onExerciseClick() }
             ) {
                 Text(
                     text = exercise.name,
@@ -529,7 +547,7 @@ fun SupersetExerciseRow(
                     modifier = Modifier.size(24.dp)
                 )
             }
-        }
+}
 
         // Badges
         Row(
@@ -599,6 +617,7 @@ fun ExerciseCard(
     exercise: Exercise,
     onToggleCompleted: () -> Unit,
     onPlayVideo: () -> Unit,
+    onExerciseClick: () -> Unit = {},
     onEditNotes: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -646,7 +665,7 @@ fun ExerciseCard(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable { onPlayVideo() }
+                        .clickable { onExerciseClick() }
                 ) {
                     Text(
                         text = exercise.name,
