@@ -30,6 +30,7 @@ data class JourneyData(
     val isSetup: Boolean = false,
     val todayScore: DailyScoreBreakdown = DailyScoreBreakdown(),
     val weeklyAverage: Float = 0f,
+    val overallAverage: Float = 0f, // average across all elapsed days
     val idealDays: Int = 90,
     val estimatedDays: Int = 90,
     val daysElapsed: Int = 0,
@@ -145,7 +146,7 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
             // Compute today's DMGS
             val todayScore = computeDailyScore(todayStr)
 
-            // Compute 7-day average
+            // Compute 7-day average (for display)
             var weekTotal = 0f
             var weekDays = 0
             for (i in 0 until 7) {
@@ -158,10 +159,29 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
             }
             val weeklyAvg = if (weekDays > 0) weekTotal / weekDays else 0f
 
+            // Compute overall average across ALL elapsed days since journey start
+            val daysElapsedForAvg = if (profile.journeyStartDate.isNotEmpty()) {
+                val startDate = LocalDate.parse(profile.journeyStartDate, formatter)
+                ChronoUnit.DAYS.between(startDate, today).toInt().coerceAtLeast(0)
+            } else 0
+
+            var overallTotal = 0f
+            var overallDays = 0
+            for (i in 0 until daysElapsedForAvg) {
+                val date = today.minusDays(i.toLong()).format(formatter)
+                val score = computeDailyScore(date)
+                if (score.dmgs > 0f) {
+                    overallTotal += score.dmgs
+                    overallDays++
+                }
+            }
+            val overallAvg = if (overallDays > 0) overallTotal / overallDays else 0f
+
             val idealDays = profile.idealDays
 
-            // Estimated Days = Ideal Days / Average Progress Score
-            val estimatedDays = if (weeklyAvg > 0f) (idealDays / weeklyAvg).toInt() else idealDays
+            // Estimated Days = Ideal Days / Overall Average Score (uses all past data)
+            val avgForEstimate = if (overallAvg > 0f) overallAvg else weeklyAvg
+            val estimatedDays = if (avgForEstimate > 0f) (idealDays / avgForEstimate).toInt() else idealDays
 
             // Days elapsed since journey start
             val daysElapsed = if (profile.journeyStartDate.isNotEmpty()) {
@@ -179,6 +199,7 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
                 isSetup = true,
                 todayScore = todayScore,
                 weeklyAverage = weeklyAvg,
+                overallAverage = if (overallAvg > 0f) overallAvg else weeklyAvg,
                 idealDays = idealDays,
                 estimatedDays = estimatedDays,
                 daysElapsed = daysElapsed,

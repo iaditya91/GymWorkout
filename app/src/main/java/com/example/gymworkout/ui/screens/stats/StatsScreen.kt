@@ -650,18 +650,19 @@ fun ScoreRow(
 fun TimelineCard(journeyData: JourneyData) {
     val profile = journeyData.profile ?: return
     val weeklyPercent = (journeyData.weeklyAverage * 100).toInt()
+    val overallPercent = (journeyData.overallAverage * 100).toInt()
 
     val progressMeaning = when {
-        weeklyPercent >= 95 -> "Optimal growth"
-        weeklyPercent >= 85 -> "Very good"
-        weeklyPercent >= 75 -> "Moderate progress"
-        weeklyPercent > 0 -> "Slow progress"
+        overallPercent >= 95 -> "Optimal growth"
+        overallPercent >= 85 -> "Very good"
+        overallPercent >= 75 -> "Moderate progress"
+        overallPercent > 0 -> "Slow progress"
         else -> "No data yet"
     }
     val progressColor = when {
-        weeklyPercent >= 85 -> Color(0xFF2E7D32)
-        weeklyPercent >= 75 -> Color(0xFFF9A825)
-        weeklyPercent >= 60 -> JourneyColor
+        overallPercent >= 85 -> Color(0xFF2E7D32)
+        overallPercent >= 75 -> Color(0xFFF9A825)
+        overallPercent >= 60 -> JourneyColor
         else -> Color(0xFFE53935)
     }
 
@@ -683,34 +684,39 @@ fun TimelineCard(journeyData: JourneyData) {
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 TimelineStat(
-                    label = "Weekly Avg",
+                    label = "This Week",
                     value = "$weeklyPercent%",
+                    subtitle = "avg score",
+                    color = when {
+                        weeklyPercent >= 85 -> Color(0xFF2E7D32)
+                        weeklyPercent >= 75 -> Color(0xFFF9A825)
+                        weeklyPercent >= 60 -> JourneyColor
+                        else -> Color(0xFFE53935)
+                    }
+                )
+                TimelineStat(
+                    label = "Overall",
+                    value = "$overallPercent%",
                     subtitle = progressMeaning,
                     color = progressColor
                 )
                 TimelineStat(
-                    label = "Ideal",
-                    value = "${journeyData.idealDays}",
-                    subtitle = "days",
-                    color = Color(0xFF2E7D32)
-                )
-                TimelineStat(
                     label = "Your Pace",
                     value = "${journeyData.estimatedDays}",
-                    subtitle = "days",
+                    subtitle = "of ${journeyData.idealDays} days",
                     color = MaterialTheme.colorScheme.primary
                 )
             }
 
-            if (weeklyPercent > 0) {
+            if (overallPercent > 0) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 val delay = journeyData.estimatedDays - journeyData.idealDays
                 Text(
                     if (delay > 0) {
-                        "At $weeklyPercent% consistency, you need ~$delay extra days beyond the ideal ${journeyData.idealDays} days."
+                        "Overall $overallPercent% consistency across ${journeyData.daysElapsed} days. ~$delay extra days needed beyond ideal ${journeyData.idealDays} days."
                     } else {
-                        "You're on track! At $weeklyPercent% consistency, you'll hit your goal in ${journeyData.idealDays} days or sooner."
+                        "Overall $overallPercent% consistency. On track to hit your goal in ${journeyData.idealDays} days or sooner!"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
