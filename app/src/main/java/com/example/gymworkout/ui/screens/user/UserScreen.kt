@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -266,6 +267,11 @@ fun UserScreen(viewModel: UserViewModel) {
                         onResetWeek = { viewModel.resetWeekChecklist() }
                     )
                 }
+            }
+
+            // Share with friends
+            item {
+                ShareWithFriendsCard(context = context)
             }
 
             // Feedback card
@@ -1963,6 +1969,81 @@ fun ChecklistResetCard(onResetDay: () -> Unit, onResetWeek: () -> Unit) {
                 TextButton(onClick = { showResetWeekConfirm = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+fun ShareWithFriendsCard(context: android.content.Context) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clickable {
+                shareApk(context)
+            },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Share,
+                contentDescription = "Share",
+                tint = Color(0xFF43A047),
+                modifier = Modifier.size(28.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Share with Friends",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Invite others by sharing the app",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                "›",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private fun shareApk(context: android.content.Context) {
+    try {
+        val appInfo = context.applicationInfo
+        val sourceApk = java.io.File(appInfo.sourceDir)
+
+        // Copy APK to cache directory for sharing
+        val shareDir = java.io.File(context.cacheDir, "apk_share")
+        shareDir.mkdirs()
+        val shareFile = java.io.File(shareDir, "GymWorkout.apk")
+        sourceApk.copyTo(shareFile, overwrite = true)
+
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            shareFile
+        )
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/vnd.android.package-archive"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, "Check out Gym Workout app! It helps you track workouts, nutrition, and more.")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share Gym Workout"))
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "Could not share app", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
 
