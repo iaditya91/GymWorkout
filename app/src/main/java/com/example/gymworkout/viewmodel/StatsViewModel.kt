@@ -4,16 +4,21 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gymworkout.data.DailyCheckIn
+import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 import kotlin.math.min
 
 data class DailyScoreBreakdown(
@@ -38,11 +43,21 @@ data class JourneyData(
     val shapeProgress: Float = 0f // 0-1 progress: daysElapsed / estimatedDays
 )
 
+// Nutrition-related custom objective names (must match NutritionScreen)
+private val nutritionRelatedNames = setOf(
+    "fat", "fiber",
+    "vitamin a", "vitamin b1", "vitamin b2", "vitamin b3",
+    "vitamin b6", "vitamin b12", "vitamin c", "vitamin d",
+    "vitamin e", "vitamin k",
+    "folate", "iron", "calcium"
+)
+
 class StatsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = WorkoutDatabase.getDatabase(application)
     private val checkInDao = db.dailyCheckInDao()
     private val nutritionDao = db.nutritionDao()
+    private val exerciseDao = db.exerciseDao()
     private val userDao = db.userDao()
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
@@ -51,6 +66,11 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _journeyData = MutableStateFlow(JourneyData())
     val journeyData: StateFlow<JourneyData> = _journeyData
+
+    init {
+        // Check if weekly workout reset is needed on app launch
+        checkWeeklyWorkoutReset()
+    }
 
     fun setMonth(yearMonth: YearMonth) {
         _selectedMonth.value = yearMonth
@@ -72,24 +92,89 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getCheckIn(date: String): Flow<DailyCheckIn?> = checkInDao.getCheckIn(date)
 
-    fun toggleWorkout(date: String, current: DailyCheckIn?) {
+    // ===== AUTOMATIC CHECK-IN =====
+
+    fun refreshTodayCheckIn() {
         viewModelScope.launch {
-            val existing = current ?: DailyCheckIn(date = date)
-            checkInDao.upsert(existing.copy(workoutDone = !existing.workoutDone))
+            val todayStr = todayString()
+            val today = LocalDate.now()
+            // dayOfWeek: Monday=1 ... Sunday=7, but Exercise uses 0=Mon ... 6=Sun
+            val dayIndex = today.dayOfWeek.value - 1
+
+            // 1. Workout: all exercises for today's day are completed
+            val totalExercises = exerciseDao.getExerciseCountForDaySync(dayIndex)
+            val completedExercises = exerciseDao.getCompletedCountForDaySync(dayIndex)
+            val workoutDone = totalExercises > 0 && completedExercises >= totalExercises
+
+            // 2. Nutrition: all nutrition targets met (CALORIES, PROTEIN, CARBS + nutrition-related custom)
+            val allTargets = nutritionDao.getAllTargetsSync()
+            val nutritionTargets = allTargets.filter { target ->
+                // Built-in nutrition categories
+                target.category in setOf(
+                    NutritionCategory.CALORIES.name,
+                    NutritionCategory.PROTEIN.name,
+                    NutritionCategory.CARBS.name
+                ) ||
+                // Custom nutrition-related objectives
+                (target.isCustom && target.label.lowercase() in nutritionRelatedNames)
+            }
+            val nutritionDone = nutritionTargets.isNotEmpty() && nutritionTargets.all { target ->
+                val actual = nutritionDao.getTotalForDateAndCategorySync(todayStr, target.category)
+                target.targetValue > 0f && actual >= target.targetValue
+            }
+
+            // 3. Sleep: sleep target met
+            val sleepTarget = nutritionDao.getTargetSync(NutritionCategory.SLEEP.name)
+            val actualSleep = nutritionDao.getTotalForDateAndCategorySync(todayStr, NutritionCategory.SLEEP.name)
+            val sleepDone = sleepTarget != null && sleepTarget.targetValue > 0f && actualSleep >= sleepTarget.targetValue
+
+            // 4. Habits: all habit targets met (WATER, SLEEP + custom non-nutrition objectives)
+            val habitTargets = allTargets.filter { target ->
+                target.category in setOf(
+                    NutritionCategory.WATER.name,
+                    NutritionCategory.SLEEP.name
+                ) ||
+                (target.isCustom && target.label.lowercase() !in nutritionRelatedNames)
+            }
+            val habitsDone = habitTargets.isNotEmpty() && habitTargets.all { target ->
+                val actual = nutritionDao.getTotalForDateAndCategorySync(todayStr, target.category)
+                target.targetValue > 0f && actual >= target.targetValue
+            }
+
+            checkInDao.upsert(
+                DailyCheckIn(
+                    date = todayStr,
+                    workoutDone = workoutDone,
+                    nutritionDone = nutritionDone,
+                    sleepDone = sleepDone,
+                    habitsDone = habitsDone
+                )
+            )
         }
     }
 
-    fun toggleNutrition(date: String, current: DailyCheckIn?) {
-        viewModelScope.launch {
-            val existing = current ?: DailyCheckIn(date = date)
-            checkInDao.upsert(existing.copy(nutritionDone = !existing.nutritionDone))
-        }
-    }
+    // ===== WEEKLY WORKOUT RESET =====
 
-    fun toggleSleep(date: String, current: DailyCheckIn?) {
+    private fun checkWeeklyWorkoutReset() {
         viewModelScope.launch {
-            val existing = current ?: DailyCheckIn(date = date)
-            checkInDao.upsert(existing.copy(sleepDone = !existing.sleepDone))
+            val prefs = getApplication<Application>().getSharedPreferences("workout_prefs", 0)
+            val lastResetStr = prefs.getString("last_weekly_reset", null)
+            val now = LocalDateTime.now()
+
+            // Find the most recent Sunday 23:59
+            val lastSunday = if (now.dayOfWeek == DayOfWeek.SUNDAY && now.toLocalTime() >= LocalTime.of(23, 59)) {
+                now.toLocalDate()
+            } else {
+                now.toLocalDate().with(TemporalAdjusters.previous(DayOfWeek.SUNDAY))
+            }
+            val lastSundayStr = lastSunday.format(formatter)
+
+            val needsReset = lastResetStr == null || lastResetStr < lastSundayStr
+
+            if (needsReset) {
+                exerciseDao.resetAllDays()
+                prefs.edit().putString("last_weekly_reset", lastSundayStr).apply()
+            }
         }
     }
 
@@ -109,6 +194,12 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
         val start = yearMonth.atDay(1).format(formatter)
         val end = yearMonth.atEndOfMonth().format(formatter)
         return checkInDao.getSleepDaysCount(start, end)
+    }
+
+    fun getHabitsDaysCount(yearMonth: YearMonth): Flow<Int> {
+        val start = yearMonth.atDay(1).format(formatter)
+        val end = yearMonth.atEndOfMonth().format(formatter)
+        return checkInDao.getHabitsDaysCount(start, end)
     }
 
     fun todayString(): String = LocalDate.now().format(formatter)
@@ -222,7 +313,7 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
         val sleepTarget = nutritionDao.getTargetSync("SLEEP")?.targetValue ?: 7f
         val waterTarget = nutritionDao.getTargetSync("WATER")?.targetValue ?: 3f
 
-        // Get workout status
+        // Get workout status from check-in
         val checkIn = checkInDao.getCheckInSync(date)
         val workoutDone = checkIn?.workoutDone ?: false
 

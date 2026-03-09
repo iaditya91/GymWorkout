@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.BedtimeOff
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Egg
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -37,8 +38,6 @@ import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -94,6 +93,7 @@ import java.util.Locale
 val WorkoutColor = Color(0xFF6C9FFF)
 val NutritionColor = Color(0xFF66BB6A)
 val SleepColor = Color(0xFFAB47BC)
+val HabitsColor = Color(0xFFFFB74D)
 val JourneyColor = Color(0xFFFF7043)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,6 +101,11 @@ val JourneyColor = Color(0xFFFF7043)
 fun StatsScreen(viewModel: StatsViewModel) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf("Overview", "Journey")
+
+    // Auto-refresh today's check-in whenever the screen is displayed
+    LaunchedEffect(Unit) {
+        viewModel.refreshTodayCheckIn()
+    }
 
     Scaffold(
         topBar = {
@@ -171,6 +176,7 @@ fun OverviewTab(viewModel: StatsViewModel) {
     val workoutDays by viewModel.getWorkoutDaysCount(selectedMonth).collectAsState(initial = 0)
     val nutritionDays by viewModel.getNutritionDaysCount(selectedMonth).collectAsState(initial = 0)
     val sleepDays by viewModel.getSleepDaysCount(selectedMonth).collectAsState(initial = 0)
+    val habitsDays by viewModel.getHabitsDaysCount(selectedMonth).collectAsState(initial = 0)
     val daysInMonth = selectedMonth.lengthOfMonth()
 
     LazyColumn(
@@ -181,15 +187,9 @@ fun OverviewTab(viewModel: StatsViewModel) {
     ) {
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
-        // Today's check-in
+        // Today's check-in (automatic, non-interactive)
         item {
-            TodayCheckInCard(
-                todayStr = todayStr,
-                checkIn = todayCheckIn,
-                onToggleWorkout = { viewModel.toggleWorkout(todayStr, todayCheckIn) },
-                onToggleNutrition = { viewModel.toggleNutrition(todayStr, todayCheckIn) },
-                onToggleSleep = { viewModel.toggleSleep(todayStr, todayCheckIn) }
-            )
+            TodayCheckInCard(checkIn = todayCheckIn)
         }
 
         // Monthly summary bars
@@ -198,6 +198,7 @@ fun OverviewTab(viewModel: StatsViewModel) {
                 workoutDays = workoutDays,
                 nutritionDays = nutritionDays,
                 sleepDays = sleepDays,
+                habitsDays = habitsDays,
                 totalDays = daysInMonth,
                 monthLabel = selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
             )
@@ -215,7 +216,7 @@ fun OverviewTab(viewModel: StatsViewModel) {
 
         // Streak info
         item {
-            StreakCard(checkIns = checkIns, viewModel = viewModel)
+            StreakCard(checkIns = checkIns)
         }
 
         item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -283,6 +284,8 @@ fun JourneyTab(viewModel: StatsViewModel) {
         item { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }
+
+// ============ Journey Components ============
 
 @Composable
 fun JourneySetupCard(onSetup: () -> Unit) {
@@ -867,11 +870,7 @@ fun JourneySetupDialog(
 
 @Composable
 fun TodayCheckInCard(
-    todayStr: String,
-    checkIn: DailyCheckIn?,
-    onToggleWorkout: () -> Unit,
-    onToggleNutrition: () -> Unit,
-    onToggleSleep: () -> Unit
+    checkIn: DailyCheckIn?
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -884,6 +883,12 @@ fun TodayCheckInCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Auto-tracked from your activity",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -893,22 +898,25 @@ fun TodayCheckInCard(
                     icon = Icons.Default.FitnessCenter,
                     label = "Workout",
                     checked = checkIn?.workoutDone ?: false,
-                    color = WorkoutColor,
-                    onToggle = onToggleWorkout
+                    color = WorkoutColor
                 )
                 CheckInItem(
                     icon = Icons.Default.Restaurant,
                     label = "Nutrition",
                     checked = checkIn?.nutritionDone ?: false,
-                    color = NutritionColor,
-                    onToggle = onToggleNutrition
+                    color = NutritionColor
                 )
                 CheckInItem(
                     icon = Icons.Default.BedtimeOff,
                     label = "Sleep",
                     checked = checkIn?.sleepDone ?: false,
-                    color = SleepColor,
-                    onToggle = onToggleSleep
+                    color = SleepColor
+                )
+                CheckInItem(
+                    icon = Icons.Default.Checklist,
+                    label = "Habits",
+                    checked = checkIn?.habitsDone ?: false,
+                    color = HabitsColor
                 )
             }
         }
@@ -920,16 +928,14 @@ fun CheckInItem(
     icon: ImageVector,
     label: String,
     checked: Boolean,
-    color: Color,
-    onToggle: () -> Unit
+    color: Color
 ) {
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onToggle)
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(52.dp)
                 .clip(CircleShape)
                 .background(
                     if (checked) color.copy(alpha = 0.2f)
@@ -941,16 +947,19 @@ fun CheckInItem(
                 icon,
                 contentDescription = label,
                 tint = if (checked) color else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(26.dp)
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
-        Checkbox(
-            checked = checked,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(checkedColor = color),
-            modifier = Modifier.size(24.dp)
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(
+                    if (checked) color else MaterialTheme.colorScheme.surfaceVariant
+                )
         )
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
@@ -964,6 +973,7 @@ fun MonthlyBarChart(
     workoutDays: Int,
     nutritionDays: Int,
     sleepDays: Int,
+    habitsDays: Int,
     totalDays: Int,
     monthLabel: String
 ) {
@@ -985,16 +995,16 @@ fun MonthlyBarChart(
                     .height(140.dp)
             ) {
                 val maxHeight = size.height - 30f
-                val barCount = 3
-                // Match SpaceEvenly: centers at width/(barCount+1), 2*width/(barCount+1), ...
+                val barCount = 4
                 val spacing = size.width / (barCount + 1)
-                val actualBarWidth = spacing * 0.6f
+                val actualBarWidth = spacing * 0.55f
 
                 data class BarData(val label: String, val value: Int, val color: Color)
                 val bars = listOf(
                     BarData("Workout", workoutDays, WorkoutColor),
                     BarData("Nutrition", nutritionDays, NutritionColor),
-                    BarData("Sleep", sleepDays, SleepColor)
+                    BarData("Sleep", sleepDays, SleepColor),
+                    BarData("Habits", habitsDays, HabitsColor)
                 )
 
                 bars.forEachIndexed { i, bar ->
@@ -1027,6 +1037,7 @@ fun MonthlyBarChart(
                 StatLabel("Workout", "$workoutDays/$totalDays", WorkoutColor)
                 StatLabel("Nutrition", "$nutritionDays/$totalDays", NutritionColor)
                 StatLabel("Sleep", "$sleepDays/$totalDays", SleepColor)
+                StatLabel("Habits", "$habitsDays/$totalDays", HabitsColor)
             }
         }
     }
@@ -1043,7 +1054,7 @@ fun StatLabel(label: String, value: String, color: Color) {
                     .background(color)
             )
             Spacer(modifier = Modifier.width(4.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall)
+            Text(label, style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
         }
         Text(
             value,
@@ -1146,10 +1157,12 @@ fun CalendarCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 LegendDot(WorkoutColor, "Workout")
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 LegendDot(NutritionColor, "Nutrition")
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 LegendDot(SleepColor, "Sleep")
+                Spacer(modifier = Modifier.width(8.dp))
+                LegendDot(HabitsColor, "Habits")
             }
         }
     }
@@ -1165,7 +1178,8 @@ fun CalendarDayCell(
     val workout = checkIn?.workoutDone ?: false
     val nutrition = checkIn?.nutritionDone ?: false
     val sleep = checkIn?.sleepDone ?: false
-    val allDone = workout && nutrition && sleep
+    val habits = checkIn?.habitsDone ?: false
+    val allDone = workout && nutrition && sleep && habits
 
     Box(
         modifier = modifier
@@ -1175,7 +1189,7 @@ fun CalendarDayCell(
             .background(
                 when {
                     allDone -> Color(0xFF2E7D32).copy(alpha = 0.25f)
-                    workout || nutrition || sleep -> MaterialTheme.colorScheme.surfaceVariant
+                    workout || nutrition || sleep || habits -> MaterialTheme.colorScheme.surfaceVariant
                     else -> Color.Transparent
                 }
             )
@@ -1199,11 +1213,11 @@ fun CalendarDayCell(
                 fontSize = 11.sp
             )
             // Color dots
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
                 if (workout) {
                     Box(
                         modifier = Modifier
-                            .size(5.dp)
+                            .size(4.dp)
                             .clip(CircleShape)
                             .background(WorkoutColor)
                     )
@@ -1211,7 +1225,7 @@ fun CalendarDayCell(
                 if (nutrition) {
                     Box(
                         modifier = Modifier
-                            .size(5.dp)
+                            .size(4.dp)
                             .clip(CircleShape)
                             .background(NutritionColor)
                     )
@@ -1219,9 +1233,17 @@ fun CalendarDayCell(
                 if (sleep) {
                     Box(
                         modifier = Modifier
-                            .size(5.dp)
+                            .size(4.dp)
                             .clip(CircleShape)
                             .background(SleepColor)
+                    )
+                }
+                if (habits) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(HabitsColor)
                     )
                 }
             }
@@ -1239,13 +1261,13 @@ fun LegendDot(color: Color, label: String) {
                 .background(color)
         )
         Spacer(modifier = Modifier.width(4.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall)
+        Text(label, style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
     }
 }
 
 @Composable
-fun StreakCard(checkIns: List<DailyCheckIn>, viewModel: StatsViewModel) {
-    // Calculate current streak (consecutive days with all 3 done)
+fun StreakCard(checkIns: List<DailyCheckIn>) {
+    // Calculate current streak (consecutive days with all 4 done)
     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     val today = LocalDate.now()
     var streak = 0
@@ -1255,7 +1277,7 @@ fun StreakCard(checkIns: List<DailyCheckIn>, viewModel: StatsViewModel) {
     while (true) {
         val dateStr = date.format(formatter)
         val ci = checkInMap[dateStr]
-        if (ci != null && ci.workoutDone && ci.nutritionDone && ci.sleepDone) {
+        if (ci != null && ci.workoutDone && ci.nutritionDone && ci.sleepDone && ci.habitsDone) {
             streak++
             date = date.minusDays(1)
         } else {
@@ -1287,8 +1309,8 @@ fun StreakCard(checkIns: List<DailyCheckIn>, viewModel: StatsViewModel) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    if (streak > 0) "Keep it going! All 3 targets for $streak day${if (streak > 1) "s" else ""} straight."
-                    else "Complete all 3 check-ins today to start your streak!",
+                    if (streak > 0) "Keep it going! All 4 targets for $streak day${if (streak > 1) "s" else ""} straight."
+                    else "Complete all 4 check-ins today to start your streak!",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

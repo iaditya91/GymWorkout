@@ -20,6 +20,12 @@ interface ExerciseDao {
     @Query("SELECT COUNT(*) FROM exercises WHERE dayOfWeek = :day AND isCompleted = 1")
     fun getCompletedCountForDay(day: Int): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM exercises WHERE dayOfWeek = :day")
+    suspend fun getExerciseCountForDaySync(day: Int): Int
+
+    @Query("SELECT COUNT(*) FROM exercises WHERE dayOfWeek = :day AND isCompleted = 1")
+    suspend fun getCompletedCountForDaySync(day: Int): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(exercise: Exercise)
 

@@ -23,6 +23,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -1260,6 +1261,7 @@ fun NotesDialog(
                 onValueChange = { notes = it },
                 label = { Text("Notes") },
                 placeholder = { Text("Add notes...") },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(150.dp),
@@ -1375,6 +1377,7 @@ fun AddObjectiveDialog(
                         onValueChange = { selectedName = it },
                         label = { Text("Custom Name") },
                         placeholder = { Text("e.g. Creatine") },
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )

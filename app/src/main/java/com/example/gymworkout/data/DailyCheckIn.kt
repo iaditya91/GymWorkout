@@ -9,5 +9,6 @@ data class DailyCheckIn(
     val date: String = "", // yyyy-MM-dd
     val workoutDone: Boolean = false,
     val nutritionDone: Boolean = false,
-    val sleepDone: Boolean = false
+    val sleepDone: Boolean = false,
+    val habitsDone: Boolean = false
 )

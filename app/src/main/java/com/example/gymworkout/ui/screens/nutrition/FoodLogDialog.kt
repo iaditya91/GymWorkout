@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.gymworkout.data.CustomFoodItem
@@ -120,6 +121,7 @@ fun FoodLogDialog(
                         label = { Text("Food Name") },
                         placeholder = { Text("e.g. Protein Bar") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -524,6 +526,7 @@ fun FoodLogDialog(
                         placeholder = { Text("Search food...") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier.fillMaxWidth()
                     )
 

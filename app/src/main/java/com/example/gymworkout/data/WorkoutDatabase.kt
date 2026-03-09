@@ -60,6 +60,12 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
     }
 }
 
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE daily_checkins ADD COLUMN habitsDone INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [
         Exercise::class,
@@ -75,7 +81,7 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
         MotivationalQuote::class,
         CustomFoodItem::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -97,7 +103,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     WorkoutDatabase::class.java,
                     "workout_database"
                 )
-                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
