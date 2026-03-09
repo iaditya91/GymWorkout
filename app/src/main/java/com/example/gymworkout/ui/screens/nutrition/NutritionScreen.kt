@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BedtimeOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Egg
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Notifications
@@ -68,6 +69,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.gymworkout.data.FoodDatabase
+import com.example.gymworkout.data.FoodItem
 import com.example.gymworkout.data.FoodLogEntry
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.NutritionEntry
@@ -352,9 +355,22 @@ fun NutritionCategoryCard(
     val progress = if (targetVal > 0) (total / targetVal).coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
     val met = targetVal > 0 && total >= targetVal
+    var showFoodSuggestions by remember { mutableStateOf(false) }
 
     val icon = getCategoryIcon(category)
     val color = getCategoryColor(category)
+
+    val hasFoodSuggestions = category in listOf(
+        NutritionCategory.PROTEIN, NutritionCategory.CALORIES, NutritionCategory.CARBS
+    )
+
+    if (showFoodSuggestions) {
+        FoodSuggestionsDialog(
+            category = category,
+            targetValue = targetVal,
+            onDismiss = { showFoodSuggestions = false }
+        )
+    }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -435,6 +451,20 @@ fun NutritionCategoryCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             Column {
+                // Food suggestions icon (only for food-related categories)
+                if (hasFoodSuggestions) {
+                    IconButton(
+                        onClick = { showFoodSuggestions = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = "Food sources for ${category.label}",
+                            tint = color.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
                 // Reminder bell icon
                 IconButton(
                     onClick = onReminderClick,
@@ -1197,6 +1227,121 @@ fun SetTargetsDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun FoodSuggestionsDialog(
+    category: NutritionCategory,
+    targetValue: Float,
+    onDismiss: () -> Unit
+) {
+    val color = getCategoryColor(category)
+
+    // Get nutrient value per base amount for each food, and sort descending
+    data class FoodNutrient(val food: FoodItem, val valuePer100: Float)
+
+    val sortedFoods = remember(category) {
+        FoodDatabase.foods.map { food ->
+            val baseAmount = food.baseAmount
+            val rawValue = when (category) {
+                NutritionCategory.PROTEIN -> food.proteinPerBase
+                NutritionCategory.CALORIES -> food.caloriesPerBase
+                NutritionCategory.CARBS -> food.carbsPerBase
+                else -> 0f
+            }
+            // Normalize to per-100g/ml for display; pieces stay as per-piece
+            val valuePer100 = if (food.servingUnit == com.example.gymworkout.data.ServingUnit.PIECE) {
+                rawValue // per piece
+            } else {
+                rawValue // already per 100g/ml
+            }
+            FoodNutrient(food, valuePer100)
+        }
+            .filter { it.valuePer100 > 0f }
+            .sortedByDescending { it.valuePer100 }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    getCategoryIcon(category),
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Top ${category.label} Foods",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.height(400.dp)
+            ) {
+                items(sortedFoods) { item ->
+                    val unit = category.unit
+                    val perLabel = if (item.food.servingUnit == com.example.gymworkout.data.ServingUnit.PIECE) {
+                        "per piece"
+                    } else {
+                        "per 100${item.food.servingUnit.label}"
+                    }
+                    val dvPercent = if (targetValue > 0f) {
+                        ((item.valuePer100 / targetValue) * 100).toInt()
+                    } else 0
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                item.food.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                "${formatValue(item.valuePer100)}$unit $perLabel",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (dvPercent > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color.copy(alpha = 0.15f),
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    "${dvPercent}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = color
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
         }
     )
 }
