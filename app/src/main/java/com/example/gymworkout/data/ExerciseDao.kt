@@ -50,6 +50,9 @@ interface ExerciseDao {
     @Query("UPDATE exercises SET orderIndex = :orderIndex WHERE id = :id")
     suspend fun updateOrderIndex(id: Int, orderIndex: Int)
 
+    @Query("UPDATE exercises SET orderIndex = orderIndex + 1 WHERE dayOfWeek = :day AND orderIndex >= :fromIndex")
+    suspend fun shiftOrderIndicesUp(day: Int, fromIndex: Int)
+
     // Day headings
     @Query("SELECT * FROM day_headings WHERE dayOfWeek = :day")
     fun getDayHeading(day: Int): Flow<DayHeading?>

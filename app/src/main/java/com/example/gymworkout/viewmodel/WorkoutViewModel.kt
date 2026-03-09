@@ -48,8 +48,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun convertToSuperset(existingExercise: Exercise, newExercise: Exercise) {
         viewModelScope.launch {
             val groupId = java.util.UUID.randomUUID().toString()
+            // Shift exercises at and after the insertion point to make room
+            dao.shiftOrderIndicesUp(existingExercise.dayOfWeek, existingExercise.orderIndex + 1)
             dao.update(existingExercise.copy(supersetGroupId = groupId))
-            dao.insert(newExercise.copy(supersetGroupId = groupId))
+            dao.insert(newExercise.copy(supersetGroupId = groupId, orderIndex = existingExercise.orderIndex + 1))
         }
     }
 
