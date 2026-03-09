@@ -92,4 +92,23 @@ interface NutritionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllFoodLog(items: List<FoodLogEntry>)
+
+    // Custom foods
+    @Query("SELECT * FROM custom_foods ORDER BY name ASC")
+    fun getAllCustomFoods(): Flow<List<CustomFoodItem>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCustomFood(item: CustomFoodItem)
+
+    @Delete
+    suspend fun deleteCustomFood(item: CustomFoodItem)
+
+    @Query("SELECT * FROM custom_foods")
+    suspend fun getAllCustomFoodsSync(): List<CustomFoodItem>
+
+    @Query("DELETE FROM custom_foods")
+    suspend fun deleteAllCustomFoods()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllCustomFoods(items: List<CustomFoodItem>)
 }

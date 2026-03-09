@@ -3,6 +3,7 @@ package com.example.gymworkout.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.gymworkout.data.CustomFoodItem
 import com.example.gymworkout.data.FoodItem
 import com.example.gymworkout.data.FoodLogEntry
 import com.example.gymworkout.data.NutritionCategory
@@ -223,6 +224,22 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
     fun deleteFoodLog(entry: FoodLogEntry) {
         viewModelScope.launch {
             dao.deleteFoodLog(entry)
+        }
+    }
+
+    // --- Custom food methods ---
+
+    val customFoods: Flow<List<CustomFoodItem>> = dao.getAllCustomFoods()
+
+    fun saveCustomFood(item: CustomFoodItem) {
+        viewModelScope.launch {
+            dao.insertCustomFood(item)
+        }
+    }
+
+    fun deleteCustomFood(item: CustomFoodItem) {
+        viewModelScope.launch {
+            dao.deleteCustomFood(item)
         }
     }
 }

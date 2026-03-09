@@ -92,6 +92,8 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     var customReminderTarget by remember { mutableStateOf<NutritionTarget?>(null) }
     var deleteTargetCategory by remember { mutableStateOf<String?>(null) }
     var showFoodLogDialog by remember { mutableStateOf(false) }
+    val customFoodItems by viewModel.customFoods.collectAsState(initial = emptyList())
+    val customFoodsAsFoodItems = remember(customFoodItems) { customFoodItems.map { it.toFoodItem() } }
     val allTargets by viewModel.getAllTargets().collectAsState(initial = emptyList())
     val displayFormatter = DateTimeFormatter.ofPattern("EEE, MMM d")
     val today = viewModel.todayString()
@@ -330,10 +332,14 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
 
     if (showFoodLogDialog) {
         FoodLogDialog(
+            customFoods = customFoodsAsFoodItems,
             onDismiss = { showFoodLogDialog = false },
             onLog = { food, qty ->
                 viewModel.logFood(selectedDate, food, qty)
                 showFoodLogDialog = false
+            },
+            onSaveCustomFood = { customFood ->
+                viewModel.saveCustomFood(customFood)
             }
         )
     }

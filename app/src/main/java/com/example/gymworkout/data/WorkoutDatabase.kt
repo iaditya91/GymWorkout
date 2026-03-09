@@ -23,6 +23,37 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
     }
 }
 
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS custom_foods (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL DEFAULT '',
+                servingUnit TEXT NOT NULL DEFAULT 'g',
+                defaultServing REAL NOT NULL DEFAULT 100,
+                caloriesPerBase REAL NOT NULL DEFAULT 0,
+                proteinPerBase REAL NOT NULL DEFAULT 0,
+                carbsPerBase REAL NOT NULL DEFAULT 0,
+                fatPerBase REAL NOT NULL DEFAULT 0,
+                fiberPerBase REAL NOT NULL DEFAULT 0,
+                vitAPerBase REAL NOT NULL DEFAULT 0,
+                vitB1PerBase REAL NOT NULL DEFAULT 0,
+                vitB2PerBase REAL NOT NULL DEFAULT 0,
+                vitB3PerBase REAL NOT NULL DEFAULT 0,
+                vitB6PerBase REAL NOT NULL DEFAULT 0,
+                vitB12PerBase REAL NOT NULL DEFAULT 0,
+                vitCPerBase REAL NOT NULL DEFAULT 0,
+                vitDPerBase REAL NOT NULL DEFAULT 0,
+                vitEPerBase REAL NOT NULL DEFAULT 0,
+                vitKPerBase REAL NOT NULL DEFAULT 0,
+                folatePerBase REAL NOT NULL DEFAULT 0,
+                ironPerBase REAL NOT NULL DEFAULT 0,
+                calciumPerBase REAL NOT NULL DEFAULT 0
+            )
+        """.trimIndent())
+    }
+}
+
 @Database(
     entities = [
         Exercise::class,
@@ -35,9 +66,10 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
         DayHeading::class,
         WorkoutReminder::class,
         FoodLogEntry::class,
-        MotivationalQuote::class
+        MotivationalQuote::class,
+        CustomFoodItem::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -59,7 +91,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     WorkoutDatabase::class.java,
                     "workout_database"
                 )
-                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14)
+                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

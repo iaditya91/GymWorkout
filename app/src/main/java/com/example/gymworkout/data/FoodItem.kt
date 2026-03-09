@@ -39,6 +39,58 @@ data class FoodItem(
     val baseAmount: Float get() = if (servingUnit == ServingUnit.PIECE) 1f else 100f
 }
 
+@Entity(tableName = "custom_foods")
+data class CustomFoodItem(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    val name: String = "",
+    val servingUnit: String = "g",
+    val defaultServing: Float = 100f,
+    val caloriesPerBase: Float = 0f,
+    val proteinPerBase: Float = 0f,
+    val carbsPerBase: Float = 0f,
+    val fatPerBase: Float = 0f,
+    val fiberPerBase: Float = 0f,
+    val vitAPerBase: Float = 0f,
+    val vitB1PerBase: Float = 0f,
+    val vitB2PerBase: Float = 0f,
+    val vitB3PerBase: Float = 0f,
+    val vitB6PerBase: Float = 0f,
+    val vitB12PerBase: Float = 0f,
+    val vitCPerBase: Float = 0f,
+    val vitDPerBase: Float = 0f,
+    val vitEPerBase: Float = 0f,
+    val vitKPerBase: Float = 0f,
+    val folatePerBase: Float = 0f,
+    val ironPerBase: Float = 0f,
+    val calciumPerBase: Float = 0f
+) {
+    fun toFoodItem(): FoodItem = FoodItem(
+        name = name,
+        category = "Custom",
+        servingUnit = ServingUnit.entries.first { it.label == servingUnit },
+        defaultServing = defaultServing,
+        caloriesPerBase = caloriesPerBase,
+        proteinPerBase = proteinPerBase,
+        carbsPerBase = carbsPerBase,
+        fatPerBase = fatPerBase,
+        fiberPerBase = fiberPerBase,
+        vitAPerBase = vitAPerBase,
+        vitB1PerBase = vitB1PerBase,
+        vitB2PerBase = vitB2PerBase,
+        vitB3PerBase = vitB3PerBase,
+        vitB6PerBase = vitB6PerBase,
+        vitB12PerBase = vitB12PerBase,
+        vitCPerBase = vitCPerBase,
+        vitDPerBase = vitDPerBase,
+        vitEPerBase = vitEPerBase,
+        vitKPerBase = vitKPerBase,
+        folatePerBase = folatePerBase,
+        ironPerBase = ironPerBase,
+        calciumPerBase = calciumPerBase
+    )
+}
+
 @Entity(tableName = "food_log")
 data class FoodLogEntry(
     @PrimaryKey(autoGenerate = true)

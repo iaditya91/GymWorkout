@@ -54,7 +54,8 @@ class BackupManager(
             quoteEnabled = QuotePreference.getEnabled(context),
             quoteSource = QuotePreference.getSource(context),
             quoteTime = QuotePreference.getTime(context),
-            progressPhotos = photos
+            progressPhotos = photos,
+            customFoods = nutritionDao.getAllCustomFoodsSync()
         )
     }
 
@@ -65,6 +66,7 @@ class BackupManager(
         nutritionDao.deleteAllEntries()
         nutritionDao.deleteAllTargets()
         nutritionDao.deleteAllFoodLog()
+        nutritionDao.deleteAllCustomFoods()
         checkInDao.deleteAll()
         userDao.deleteAllProfiles()
         userDao.deleteAllChecklistItems()
@@ -115,6 +117,7 @@ class BackupManager(
         if (data.workoutReminders.isNotEmpty()) userDao.upsertAllWorkoutReminders(data.workoutReminders)
         if (data.foodLogEntries.isNotEmpty()) nutritionDao.insertAllFoodLog(data.foodLogEntries)
         if (data.customQuotes.isNotEmpty()) userDao.insertAllCustomQuotes(data.customQuotes)
+        if (data.customFoods.isNotEmpty()) nutritionDao.insertAllCustomFoods(data.customFoods)
 
         // Restore theme preference
         ThemePreference.setDarkMode(context, data.themePreference)
