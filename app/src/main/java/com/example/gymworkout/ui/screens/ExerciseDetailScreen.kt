@@ -67,14 +67,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.SwapHoriz
 import com.example.gymworkout.data.ExerciseInfo
 import com.example.gymworkout.data.ExerciseRepository
+import com.example.gymworkout.data.MuscleTarget
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ExerciseDetailScreen(
     exerciseName: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToExercise: (String) -> Unit = {}
 ) {
     val foundExercise = remember { ExerciseRepository.findByName(exerciseName) }
     val isCustom = foundExercise == null
@@ -86,11 +90,15 @@ fun ExerciseDetailScreen(
     var mechanic by remember { mutableStateOf(foundExercise?.mechanic ?: "") }
     var equipment by remember { mutableStateOf(foundExercise?.equipment ?: "") }
     var category by remember { mutableStateOf(foundExercise?.category ?: "") }
-    val primaryMuscles = remember {
-        mutableStateListOf<String>().apply { addAll(foundExercise?.primaryMuscles ?: emptyList()) }
+    val primaryMuscleNames = remember {
+        mutableStateListOf<String>().apply {
+            addAll(foundExercise?.primaryMuscles?.map { it.target } ?: emptyList())
+        }
     }
-    val secondaryMuscles = remember {
-        mutableStateListOf<String>().apply { addAll(foundExercise?.secondaryMuscles ?: emptyList()) }
+    val secondaryMuscleNames = remember {
+        mutableStateListOf<String>().apply {
+            addAll(foundExercise?.secondaryMuscles?.map { it.target } ?: emptyList())
+        }
     }
     val instructions = remember {
         mutableStateListOf<String>().apply { addAll(foundExercise?.instructions ?: emptyList()) }
@@ -138,8 +146,14 @@ fun ExerciseDetailScreen(
                             level = level,
                             mechanic = mechanic.ifBlank { null },
                             equipment = equipment.ifBlank { null },
-                            primaryMuscles = primaryMuscles.toList(),
-                            secondaryMuscles = secondaryMuscles.toList(),
+                            primaryMuscles = primaryMuscleNames.map { name ->
+                                foundExercise?.primaryMuscles?.find { it.target == name }
+                                    ?: MuscleTarget(target = name)
+                            },
+                            secondaryMuscles = secondaryMuscleNames.map { name ->
+                                foundExercise?.secondaryMuscles?.find { it.target == name }
+                                    ?: MuscleTarget(target = name)
+                            },
                             instructions = instructions.toList(),
                             category = category,
                             images = foundExercise?.images ?: emptyList(),
@@ -183,13 +197,15 @@ fun ExerciseDetailScreen(
 
             // Muscles
             MusclesCard(
-                primaryMuscles = primaryMuscles,
-                secondaryMuscles = secondaryMuscles,
+                primaryMuscles = foundExercise?.primaryMuscles ?: primaryMuscleNames.map { MuscleTarget(target = it) },
+                secondaryMuscles = foundExercise?.secondaryMuscles ?: secondaryMuscleNames.map { MuscleTarget(target = it) },
                 isEditable = isEditing,
-                onAddPrimary = { primaryMuscles.add(it) },
-                onRemovePrimary = { primaryMuscles.removeAt(it) },
-                onAddSecondary = { secondaryMuscles.add(it) },
-                onRemoveSecondary = { secondaryMuscles.removeAt(it) }
+                editablePrimaryNames = primaryMuscleNames,
+                editableSecondaryNames = secondaryMuscleNames,
+                onAddPrimary = { primaryMuscleNames.add(it) },
+                onRemovePrimary = { primaryMuscleNames.removeAt(it) },
+                onAddSecondary = { secondaryMuscleNames.add(it) },
+                onRemoveSecondary = { secondaryMuscleNames.removeAt(it) }
             )
 
             // Instructions
@@ -218,6 +234,14 @@ fun ExerciseDetailScreen(
                     level = level,
                     mechanic = mechanic,
                     id = exerciseId
+                )
+            }
+
+            // Replacement exercises
+            if (!isEditing && (foundExercise?.replacementExercises?.isNotEmpty() == true)) {
+                ReplacementExercisesCard(
+                    replacements = foundExercise.replacementExercises,
+                    onExerciseClick = onNavigateToExercise
                 )
             }
 
@@ -416,9 +440,11 @@ private fun EditableStatChip(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MusclesCard(
-    primaryMuscles: List<String>,
-    secondaryMuscles: List<String>,
+    primaryMuscles: List<MuscleTarget>,
+    secondaryMuscles: List<MuscleTarget>,
     isEditable: Boolean,
+    editablePrimaryNames: List<String>,
+    editableSecondaryNames: List<String>,
     onAddPrimary: (String) -> Unit,
     onRemovePrimary: (Int) -> Unit,
     onAddSecondary: (String) -> Unit,
@@ -445,60 +471,100 @@ private fun MusclesCard(
             // Primary muscles
             Text("Primary", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(6.dp))
-            if (primaryMuscles.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    primaryMuscles.forEachIndexed { index, muscle ->
-                        MuscleChip(
-                            muscle = muscle.replaceFirstChar { it.uppercase() },
-                            isPrimary = true,
-                            isEditable = isEditable,
-                            onRemove = { onRemovePrimary(index) }
-                        )
+            if (isEditable) {
+                if (editablePrimaryNames.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        editablePrimaryNames.forEachIndexed { index, muscle ->
+                            MuscleChip(
+                                muscle = muscle.replaceFirstChar { it.uppercase() },
+                                isPrimary = true,
+                                isEditable = true,
+                                onRemove = { onRemovePrimary(index) }
+                            )
+                        }
                     }
                 }
-            } else if (!isEditable) {
-                Text("None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (isEditable) {
                 Spacer(modifier = Modifier.height(6.dp))
                 MuscleDropdown(
                     placeholder = "Add primary muscle",
-                    existingMuscles = primaryMuscles + secondaryMuscles,
+                    existingMuscles = editablePrimaryNames + editableSecondaryNames,
                     onAdd = onAddPrimary
                 )
+            } else {
+                if (primaryMuscles.isNotEmpty()) {
+                    primaryMuscles.forEach { mt ->
+                        MuscleWithSubTargets(muscleTarget = mt, isPrimary = true)
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                } else {
+                    Text("None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
 
             // Secondary muscles
             Spacer(modifier = Modifier.height(12.dp))
             Text("Secondary", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
             Spacer(modifier = Modifier.height(6.dp))
-            if (secondaryMuscles.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    secondaryMuscles.forEachIndexed { index, muscle ->
-                        MuscleChip(
-                            muscle = muscle.replaceFirstChar { it.uppercase() },
-                            isPrimary = false,
-                            isEditable = isEditable,
-                            onRemove = { onRemoveSecondary(index) }
-                        )
+            if (isEditable) {
+                if (editableSecondaryNames.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        editableSecondaryNames.forEachIndexed { index, muscle ->
+                            MuscleChip(
+                                muscle = muscle.replaceFirstChar { it.uppercase() },
+                                isPrimary = false,
+                                isEditable = true,
+                                onRemove = { onRemoveSecondary(index) }
+                            )
+                        }
                     }
                 }
-            } else if (!isEditable) {
-                Text("None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (isEditable) {
                 Spacer(modifier = Modifier.height(6.dp))
                 MuscleDropdown(
                     placeholder = "Add secondary muscle",
-                    existingMuscles = primaryMuscles + secondaryMuscles,
+                    existingMuscles = editablePrimaryNames + editableSecondaryNames,
                     onAdd = onAddSecondary
                 )
+            } else {
+                if (secondaryMuscles.isNotEmpty()) {
+                    secondaryMuscles.forEach { mt ->
+                        MuscleWithSubTargets(muscleTarget = mt, isPrimary = false)
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                } else {
+                    Text("None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MuscleWithSubTargets(muscleTarget: MuscleTarget, isPrimary: Boolean) {
+    Column {
+        MuscleChip(
+            muscle = muscleTarget.target.replaceFirstChar { it.uppercase() },
+            isPrimary = isPrimary
+        )
+        if (muscleTarget.subTargets.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
+                muscleTarget.subTargets.forEach { sub ->
+                    SubTargetChip(
+                        label = sub.replaceFirstChar { it.uppercase() },
+                        isPrimary = isPrimary
+                    )
+                }
             }
         }
     }
@@ -894,6 +960,87 @@ private fun EditableMetaRow(
                         expanded = false
                     }
                 )
+            }
+        }
+    }
+}
+
+// ─── Sub-Target Chip ─────────────────────────────────────────────────
+
+@Composable
+private fun SubTargetChip(label: String, isPrimary: Boolean) {
+    val borderColor = if (isPrimary)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+    else
+        MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)
+    val textColor = if (isPrimary)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+    else
+        MaterialTheme.colorScheme.secondary.copy(alpha = 0.75f)
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = textColor
+        )
+    }
+}
+
+// ─── Replacement Exercises Card ──────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReplacementExercisesCard(
+    replacements: List<com.example.gymworkout.data.ReplacementExercise>,
+    onExerciseClick: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.SwapHoriz,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Replacement Exercises",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                replacements.forEach { replacement ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                            .clickable { onExerciseClick(replacement.name) }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            replacement.name,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
             }
         }
     }

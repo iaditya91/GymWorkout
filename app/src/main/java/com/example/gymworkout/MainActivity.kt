@@ -241,7 +241,11 @@ fun WorkoutApp() {
                 )
                 ExerciseDetailScreen(
                     exerciseName = exerciseName,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onNavigateToExercise = { targetName ->
+                        val encoded = URLEncoder.encode(targetName, "UTF-8")
+                        navController.navigate("exercise_detail/$encoded")
+                    }
                 )
             }
             composable("nutrition") {
