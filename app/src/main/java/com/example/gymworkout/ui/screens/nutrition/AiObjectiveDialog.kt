@@ -77,6 +77,7 @@ data class ObjectiveSelection(
     var selected: Boolean = true,
     var editedTarget: Float = objective.target,
     var editedName: String = objective.name,
+    var editedUnit: String = objective.unit,
     var alreadyExists: Boolean = false
 )
 
@@ -363,6 +364,9 @@ fun AiObjectiveDialog(
                                 },
                                 onNameChange = { newName ->
                                     generatedObjectives[globalIndex] = item.copy(editedName = newName)
+                                },
+                                onUnitChange = { newUnit ->
+                                    generatedObjectives[globalIndex] = item.copy(editedUnit = newUnit)
                                 }
                             )
                         }
@@ -400,6 +404,9 @@ fun AiObjectiveDialog(
                                 },
                                 onNameChange = { newName ->
                                     generatedObjectives[globalIndex] = item.copy(editedName = newName)
+                                },
+                                onUnitChange = { newUnit ->
+                                    generatedObjectives[globalIndex] = item.copy(editedUnit = newUnit)
                                 }
                             )
                         }
@@ -501,7 +508,8 @@ private fun ObjectiveCard(
     item: ObjectiveSelection,
     onToggle: () -> Unit,
     onTargetChange: (Float) -> Unit,
-    onNameChange: (String) -> Unit
+    onNameChange: (String) -> Unit,
+    onUnitChange: (String) -> Unit
 ) {
     val obj = item.objective
     var isEditingTarget by remember { mutableStateOf(false) }
@@ -513,6 +521,7 @@ private fun ObjectiveCard(
             }
         )
     }
+    var editUnitText by remember(item.editedUnit) { mutableStateOf(item.editedUnit) }
     var editNameText by remember(item.editedName) { mutableStateOf(item.editedName) }
     val focusManager = LocalFocusManager.current
 
@@ -628,7 +637,7 @@ private fun ObjectiveCard(
                 OutlinedTextField(
                     value = editText,
                     onValueChange = { editText = it },
-                    modifier = Modifier.width(80.dp),
+                    modifier = Modifier.width(72.dp),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Decimal,
                         imeAction = ImeAction.Done
@@ -636,14 +645,37 @@ private fun ObjectiveCard(
                     keyboardActions = KeyboardActions(
                         onDone = {
                             editText.toFloatOrNull()?.let { onTargetChange(it) }
+                            val trimmedUnit = editUnitText.trim()
+                            if (trimmedUnit.isNotBlank() && trimmedUnit != obj.unit) onUnitChange(trimmedUnit)
                             isEditingTarget = false
+                            focusManager.clearFocus()
                         }
                     ),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(obj.unit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!obj.isBuiltIn) {
+                    OutlinedTextField(
+                        value = editUnitText,
+                        onValueChange = { editUnitText = it },
+                        modifier = Modifier.width(56.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                editText.toFloatOrNull()?.let { onTargetChange(it) }
+                                val trimmedUnit = editUnitText.trim()
+                                if (trimmedUnit.isNotBlank()) onUnitChange(trimmedUnit)
+                                isEditingTarget = false
+                                focusManager.clearFocus()
+                            }
+                        ),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall
+                    )
+                } else {
+                    Text(item.editedUnit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             } else {
                 Text(
                     text = formatTarget(item.editedTarget),
@@ -652,7 +684,7 @@ private fun ObjectiveCard(
                     color = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(obj.unit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha))
+                Text(item.editedUnit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha))
                 if (!alreadyExists) {
                     Spacer(modifier = Modifier.width(4.dp))
                     IconButton(onClick = { isEditingTarget = true }, modifier = Modifier.size(28.dp)) {

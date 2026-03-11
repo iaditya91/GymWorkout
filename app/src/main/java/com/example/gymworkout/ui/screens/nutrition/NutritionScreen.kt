@@ -4,6 +4,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BedtimeOff
 import androidx.compose.material.icons.filled.Delete
@@ -360,7 +363,8 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                         date = selectedDate,
                         viewModel = viewModel,
                         onReminderClick = { customReminderTarget = target },
-                        onDelete = { deleteTargetCategory = target.category }
+                        onDelete = { deleteTargetCategory = target.category },
+                        isHabit = true
                     )
                 }
 
@@ -466,7 +470,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                     } else {
                         viewModel.addCustomObjective(
                             sel.editedName,
-                            sel.objective.unit,
+                            sel.editedUnit,
                             sel.editedTarget
                         )
                     }
@@ -889,7 +893,7 @@ fun AddNutritionDialog(
             }
         },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text("Category", style = MaterialTheme.typography.labelMedium)
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -1038,7 +1042,8 @@ fun CustomCategoryCard(
     date: String,
     viewModel: NutritionViewModel,
     onReminderClick: () -> Unit = {},
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    isHabit: Boolean = false
 ) {
     val context = LocalContext.current
     val total by viewModel.getTotalForCategory(date, target.category).collectAsState(initial = 0f)
@@ -1200,6 +1205,24 @@ fun CustomCategoryCard(
                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(18.dp)
                         )
+                    }
+                    if (isHabit) {
+                        IconButton(
+                            onClick = {
+                                if (!met) {
+                                    viewModel.addEntryByKey(date, target.category, target.targetValue)
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = "Mark ${target.label} as done",
+                                tint = if (met) color
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                     if (foodFieldKey != null) {
                         IconButton(
