@@ -85,7 +85,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1119,9 +1122,9 @@ fun CustomCategoryCard(
         EditCustomObjectiveDialog(
             target = target,
             onDismiss = { showEditDialog = false },
-            onSave = { label, timerSecs, notifyOn ->
+            onSave = { label, unit, timerSecs, notifyOn ->
                 viewModel.updateCustomObjective(
-                    target.category, label, timerSecs, notifyOn
+                    target.category, label, unit, timerSecs, notifyOn
                 )
                 timerRemaining = timerSecs.toLong()
                 showEditDialog = false
@@ -1166,31 +1169,26 @@ fun CustomCategoryCard(
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                // Name + target met badge
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = target.label,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                // Name + target met badge (inline)
+                Text(
+                    text = buildAnnotatedString {
+                        append(target.label)
                         if (met) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    "Target Met",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = color,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            append("  ")
+                            withStyle(SpanStyle(
+                                color = color,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = MaterialTheme.typography.labelSmall.fontSize,
+                                background = color.copy(alpha = 0.2f)
+                            )) {
+                                append(" Target Met ")
                             }
                         }
-                    }
-                }
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
 
                 // Action icons in horizontal row
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1902,9 +1900,10 @@ private fun formatTimerDisplay(seconds: Long): String {
 fun EditCustomObjectiveDialog(
     target: NutritionTarget,
     onDismiss: () -> Unit,
-    onSave: (label: String, timerSeconds: Int, notifyEnabled: Boolean) -> Unit
+    onSave: (label: String, unit: String, timerSeconds: Int, notifyEnabled: Boolean) -> Unit
 ) {
     var label by remember { mutableStateOf(target.label) }
+    var unit by remember { mutableStateOf(target.unit) }
     var timerMinutes by remember { mutableStateOf(
         if (target.timerSeconds > 0) (target.timerSeconds / 60).toString() else ""
     ) }
@@ -1924,6 +1923,15 @@ fun EditCustomObjectiveDialog(
                     label = { Text("Name") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = unit,
+                    onValueChange = { unit = it },
+                    label = { Text("Unit") },
+                    placeholder = { Text("e.g. min, hrs, steps, days") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -1985,7 +1993,7 @@ fun EditCustomObjectiveDialog(
                         val mins = timerMinutes.toIntOrNull() ?: 0
                         val secs = timerSecs.toIntOrNull() ?: 0
                         val totalSeconds = (mins * 60) + secs
-                        onSave(label.trim(), totalSeconds, notifyEnabled)
+                        onSave(label.trim(), unit.trim().ifBlank { "days" }, totalSeconds, notifyEnabled)
                     }
                 }
             ) { Text("Save") }

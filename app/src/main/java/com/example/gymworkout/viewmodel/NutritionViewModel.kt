@@ -118,9 +118,9 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun updateCustomObjective(category: String, label: String, timerSeconds: Int, notifyEnabled: Boolean) {
+    fun updateCustomObjective(category: String, label: String, unit: String, timerSeconds: Int, notifyEnabled: Boolean) {
         viewModelScope.launch {
-            dao.updateCustomObjective(category, label, timerSeconds, notifyEnabled)
+            dao.updateCustomObjective(category, label, unit, timerSeconds, notifyEnabled)
         }
     }
 
