@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BedtimeOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Egg
@@ -100,6 +101,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     var deleteTargetCategory by remember { mutableStateOf<String?>(null) }
     var showFoodLogDialog by remember { mutableStateOf(false) }
     var showBarcodeScanner by remember { mutableStateOf(false) }
+    var showAiObjectiveDialog by remember { mutableStateOf(false) }
     val barcodeLookupState by viewModel.barcodeLookupState.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Nutrition, 1 = Habits
     val customFoodItems by viewModel.customFoods.collectAsState(initial = emptyList())
@@ -137,6 +139,9 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showAiObjectiveDialog = true }) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = "AI generate objectives")
+                    }
                     IconButton(onClick = { showAddObjectiveDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Add objective")
                     }
@@ -413,6 +418,26 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { deleteTargetCategory = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showAiObjectiveDialog) {
+        AiObjectiveDialog(
+            onDismiss = { showAiObjectiveDialog = false },
+            onAddObjectives = { selections ->
+                selections.forEach { sel ->
+                    if (sel.objective.isBuiltIn && sel.objective.builtInCategory != null) {
+                        viewModel.setTarget(sel.objective.builtInCategory, sel.editedTarget)
+                    } else {
+                        viewModel.addCustomObjective(
+                            sel.objective.name,
+                            sel.objective.unit,
+                            sel.editedTarget
+                        )
+                    }
+                }
+                showAiObjectiveDialog = false
             }
         )
     }
