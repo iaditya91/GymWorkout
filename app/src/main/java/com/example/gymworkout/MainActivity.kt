@@ -45,10 +45,17 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.gymworkout.data.ExerciseRepository
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import com.example.gymworkout.ui.screens.AiChatScreen
 import com.example.gymworkout.ui.screens.DayDetailScreen
 import com.example.gymworkout.ui.screens.ExerciseDetailScreen
 import com.example.gymworkout.ui.screens.WeeklyPlanScreen
 import com.example.gymworkout.ui.screens.YouTubePlayerScreen
+import com.example.gymworkout.viewmodel.AiChatViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import com.example.gymworkout.ui.screens.nutrition.NutritionScreen
@@ -126,13 +133,36 @@ fun WorkoutApp() {
     val nutritionViewModel: NutritionViewModel = viewModel()
     val statsViewModel: StatsViewModel = viewModel()
     val userViewModel: UserViewModel = viewModel()
+    val aiChatViewModel: AiChatViewModel = viewModel()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomBarRoutes
+    val showFab = Build.VERSION.SDK_INT >= 31 && currentRoute != "ai_chat"
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            if (showFab) {
+                FloatingActionButton(
+                    onClick = { navController.navigate("ai_chat") },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 2.dp,
+                        pressedElevation = 4.dp
+                    ),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = "AI Chat",
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        },
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
@@ -256,6 +286,12 @@ fun WorkoutApp() {
             }
             composable("user") {
                 UserScreen(viewModel = userViewModel)
+            }
+            composable("ai_chat") {
+                AiChatScreen(
+                    viewModel = aiChatViewModel,
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }

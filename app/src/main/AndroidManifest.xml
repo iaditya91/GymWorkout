@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Allow aicore (Gemini Nano) on minSdk 24; runtime-checked in AiPlannerEngine -->
-    <uses-sdk tools:overrideLibrary="com.google.ai.edge.aicore" />
+    <uses-sdk tools:overrideLibrary="com.google.ai.edge.aicore,com.google.mlkit.genai.prompt,com.google.mlkit.genai.common" />
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
