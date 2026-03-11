@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -395,7 +397,8 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
 
     if (showAddDialog) {
         AddNutritionDialog(
-            customTargets = allTargets.filter { it.isCustom },
+            allTargets = allTargets,
+            initialTab = selectedTab,
             onDismiss = { showAddDialog = false },
             onSaveBuiltIn = { category, value ->
                 viewModel.addEntry(selectedDate, category, value)
@@ -454,6 +457,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
 
     if (showAiObjectiveDialog) {
         AiObjectiveDialog(
+            existingTargets = allTargets,
             onDismiss = { showAiObjectiveDialog = false },
             onAddObjectives = { selections ->
                 selections.forEach { sel ->
@@ -461,7 +465,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                         viewModel.setTarget(sel.objective.builtInCategory, sel.editedTarget)
                     } else {
                         viewModel.addCustomObjective(
-                            sel.objective.name,
+                            sel.editedName,
                             sel.objective.unit,
                             sel.editedTarget
                         )
@@ -805,88 +809,136 @@ fun EntryRow(entry: NutritionEntry, onDelete: () -> Unit, allTargets: List<Nutri
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun AddNutritionDialog(
-    customTargets: List<NutritionTarget> = emptyList(),
+    allTargets: List<NutritionTarget> = emptyList(),
+    initialTab: Int = 0,
     onDismiss: () -> Unit,
     onSaveBuiltIn: (NutritionCategory, Float) -> Unit,
     onSaveCustom: (String, Float) -> Unit
 ) {
-    var selectedBuiltIn by remember { mutableStateOf<NutritionCategory?>(NutritionCategory.WATER) }
+    // 0 = Log Intake (nutrition), 1 = Log Habit
+    var dialogTab by remember { mutableIntStateOf(initialTab) }
+    var selectedBuiltIn by remember { mutableStateOf<NutritionCategory?>(null) }
     var selectedCustomKey by remember { mutableStateOf<String?>(null) }
     var value by remember { mutableStateOf("") }
 
+    // Split targets into nutrition vs habits using same logic as main screen
+    val customNutritionTargets = allTargets.filter {
+        it.isCustom && it.label.lowercase() in nutritionRelatedNames
+    }
+    val customHabitTargets = allTargets.filter {
+        it.isCustom && it.label.lowercase() !in nutritionRelatedNames
+    }
+
+    // Nutrition built-ins: Water, Calories, Protein, Carbs (only those with targets set)
+    val nutritionBuiltIns = listOf(
+        NutritionCategory.WATER,
+        NutritionCategory.CALORIES,
+        NutritionCategory.PROTEIN,
+        NutritionCategory.CARBS
+    ).filter { cat -> allTargets.any { it.category == cat.name } }
+
+    // Habit built-in: Sleep (only if target set)
+    val habitBuiltIn = if (allTargets.any { it.category == NutritionCategory.SLEEP.name })
+        NutritionCategory.SLEEP else null
+
+    // Auto-select first item when switching tabs
+    LaunchedEffect(dialogTab) {
+        selectedBuiltIn = null
+        selectedCustomKey = null
+        value = ""
+        if (dialogTab == 0) {
+            selectedBuiltIn = nutritionBuiltIns.firstOrNull()
+            if (selectedBuiltIn == null) {
+                selectedCustomKey = customNutritionTargets.firstOrNull()?.category
+            }
+        } else {
+            if (habitBuiltIn != null) {
+                selectedBuiltIn = habitBuiltIn
+            } else {
+                selectedCustomKey = customHabitTargets.firstOrNull()?.category
+            }
+        }
+    }
+
     val currentUnit = when {
         selectedBuiltIn != null -> selectedBuiltIn!!.unit
-        selectedCustomKey != null -> customTargets.find { it.category == selectedCustomKey }?.unit ?: ""
+        selectedCustomKey != null -> allTargets.find { it.category == selectedCustomKey }?.unit ?: ""
         else -> ""
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Log Intake") },
+        title = {
+            Column {
+                Text(if (dialogTab == 0) "Log Intake" else "Log Habit")
+                Spacer(modifier = Modifier.height(8.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = dialogTab == 0,
+                        onClick = { dialogTab = 0 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) { Text("Intake", style = MaterialTheme.typography.labelMedium) }
+                    SegmentedButton(
+                        selected = dialogTab == 1,
+                        onClick = { dialogTab = 1 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) { Text("Habit", style = MaterialTheme.typography.labelMedium) }
+                }
+            }
+        },
         text = {
             Column {
                 Text("Category", style = MaterialTheme.typography.labelMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                // Built-in category chips
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    NutritionCategory.entries.take(3).forEach { cat ->
-                        CategoryChip(
-                            category = cat,
-                            selected = selectedBuiltIn == cat,
-                            onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    NutritionCategory.entries.drop(3).forEach { cat ->
-                        CategoryChip(
-                            category = cat,
-                            selected = selectedBuiltIn == cat,
-                            onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
-                        )
-                    }
-                }
-                // Custom category chips
-                if (customTargets.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
+
+                if (dialogTab == 0) {
+                    // === INTAKE TAB: nutrition built-ins + custom nutrition ===
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        customTargets.forEach { t ->
-                            val isSelected = selectedCustomKey == t.category
-                            val color = Color(0xFF78909C)
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (isSelected) color.copy(alpha = 0.2f)
-                                        else MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                    .clickable {
-                                        selectedCustomKey = t.category
-                                        selectedBuiltIn = null
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    t.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSelected) color else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
+                        nutritionBuiltIns.forEach { cat ->
+                            CategoryChip(
+                                category = cat,
+                                selected = selectedBuiltIn == cat,
+                                onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
+                            )
+                        }
+                        customNutritionTargets.forEach { t ->
+                            CustomChip(
+                                label = t.label,
+                                selected = selectedCustomKey == t.category,
+                                onClick = { selectedCustomKey = t.category; selectedBuiltIn = null }
+                            )
+                        }
+                    }
+                } else {
+                    // === HABIT TAB: Sleep + custom habits ===
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (habitBuiltIn != null) {
+                            CategoryChip(
+                                category = habitBuiltIn,
+                                selected = selectedBuiltIn == habitBuiltIn,
+                                onClick = { selectedBuiltIn = habitBuiltIn; selectedCustomKey = null }
+                            )
+                        }
+                        customHabitTargets.forEach { t ->
+                            CustomChip(
+                                label = t.label,
+                                selected = selectedCustomKey == t.category,
+                                onClick = { selectedCustomKey = t.category; selectedBuiltIn = null }
+                            )
                         }
                     }
                 }
+
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = value,
@@ -917,6 +969,32 @@ fun AddNutritionDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+private fun CustomChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val color = Color(0xFF78909C)
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) color.copy(alpha = 0.2f)
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) color else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+        )
+    }
 }
 
 @Composable

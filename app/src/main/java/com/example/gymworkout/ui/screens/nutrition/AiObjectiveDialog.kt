@@ -69,17 +69,21 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.gymworkout.ai.AiObjectiveGenerator
+import com.example.gymworkout.data.NutritionTarget
 import kotlinx.coroutines.delay
 
 data class ObjectiveSelection(
     val objective: AiObjectiveGenerator.GeneratedObjective,
     var selected: Boolean = true,
-    var editedTarget: Float = objective.target
+    var editedTarget: Float = objective.target,
+    var editedName: String = objective.name,
+    var alreadyExists: Boolean = false
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiObjectiveDialog(
+    existingTargets: List<NutritionTarget> = emptyList(),
     onDismiss: () -> Unit,
     onAddObjectives: (List<ObjectiveSelection>) -> Unit
 ) {
@@ -93,8 +97,29 @@ fun AiObjectiveDialog(
         LaunchedEffect(Unit) {
             delay(600)
             val results = AiObjectiveGenerator.generateObjectives(inputText)
+            // Build sets of existing target identifiers for quick lookup
+            val existingBuiltInCategories = existingTargets
+                .filter { !it.isCustom }
+                .map { it.category.uppercase() }
+                .toSet()
+            val existingCustomLabels = existingTargets
+                .filter { it.isCustom }
+                .map { it.label.lowercase().trim() }
+                .toSet()
+
             generatedObjectives.clear()
-            generatedObjectives.addAll(results.map { ObjectiveSelection(it) })
+            generatedObjectives.addAll(results.map { obj ->
+                val exists = if (obj.isBuiltIn && obj.builtInCategory != null) {
+                    obj.builtInCategory.name in existingBuiltInCategories
+                } else {
+                    obj.name.lowercase().trim() in existingCustomLabels
+                }
+                ObjectiveSelection(
+                    objective = obj,
+                    selected = !exists,
+                    alreadyExists = exists
+                )
+            })
             hasGenerated = true
             isProcessing = false
         }
@@ -295,12 +320,15 @@ fun AiObjectiveDialog(
                             fontWeight = FontWeight.SemiBold
                         )
                         TextButton(onClick = {
-                            val allSelected = generatedObjectives.all { it.selected }
+                            val selectableItems = generatedObjectives.filter { !it.alreadyExists }
+                            val allSelected = selectableItems.all { it.selected }
                             generatedObjectives.forEachIndexed { i, item ->
-                                generatedObjectives[i] = item.copy(selected = !allSelected)
+                                if (!item.alreadyExists) {
+                                    generatedObjectives[i] = item.copy(selected = !allSelected)
+                                }
                             }
                         }) {
-                            Text(if (generatedObjectives.all { it.selected }) "Deselect All" else "Select All")
+                            Text(if (generatedObjectives.filter { !it.alreadyExists }.all { it.selected }) "Deselect All" else "Select All")
                         }
                     }
                 }
@@ -332,6 +360,9 @@ fun AiObjectiveDialog(
                                 },
                                 onTargetChange = { newTarget ->
                                     generatedObjectives[globalIndex] = item.copy(editedTarget = newTarget)
+                                },
+                                onNameChange = { newName ->
+                                    generatedObjectives[globalIndex] = item.copy(editedName = newName)
                                 }
                             )
                         }
@@ -366,6 +397,9 @@ fun AiObjectiveDialog(
                                 },
                                 onTargetChange = { newTarget ->
                                     generatedObjectives[globalIndex] = item.copy(editedTarget = newTarget)
+                                },
+                                onNameChange = { newName ->
+                                    generatedObjectives[globalIndex] = item.copy(editedName = newName)
                                 }
                             )
                         }
@@ -375,10 +409,10 @@ fun AiObjectiveDialog(
                 // Confirm button
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    val selectedCount = generatedObjectives.count { it.selected }
+                    val selectedCount = generatedObjectives.count { it.selected && !it.alreadyExists }
                     Button(
                         onClick = {
-                            onAddObjectives(generatedObjectives.filter { it.selected })
+                            onAddObjectives(generatedObjectives.filter { it.selected && !it.alreadyExists })
                         },
                         enabled = selectedCount > 0,
                         modifier = Modifier
@@ -466,10 +500,12 @@ private fun SectionHeader(
 private fun ObjectiveCard(
     item: ObjectiveSelection,
     onToggle: () -> Unit,
-    onTargetChange: (Float) -> Unit
+    onTargetChange: (Float) -> Unit,
+    onNameChange: (String) -> Unit
 ) {
     val obj = item.objective
-    var isEditing by remember { mutableStateOf(false) }
+    var isEditingTarget by remember { mutableStateOf(false) }
+    var isEditingName by remember { mutableStateOf(false) }
     var editText by remember(item.editedTarget) {
         mutableStateOf(
             item.editedTarget.let {
@@ -477,11 +513,18 @@ private fun ObjectiveCard(
             }
         )
     }
+    var editNameText by remember(item.editedName) { mutableStateOf(item.editedName) }
+    val focusManager = LocalFocusManager.current
+
+    val alreadyExists = item.alreadyExists
+    val contentAlpha = if (alreadyExists) 0.5f else 1f
 
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (item.selected)
+            containerColor = if (alreadyExists)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+            else if (item.selected)
                 MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
             else
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
@@ -491,33 +534,97 @@ private fun ObjectiveCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onToggle() }
+                .then(if (!alreadyExists) Modifier.clickable { onToggle() } else Modifier)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = item.selected,
-                onCheckedChange = { onToggle() },
+                onCheckedChange = if (!alreadyExists) { { onToggle() } } else null,
+                enabled = !alreadyExists,
                 colors = CheckboxDefaults.colors(
                     checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.outline
+                    uncheckedColor = MaterialTheme.colorScheme.outline,
+                    disabledCheckedColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    disabledUncheckedColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
                 )
             )
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = obj.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = if (obj.isBuiltIn) "Built-in tracker" else "Custom objective",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (isEditingName && !alreadyExists) {
+                    OutlinedTextField(
+                        value = editNameText,
+                        onValueChange = { editNameText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                val trimmed = editNameText.trim()
+                                if (trimmed.isNotBlank()) onNameChange(trimmed)
+                                isEditingName = false
+                                focusManager.clearFocus()
+                            }
+                        ),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = item.editedName,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .then(if (!alreadyExists) Modifier.clickable { isEditingName = true } else Modifier)
+                        )
+                        if (!alreadyExists) {
+                            IconButton(
+                                onClick = { isEditingName = true },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit name",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = if (obj.isBuiltIn) "Built-in tracker" else "Custom objective",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha)
+                    )
+                    if (alreadyExists) {
+                        Text(
+                            text = "Already added",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
 
-            if (isEditing) {
+            if (isEditingTarget && !alreadyExists) {
                 OutlinedTextField(
                     value = editText,
                     onValueChange = { editText = it },
@@ -529,7 +636,7 @@ private fun ObjectiveCard(
                     keyboardActions = KeyboardActions(
                         onDone = {
                             editText.toFloatOrNull()?.let { onTargetChange(it) }
-                            isEditing = false
+                            isEditingTarget = false
                         }
                     ),
                     singleLine = true,
@@ -542,13 +649,15 @@ private fun ObjectiveCard(
                     text = formatTarget(item.editedTarget),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(obj.unit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(onClick = { isEditing = true }, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit target", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(obj.unit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha))
+                if (!alreadyExists) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = { isEditingTarget = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit target", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

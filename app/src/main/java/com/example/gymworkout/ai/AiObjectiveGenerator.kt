@@ -220,6 +220,88 @@ object AiObjectiveGenerator {
         ObjectiveRule(
             aliases = listOf("sunlight", "sun exposure", "morning sun", "sunlight exposure"),
             name = "Sunlight", unit = "min", defaultTarget = 15f, isNutritionRelated = false
+        ),
+
+        // ── Rule-based / sentence-style habits ────────────────────────────
+        ObjectiveRule(
+            aliases = listOf("wake up at same time", "consistent wake", "wake up consistently", "fixed wake time", "same wake time"),
+            name = "Wake Up at Same Time Daily", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("drink water immediately after waking", "water after waking", "morning water", "water first thing"),
+            name = "Drink Water After Waking", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("avoid phone for first", "no phone first", "phone free morning", "no phone morning", "avoid phone morning", "avoid phone after waking"),
+            name = "Avoid Phone for First 30 Min", unit = "min", defaultTarget = 30f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("light exercise", "morning exercise", "morning stretching", "light stretching"),
+            name = "Light Exercise / Stretching", unit = "min", defaultTarget = 10f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("quiet breathing", "breathing exercise morning", "calm breathing"),
+            name = "Quiet Breathing", unit = "min", defaultTarget = 10f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("review priorities", "top 3 priorities", "plan the day", "daily planning", "review top priorities", "plan priorities"),
+            name = "Review Top 3 Priorities", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("start hardest task", "eat the frog", "hardest task first", "most important task first", "mit first"),
+            name = "Start Hardest Task First", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("deep focus block", "deep work block", "focus block", "pomodoro", "50 minute block", "deep-focus block"),
+            name = "Deep Focus Blocks", unit = "blocks", defaultTarget = 4f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("no multitasking", "single tasking", "one task at a time", "focus on one task", "single-tasking"),
+            name = "Focus on One Task at a Time", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("reversible decisions", "decide quickly", "quick decisions", "70% information", "bias for action"),
+            name = "Make Quick Decisions (~70% Info)", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("no junk food", "avoid junk", "clean eating", "eat clean"),
+            name = "No Junk Food", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("no social media", "social media free", "avoid social media", "social media detox"),
+            name = "No Social Media", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("early to bed", "sleep early", "bed by 10", "bed by 11", "early bedtime", "consistent bedtime", "same bedtime"),
+            name = "Early / Consistent Bedtime", unit = "days", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("no screen before bed", "no phone before bed", "screen free before bed", "no blue light"),
+            name = "No Screens Before Bed", unit = "min", defaultTarget = 30f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("meal prep", "prepare meals", "cook meals", "batch cook"),
+            name = "Meal Prep", unit = "meals", defaultTarget = 3f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("posture check", "fix posture", "good posture", "posture correction"),
+            name = "Posture Check", unit = "times", defaultTarget = 5f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("eye break", "20-20-20", "eye rest", "look away from screen"),
+            name = "Eye Break (20-20-20)", unit = "times", defaultTarget = 8f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("floss", "flossing", "dental floss"),
+            name = "Flossing", unit = "times", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("affirmation", "affirmations", "positive affirmation", "self affirmation"),
+            name = "Affirmations", unit = "times", defaultTarget = 1f, isNutritionRelated = false
+        ),
+        ObjectiveRule(
+            aliases = listOf("learn something new", "learning", "study", "skill building", "upskill"),
+            name = "Learn Something New", unit = "min", defaultTarget = 30f, isNutritionRelated = false
         )
     )
 
@@ -244,8 +326,8 @@ object AiObjectiveGenerator {
         val results = mutableListOf<GeneratedObjective>()
         val matchedRules = mutableSetOf<String>()
 
-        // Split into segments by commas, "and", periods, newlines, semicolons
-        val segments = input.split(Regex("""[,;\n]+|(?:\band\b)"""))
+        // Split into segments by commas, periods, newlines, semicolons
+        val segments = input.split(Regex("""[,;.\n]+|(?:\band\b)"""))
             .map { it.trim() }
             .filter { it.isNotBlank() }
 
@@ -310,7 +392,120 @@ object AiObjectiveGenerator {
             }
         }
 
+        // ── Fallback: convert unmatched sentence-segments into custom habits ──
+        // Track which segments were already matched by a rule
+        val matchedSegments = mutableSetOf<Int>()
+        for ((index, segment) in effectiveSegments.withIndex()) {
+            for (rule in rules) {
+                val segMatched = rule.aliases.any { alias ->
+                    segment.contains(Regex("""\b${Regex.escape(alias)}\b"""))
+                }
+                if (segMatched) {
+                    matchedSegments.add(index)
+                    break
+                }
+            }
+        }
+
+        // For each unmatched segment that looks like a meaningful sentence (>3 words),
+        // create a custom habit objective from the full sentence
+        for ((index, segment) in effectiveSegments.withIndex()) {
+            if (index in matchedSegments) continue
+
+            val cleaned = segment.trim()
+            if (cleaned.split("\\s+".toRegex()).size < 3) continue  // skip very short fragments
+            if (cleaned.length < 8) continue  // skip trivially short text
+
+            val habitName = sentenceToHabitName(cleaned)
+            if (habitName.isBlank() || habitName in matchedRules) continue
+
+            // Extract time/number if mentioned in the sentence
+            val numberMatch = numberBeforeUnit.find(cleaned) ?: numberAfterKeyword.find(cleaned)
+            val target: Float
+            val unit: String
+            if (numberMatch != null) {
+                val raw = numberMatch.groupValues[1].toFloatOrNull() ?: 1f
+                val multiplier = if (numberMatch.groupValues[2].equals("k", ignoreCase = true)) 1000f else 1f
+                target = raw * multiplier
+                // Infer unit from the sentence
+                unit = inferUnitFromSegment(cleaned)
+            } else {
+                target = 1f
+                unit = "days"  // daily check-off habit
+            }
+
+            matchedRules.add(habitName)
+            results.add(
+                GeneratedObjective(
+                    name = habitName,
+                    unit = unit,
+                    target = target,
+                    isBuiltIn = false,
+                    builtInCategory = null,
+                    isNutritionRelated = false
+                )
+            )
+        }
+
         return results
+    }
+
+    // ── Filler words to strip when converting a sentence to a habit name ──
+    private val fillerWords = setOf(
+        "i", "want", "to", "my", "the", "a", "an", "do", "does", "did", "should",
+        "need", "try", "have", "make", "sure", "be", "will", "am", "is", "are",
+        "for", "of", "in", "on", "at", "by", "with", "it", "its", "that", "this",
+        "also", "just", "so", "very", "really", "always", "every", "each"
+    )
+
+    /**
+     * Convert a raw sentence into a clean, title-cased habit name.
+     * e.g. "wake up at same time daily to maintain consistency"
+     *       → "Wake Up at Same Time Daily"
+     * Preserves meaningful structure; only strips leading filler.
+     */
+    private fun sentenceToHabitName(sentence: String): String {
+        val words = sentence.trim().split("\\s+".toRegex())
+
+        // Remove "to + reason" suffix (e.g. "to maintain consistency", "to refresh organs")
+        // Find a "to" that appears after the first 3 words (to avoid stripping "to" from core phrases)
+        var purposeIndex = -1
+        for (i in 3 until words.size) {
+            if (words[i] == "to") { purposeIndex = i; break }
+        }
+        val coreWords = if (purposeIndex > 2) words.subList(0, purposeIndex) else words
+
+        // Drop leading filler words (I want to do → drop "I want to do")
+        val startIndex = coreWords.indexOfFirst { it.lowercase() !in fillerWords }
+        val meaningful = if (startIndex >= 0) coreWords.subList(startIndex, coreWords.size) else coreWords
+
+        if (meaningful.isEmpty()) return ""
+
+        // Title case: capitalize first letter of each word except small words
+        val smallWords = setOf("at", "in", "on", "of", "for", "the", "a", "an", "by", "with", "or", "no")
+        return meaningful.mapIndexed { i, word ->
+            if (i == 0 || word.lowercase() !in smallWords) {
+                word.replaceFirstChar { it.uppercase() }
+            } else {
+                word.lowercase()
+            }
+        }.joinToString(" ")
+    }
+
+    /**
+     * Infer the most likely unit from a segment's text.
+     */
+    private fun inferUnitFromSegment(segment: String): String {
+        return when {
+            segment.contains(Regex("""\b(min|minutes?)\b""")) -> "min"
+            segment.contains(Regex("""\b(hrs?|hours?)\b""")) -> "hrs"
+            segment.contains(Regex("""\b(steps?)\b""")) -> "steps"
+            segment.contains(Regex("""\b(times?|reps?|sets?)\b""")) -> "times"
+            segment.contains(Regex("""\b(blocks?)\b""")) -> "blocks"
+            segment.contains(Regex("""\b(g|grams?)\b""")) -> "g"
+            segment.contains(Regex("""\b(ml|liters?|litres?)\b""")) -> "L"
+            else -> "days"
+        }
     }
 
     /**
@@ -345,7 +540,7 @@ object AiObjectiveGenerator {
         "Track 2000 calories, 200g carbs, 120g protein, take 5g creatine",
         "Walk 10k steps, meditate 15 min, read 30 min, no sugar",
         "High protein: 2500 cal, 180g protein, low carb 100g, take omega-3",
-        "Drink more water, take vitamins (A, C, D, B12), get 8hrs sleep",
-        "Morning routine: cold shower, stretching 15 min, journaling, breathwork"
+        "Wake up at same time daily, drink water after waking, avoid phone for first 30 minutes",
+        "Work in 50-minute deep focus blocks, focus on one task at a time, review top 3 priorities"
     )
 }
