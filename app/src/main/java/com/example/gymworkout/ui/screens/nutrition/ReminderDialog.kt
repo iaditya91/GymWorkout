@@ -3,6 +3,7 @@ package com.example.gymworkout.ui.screens.nutrition
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.media.RingtoneManager
+import com.example.gymworkout.notification.NotificationHelper
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -373,6 +374,7 @@ fun AddEditReminderDialog(
         val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
         ringtoneUri = uri
         ringtoneName = if (uri != null) TimerSoundPreference.getRingtoneName(context, uri) else "Silent"
+        NotificationHelper.cleanupOldSoundChannels(context, NotificationHelper.CHANNEL_ID, uri)
     }
 
     // Specific times

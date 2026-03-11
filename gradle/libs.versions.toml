@@ -19,6 +19,7 @@ playServicesAuth = "21.3.0"
 gson = "2.11.0"
 mlkitBarcode = "17.3.0"
 cameraX = "1.4.1"
+aicore = "0.0.1-exp02"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -50,6 +51,7 @@ camerax-core = { group = "androidx.camera", name = "camera-core", version.ref = 
 camerax-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraX" }
 camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraX" }
 camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraX" }
+aicore = { group = "com.google.ai.edge.aicore", name = "aicore", version.ref = "aicore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

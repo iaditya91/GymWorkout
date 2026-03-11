@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -101,7 +102,36 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, channelId)
+        // On Android 8+, notification sound is controlled by the channel, not the builder.
+        // Create a unique channel per sound URI so custom sounds actually play.
+        val effectiveChannelId = if (soundUri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val customChannelId = "${channelId}_sound_${soundUri.hashCode()}"
+            val manager = context.getSystemService(NotificationManager::class.java)
+            if (manager.getNotificationChannel(customChannelId) == null) {
+                val baseChannel = manager.getNotificationChannel(channelId)
+                val channelName = (baseChannel?.name ?: "Reminders").toString() + " (Custom Sound)"
+                val channel = NotificationChannel(
+                    customChannelId,
+                    channelName,
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = baseChannel?.description ?: ""
+                    setSound(
+                        soundUri,
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .build()
+                    )
+                }
+                manager.createNotificationChannel(channel)
+            }
+            customChannelId
+        } else {
+            channelId
+        }
+
+        val builder = NotificationCompat.Builder(context, effectiveChannelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(text)
@@ -109,11 +139,26 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
 
-        if (soundUri != null) {
+        if (soundUri != null && Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             builder.setSound(soundUri)
         }
 
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.notify(notificationId, builder.build())
+    }
+
+    /**
+     * Delete old custom sound channels for a base channel when sound changes.
+     * Call this when the user picks a new sound, passing the new soundUri.
+     */
+    fun cleanupOldSoundChannels(context: Context, baseChannelId: String, newSoundUri: Uri?) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val keepChannelId = if (newSoundUri != null) {
+            "${baseChannelId}_sound_${newSoundUri.hashCode()}"
+        } else null
+        manager.notificationChannels
+            .filter { it.id.startsWith("${baseChannelId}_sound_") && it.id != keepChannelId }
+            .forEach { manager.deleteNotificationChannel(it.id) }
     }
 }

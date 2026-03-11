@@ -3,6 +3,7 @@ package com.example.gymworkout.ui.screens.user
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
+import com.example.gymworkout.notification.NotificationHelper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -803,6 +804,7 @@ fun TimerSoundSettingsCard() {
         if (uri != null) {
             TimerSoundPreference.setRestTimerSoundUri(context, uri)
             restSoundName = TimerSoundPreference.getRingtoneName(context, uri)
+            NotificationHelper.cleanupOldSoundChannels(context, NotificationHelper.CHANNEL_ID, uri)
         }
     }
 
@@ -813,6 +815,7 @@ fun TimerSoundSettingsCard() {
         if (uri != null) {
             TimerSoundPreference.setHabitTimerSoundUri(context, uri)
             habitSoundName = TimerSoundPreference.getRingtoneName(context, uri)
+            NotificationHelper.cleanupOldSoundChannels(context, NotificationHelper.CHANNEL_ID, uri)
         }
     }
 

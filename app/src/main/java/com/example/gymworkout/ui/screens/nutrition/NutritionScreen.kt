@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
@@ -116,6 +117,7 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     var showFoodLogDialog by remember { mutableStateOf(false) }
     var showBarcodeScanner by remember { mutableStateOf(false) }
     var showAiObjectiveDialog by remember { mutableStateOf(false) }
+    var showAiPlannerDialog by remember { mutableStateOf(false) }
     val barcodeLookupState by viewModel.barcodeLookupState.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Nutrition, 1 = Habits
     val customFoodItems by viewModel.customFoods.collectAsState(initial = emptyList())
@@ -153,6 +155,12 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        viewModel.loadPlannerProgress(selectedDate)
+                        showAiPlannerDialog = true
+                    }) {
+                        Icon(Icons.Default.TipsAndUpdates, contentDescription = "AI Daily Planner")
+                    }
                     IconButton(onClick = { showAiObjectiveDialog = true }) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = "AI generate objectives")
                     }
@@ -433,6 +441,14 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
             dismissButton = {
                 TextButton(onClick = { deleteTargetCategory = null }) { Text("Cancel") }
             }
+        )
+    }
+
+    if (showAiPlannerDialog) {
+        val plannerProgress by viewModel.plannerProgress.collectAsState()
+        AiPlannerDialog(
+            progressList = plannerProgress,
+            onDismiss = { showAiPlannerDialog = false }
         )
     }
 

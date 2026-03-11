@@ -17,6 +17,7 @@ import com.example.gymworkout.notification.ReminderScheduler
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
+import com.example.gymworkout.ai.AiPlannerEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -270,6 +271,43 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             dao.deleteCustomFood(item)
         }
+    }
+
+    // --- AI Planner ---
+
+    private val _plannerProgress = MutableStateFlow<List<AiPlannerEngine.TargetProgress>>(emptyList())
+    val plannerProgress: StateFlow<List<AiPlannerEngine.TargetProgress>> = _plannerProgress
+
+    fun loadPlannerProgress(date: String) {
+        viewModelScope.launch {
+            val targets = dao.getAllTargetsSync()
+            val progressList = targets.map { target ->
+                val current = dao.getTotalForDateAndCategorySync(date, target.category)
+                val isNutrition = !target.isCustom ||
+                        target.label.lowercase() in nutritionRelatedLabels
+                AiPlannerEngine.TargetProgress(
+                    label = target.label,
+                    unit = target.unit,
+                    current = current,
+                    target = target.targetValue,
+                    isNutrition = isNutrition
+                )
+            }
+            _plannerProgress.value = progressList
+        }
+    }
+
+    companion object {
+        private val nutritionRelatedLabels = setOf(
+            "water", "calories", "protein", "carbs", "sleep",
+            "fat", "fiber",
+            "vitamin a", "vitamin b1", "vitamin b2", "vitamin b3",
+            "vitamin b6", "vitamin b12", "vitamin c", "vitamin d",
+            "vitamin e", "vitamin k",
+            "folate", "iron", "calcium", "magnesium", "potassium",
+            "zinc", "copper", "selenium",
+            "omega-3", "caffeine", "sugar", "sodium"
+        )
     }
 
     // --- Barcode scanner ---
