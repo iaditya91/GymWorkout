@@ -1,5 +1,6 @@
 package com.example.gymworkout.ui.components
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,9 +33,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.gymworkout.notification.TimerReceiver
 import kotlinx.coroutines.delay
 
 @Composable
@@ -43,6 +46,7 @@ fun RestTimerDialog(
     totalSeconds: Int,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var remainingSeconds by remember { mutableIntStateOf(totalSeconds) }
     var isRunning by remember { mutableStateOf(true) }
     val progress = if (totalSeconds > 0) remainingSeconds.toFloat() / totalSeconds else 0f
@@ -52,6 +56,19 @@ fun RestTimerDialog(
         if (isRunning && remainingSeconds > 0) {
             delay(1000L)
             remainingSeconds--
+        }
+    }
+
+    // Notify when timer finishes
+    LaunchedEffect(finished) {
+        if (finished) {
+            val intent = Intent(context, TimerReceiver::class.java).apply {
+                putExtra(TimerReceiver.EXTRA_LABEL, "Rest - $exerciseName")
+                putExtra(TimerReceiver.EXTRA_NOTIFY, true)
+                putExtra(TimerReceiver.EXTRA_NOTIFICATION_ID, "rest_$exerciseName".hashCode())
+                putExtra(TimerReceiver.EXTRA_TIMER_TYPE, "rest")
+            }
+            context.sendBroadcast(intent)
         }
     }
 

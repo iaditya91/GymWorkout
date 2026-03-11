@@ -28,5 +28,7 @@ data class NutritionTarget(
     val label: String = "",    // Display name (e.g. "Water", "Creatine")
     val unit: String = "",     // Unit (e.g. "L", "g", "mg")
     val isCustom: Boolean = false, // true for user-added objectives
-    val notes: String = ""     // User notes for this objective
+    val notes: String = "",    // User notes for this objective
+    val timerSeconds: Int = 0, // Timer duration in seconds (0 = no timer)
+    val timerNotifyEnabled: Boolean = true   // Show notification when timer finishes (respects device sound profile)
 )

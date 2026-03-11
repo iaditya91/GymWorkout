@@ -3,6 +3,7 @@ package com.example.gymworkout.notification
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +17,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val customText = intent.getStringExtra(EXTRA_CUSTOM_TEXT) ?: ""
         val reminderId = intent.getIntExtra(EXTRA_REMINDER_ID, 0)
         val timeIndex = intent.getIntExtra(EXTRA_TIME_INDEX, 0)
+        val ringtoneUriStr = intent.getStringExtra(EXTRA_RINGTONE_URI) ?: ""
 
         val pendingResult = goAsync()
 
@@ -48,7 +50,8 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 NotificationHelper.createNotificationChannel(context)
                 val notificationId = reminderId * 100 + timeIndex
-                NotificationHelper.showNotification(context, notificationId, title, text)
+                val soundUri = if (ringtoneUriStr.isNotBlank()) Uri.parse(ringtoneUriStr) else null
+                NotificationHelper.showNotification(context, notificationId, title, text, soundUri = soundUri)
 
                 // Reschedule for next day
                 val reminder = db.reminderDao().getReminderById(reminderId)
@@ -66,5 +69,6 @@ class ReminderReceiver : BroadcastReceiver() {
         const val EXTRA_CUSTOM_TEXT = "extra_custom_text"
         const val EXTRA_REMINDER_ID = "extra_reminder_id"
         const val EXTRA_TIME_INDEX = "extra_time_index"
+        const val EXTRA_RINGTONE_URI = "extra_ringtone_uri"
     }
 }

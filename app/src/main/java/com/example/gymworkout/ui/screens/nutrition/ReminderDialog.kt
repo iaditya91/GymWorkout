@@ -1,6 +1,11 @@
 package com.example.gymworkout.ui.screens.nutrition
 
 import android.app.TimePickerDialog
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +28,7 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.AlertDialog
@@ -52,9 +58,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.NutritionReminder
+import com.example.gymworkout.data.TimerSoundPreference
 import com.example.gymworkout.viewmodel.NutritionViewModel
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -272,6 +280,31 @@ fun ReminderItem(
                     modifier = Modifier.padding(start = 26.dp, top = 4.dp)
                 )
             }
+            if (reminder.ringtoneUri.isNotBlank()) {
+                val ctx = LocalContext.current
+                val soundName = remember(reminder.ringtoneUri) {
+                    TimerSoundPreference.getRingtoneName(ctx, Uri.parse(reminder.ringtoneUri))
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 26.dp, top = 2.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = color.copy(alpha = 0.7f),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        soundName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = color.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }
@@ -321,6 +354,26 @@ fun AddEditReminderDialog(
     val context = LocalContext.current
     var type by remember { mutableStateOf(existingReminder?.type ?: "SPECIFIC") }
     var customText by remember { mutableStateOf(existingReminder?.customText ?: "") }
+    var ringtoneUri by remember {
+        mutableStateOf(
+            if (existingReminder?.ringtoneUri?.isNotBlank() == true) Uri.parse(existingReminder.ringtoneUri)
+            else null
+        )
+    }
+    var ringtoneName by remember {
+        mutableStateOf(
+            if (existingReminder?.ringtoneUri?.isNotBlank() == true)
+                TimerSoundPreference.getRingtoneName(context, Uri.parse(existingReminder.ringtoneUri))
+            else "Default"
+        )
+    }
+    val ringtonePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        ringtoneUri = uri
+        ringtoneName = if (uri != null) TimerSoundPreference.getRingtoneName(context, uri) else "Silent"
+    }
 
     // Specific times
     val specificTimes = remember {
@@ -535,6 +588,54 @@ fun AddEditReminderDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Notification sound picker
+                Text(
+                    "Notification Sound",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            val pickerIntent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Choose Notification Sound")
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                if (ringtoneUri != null) {
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, ringtoneUri)
+                                }
+                            }
+                            ringtonePicker.launch(pickerIntent)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        ringtoneName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = color,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         },
         confirmButton = {
@@ -550,7 +651,8 @@ fun AddEditReminderDialog(
                             specificTimes.joinToString(",") else "",
                         startTime = if (type == "INTERVAL") startTime else "",
                         endTime = if (type == "INTERVAL") endTime else "",
-                        intervalMinutes = if (type == "INTERVAL") intervalMinutes else 0
+                        intervalMinutes = if (type == "INTERVAL") intervalMinutes else 0,
+                        ringtoneUri = ringtoneUri?.toString() ?: ""
                     )
                     onSave(reminder)
                 },

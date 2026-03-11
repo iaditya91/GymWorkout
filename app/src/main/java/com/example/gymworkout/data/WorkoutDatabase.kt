@@ -83,6 +83,63 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
     }
 }
 
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE nutrition_targets ADD COLUMN timerSeconds INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE nutrition_targets ADD COLUMN timerNotifyEnabled INTEGER NOT NULL DEFAULT 1")
+    }
+}
+
+val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Add ringtoneUri to nutrition_reminders
+        db.execSQL("ALTER TABLE nutrition_reminders ADD COLUMN ringtoneUri TEXT NOT NULL DEFAULT ''")
+
+        // Fix nutrition_targets: old DB may have timerSoundEnabled/timerVibrateEnabled
+        // instead of timerNotifyEnabled. Recreate table with correct schema.
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS nutrition_targets_new (
+                category TEXT NOT NULL PRIMARY KEY DEFAULT '',
+                targetValue REAL NOT NULL DEFAULT 0,
+                label TEXT NOT NULL DEFAULT '',
+                unit TEXT NOT NULL DEFAULT '',
+                isCustom INTEGER NOT NULL DEFAULT 0,
+                notes TEXT NOT NULL DEFAULT '',
+                timerSeconds INTEGER NOT NULL DEFAULT 0,
+                timerNotifyEnabled INTEGER NOT NULL DEFAULT 1
+            )
+        """.trimIndent())
+        // Copy data, mapping old columns if they exist
+        try {
+            // Try with old column names (timerSoundEnabled OR timerVibrateEnabled)
+            db.execSQL("""
+                INSERT INTO nutrition_targets_new (category, targetValue, label, unit, isCustom, notes, timerSeconds, timerNotifyEnabled)
+                SELECT category, targetValue, label, unit, isCustom, notes, timerSeconds,
+                    CASE WHEN timerSoundEnabled = 1 OR timerVibrateEnabled = 1 THEN 1 ELSE 0 END
+                FROM nutrition_targets
+            """.trimIndent())
+        } catch (_: Exception) {
+            try {
+                // Try with new column name (timerNotifyEnabled already exists)
+                db.execSQL("""
+                    INSERT INTO nutrition_targets_new (category, targetValue, label, unit, isCustom, notes, timerSeconds, timerNotifyEnabled)
+                    SELECT category, targetValue, label, unit, isCustom, notes, timerSeconds, timerNotifyEnabled
+                    FROM nutrition_targets
+                """.trimIndent())
+            } catch (_: Exception) {
+                // Fallback: copy only base columns
+                db.execSQL("""
+                    INSERT INTO nutrition_targets_new (category, targetValue, label, unit, isCustom, notes)
+                    SELECT category, targetValue, label, unit, isCustom, notes
+                    FROM nutrition_targets
+                """.trimIndent())
+            }
+        }
+        db.execSQL("DROP TABLE nutrition_targets")
+        db.execSQL("ALTER TABLE nutrition_targets_new RENAME TO nutrition_targets")
+    }
+}
+
 @Database(
     entities = [
         Exercise::class,
@@ -98,7 +155,7 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
         MotivationalQuote::class,
         CustomFoodItem::class
     ],
-    version = 18,
+    version = 20,
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -120,7 +177,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     WorkoutDatabase::class.java,
                     "workout_database"
                 )
-                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
+                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

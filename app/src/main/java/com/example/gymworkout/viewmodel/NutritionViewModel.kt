@@ -91,7 +91,10 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun addCustomObjective(name: String, unit: String, target: Float) {
+    fun addCustomObjective(
+        name: String, unit: String, target: Float,
+        timerSeconds: Int = 0, timerNotifyEnabled: Boolean = true
+    ) {
         viewModelScope.launch {
             val key = "CUSTOM_${name.uppercase().replace(" ", "_")}_${System.currentTimeMillis()}"
             dao.insertTarget(
@@ -100,7 +103,9 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
                     targetValue = target,
                     label = name,
                     unit = unit,
-                    isCustom = true
+                    isCustom = true,
+                    timerSeconds = timerSeconds,
+                    timerNotifyEnabled = timerNotifyEnabled
                 )
             )
         }
@@ -109,6 +114,12 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
     fun updateNotes(category: String, notes: String) {
         viewModelScope.launch {
             dao.updateTargetNotes(category, notes)
+        }
+    }
+
+    fun updateCustomObjective(category: String, label: String, timerSeconds: Int, notifyEnabled: Boolean) {
+        viewModelScope.launch {
+            dao.updateCustomObjective(category, label, timerSeconds, notifyEnabled)
         }
     }
 

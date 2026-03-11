@@ -96,6 +96,9 @@ import com.example.gymworkout.data.MotivationalQuote
 import com.example.gymworkout.data.MotivationalQuotes
 import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.sync.SyncPreference
+import android.media.RingtoneManager
+import androidx.compose.material.icons.filled.MusicNote
+import com.example.gymworkout.data.TimerSoundPreference
 import com.example.gymworkout.viewmodel.SyncState
 import com.example.gymworkout.viewmodel.UserViewModel
 import kotlinx.coroutines.delay
@@ -207,6 +210,8 @@ fun UserScreen(viewModel: UserViewModel) {
             }
 
             item { ThemeToggleCard() }
+
+            item { TimerSoundSettingsCard() }
 
             item {
                 WorkoutNotificationCard(
@@ -781,6 +786,150 @@ fun ThemeToggleCard() {
                     checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
+        }
+    }
+}
+
+@Composable
+fun TimerSoundSettingsCard() {
+    val context = LocalContext.current
+    var restSoundName by remember { mutableStateOf(TimerSoundPreference.getRestTimerSoundName(context)) }
+    var habitSoundName by remember { mutableStateOf(TimerSoundPreference.getHabitTimerSoundName(context)) }
+
+    val restSoundPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        if (uri != null) {
+            TimerSoundPreference.setRestTimerSoundUri(context, uri)
+            restSoundName = TimerSoundPreference.getRingtoneName(context, uri)
+        }
+    }
+
+    val habitSoundPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        if (uri != null) {
+            TimerSoundPreference.setHabitTimerSoundUri(context, uri)
+            habitSoundName = TimerSoundPreference.getRingtoneName(context, uri)
+        }
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    "Timer Sounds",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Rest Timer Sound
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable {
+                        val currentUri = TimerSoundPreference.getRestTimerSoundUri(context)
+                        val pickerIntent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Rest Timer Sound")
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, currentUri)
+                        }
+                        restSoundPicker.launch(pickerIntent)
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Rest Timer Sound",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        restSoundName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Habit Timer Sound
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable {
+                        val currentUri = TimerSoundPreference.getHabitTimerSoundUri(context)
+                        val pickerIntent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Habit Timer Sound")
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, currentUri)
+                        }
+                        habitSoundPicker.launch(pickerIntent)
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Habit Timer Sound",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        habitSoundName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

@@ -16,5 +16,6 @@ data class NutritionReminder(
     // For INTERVAL type:
     val startTime: String = "",         // "08:00"
     val endTime: String = "",           // "22:00"
-    val intervalMinutes: Int = 0        // e.g., 60 for every hour
+    val intervalMinutes: Int = 0,        // e.g., 60 for every hour
+    val ringtoneUri: String = ""         // Custom notification ringtone URI (empty = default)
 )

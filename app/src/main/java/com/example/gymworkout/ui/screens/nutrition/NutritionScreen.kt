@@ -32,12 +32,17 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BedtimeOff
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Egg
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -63,6 +68,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
@@ -85,6 +91,14 @@ import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.data.NutritionReminder
+import com.example.gymworkout.notification.TimerReceiver
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import androidx.compose.material3.Switch
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -396,8 +410,8 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     if (showAddObjectiveDialog) {
         AddObjectiveDialog(
             onDismiss = { showAddObjectiveDialog = false },
-            onSave = { name, unit, target ->
-                viewModel.addCustomObjective(name, unit, target)
+            onSave = { name, unit, target, timerSeconds, notifyEnabled ->
+                viewModel.addCustomObjective(name, unit, target, timerSeconds, notifyEnabled)
                 showAddObjectiveDialog = false
             }
         )
@@ -932,17 +946,50 @@ fun CustomCategoryCard(
     onReminderClick: () -> Unit = {},
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
     val total by viewModel.getTotalForCategory(date, target.category).collectAsState(initial = 0f)
     val reminders by viewModel.getRemindersForCategory(target.category).collectAsState(initial = emptyList())
     val hasActiveReminders = reminders.any { it.enabled }
     val targetVal = target.targetValue
     val currentNotes = target.notes
+    val isTrulyCustom = target.label.lowercase() !in presetObjectiveNames
     val progress = if (targetVal > 0) (total / targetVal).coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
     val met = targetVal > 0 && total >= targetVal
     val color = Color(0xFF78909C) // neutral color for custom
     var showFoodSuggestions by remember { mutableStateOf(false) }
     var showNotesDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+
+    // Timer state (only for truly custom objectives)
+    val hasTimer = isTrulyCustom && target.timerSeconds > 0
+    var timerRunning by remember { mutableStateOf(false) }
+    var timerPaused by remember { mutableStateOf(false) }
+    var timerRemaining by remember { mutableLongStateOf(target.timerSeconds.toLong()) }
+
+    // Countdown effect
+    if (isTrulyCustom) {
+        LaunchedEffect(timerRunning, timerPaused) {
+            if (timerRunning && !timerPaused) {
+                while (timerRemaining > 0) {
+                    delay(1000L)
+                    timerRemaining--
+                }
+                if (timerRemaining <= 0L) {
+                    timerRunning = false
+                    timerPaused = false
+                    val intent = Intent(context, TimerReceiver::class.java).apply {
+                        putExtra(TimerReceiver.EXTRA_LABEL, target.label)
+                        putExtra(TimerReceiver.EXTRA_NOTIFY, target.timerNotifyEnabled)
+                        putExtra(TimerReceiver.EXTRA_NOTIFICATION_ID, target.category.hashCode())
+                        putExtra(TimerReceiver.EXTRA_TIMER_TYPE, "habit")
+                    }
+                    context.sendBroadcast(intent)
+                    timerRemaining = target.timerSeconds.toLong()
+                }
+            }
+        }
+    }
 
     val foodFieldKey = getCustomFoodFieldKey(target.label)
 
@@ -965,6 +1012,20 @@ fun CustomCategoryCard(
             onSave = { notes ->
                 viewModel.updateNotes(target.category, notes)
                 showNotesDialog = false
+            }
+        )
+    }
+
+    if (showEditDialog) {
+        EditCustomObjectiveDialog(
+            target = target,
+            onDismiss = { showEditDialog = false },
+            onSave = { label, timerSecs, notifyOn ->
+                viewModel.updateCustomObjective(
+                    target.category, label, timerSecs, notifyOn
+                )
+                timerRemaining = timerSecs.toLong()
+                showEditDialog = false
             }
         )
     }
@@ -1071,6 +1132,19 @@ fun CustomCategoryCard(
                             modifier = Modifier.size(18.dp)
                         )
                     }
+                    if (isTrulyCustom) {
+                        IconButton(
+                            onClick = { showEditDialog = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Edit ${target.label}",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = onDelete,
                         modifier = Modifier.size(32.dp)
@@ -1103,6 +1177,86 @@ fun CustomCategoryCard(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 strokeCap = StrokeCap.Round
             )
+
+            // Timer section
+            if (hasTimer) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Timer,
+                        contentDescription = null,
+                        tint = if (timerRunning) MaterialTheme.colorScheme.primary else color,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = formatTimerDisplay(timerRemaining),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (timerRunning && !timerPaused)
+                            MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (!timerRunning) {
+                        // Start button
+                        IconButton(
+                            onClick = {
+                                timerRemaining = target.timerSeconds.toLong()
+                                timerRunning = true
+                                timerPaused = false
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.PlayCircle,
+                                contentDescription = "Start timer",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    } else {
+                        // Pause/Resume
+                        IconButton(
+                            onClick = { timerPaused = !timerPaused },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                if (timerPaused) Icons.Default.PlayCircle else Icons.Default.PauseCircle,
+                                contentDescription = if (timerPaused) "Resume" else "Pause",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        // Stop
+                        IconButton(
+                            onClick = {
+                                timerRunning = false
+                                timerPaused = false
+                                timerRemaining = target.timerSeconds.toLong()
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.StopCircle,
+                                contentDescription = "Stop timer",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+            }
 
             // Show notes preview if present
             if (currentNotes.isNotBlank()) {
@@ -1365,6 +1519,9 @@ private val objectivePresets = listOf(
     "Sleep" to "hrs"
 )
 
+// Preset objective names - these get no timer/edit (not truly custom)
+private val presetObjectiveNames = objectivePresets.map { it.first.lowercase() }.toSet()
+
 // Nutrition-related custom objective names (shown under Nutrition tab)
 private val nutritionRelatedNames = setOf(
     "fat", "fiber",
@@ -1378,13 +1535,18 @@ private val nutritionRelatedNames = setOf(
 @Composable
 fun AddObjectiveDialog(
     onDismiss: () -> Unit,
-    onSave: (String, String, Float) -> Unit
+    onSave: (name: String, unit: String, target: Float, timerSeconds: Int, notifyEnabled: Boolean) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedName by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf("") }
     var target by remember { mutableStateOf("") }
     var isCustom by remember { mutableStateOf(false) }
+
+    // Timer fields (only for custom)
+    var timerMinutes by remember { mutableStateOf("") }
+    var timerSecs by remember { mutableStateOf("") }
+    var notifyEnabled by remember { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1471,6 +1633,52 @@ fun AddObjectiveDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // Timer options (only for custom objectives)
+                if (isCustom) {
+                    Text(
+                        "Timer (optional)",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = timerMinutes,
+                            onValueChange = { timerMinutes = it.filter { c -> c.isDigit() } },
+                            label = { Text("Min") },
+                            placeholder = { Text("0") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(":", fontWeight = FontWeight.Bold)
+                        OutlinedTextField(
+                            value = timerSecs,
+                            onValueChange = {
+                                val filtered = it.filter { c -> c.isDigit() }
+                                val num = filtered.toIntOrNull() ?: 0
+                                timerSecs = if (num > 59) "59" else filtered
+                            },
+                            label = { Text("Sec") },
+                            placeholder = { Text("0") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Notify when done", style = MaterialTheme.typography.bodyMedium)
+                        Switch(checked = notifyEnabled, onCheckedChange = { notifyEnabled = it })
+                    }
+                }
             }
         },
         confirmButton = {
@@ -1478,7 +1686,10 @@ fun AddObjectiveDialog(
                 onClick = {
                     val v = target.toFloatOrNull()
                     if (selectedName.isNotBlank() && unit.isNotBlank() && v != null && v > 0) {
-                        onSave(selectedName.trim(), unit.trim(), v)
+                        val mins = timerMinutes.toIntOrNull() ?: 0
+                        val secs = timerSecs.toIntOrNull() ?: 0
+                        val totalTimerSeconds = if (isCustom) (mins * 60) + secs else 0
+                        onSave(selectedName.trim(), unit.trim(), v, totalTimerSeconds, notifyEnabled)
                     }
                 }
             ) { Text("Add") }
@@ -1555,6 +1766,112 @@ fun SetTargetsDialog(
                 }
                 onDismiss()
             }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+private fun formatTimerDisplay(seconds: Long): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
+    else String.format("%02d:%02d", m, s)
+}
+
+@Composable
+fun EditCustomObjectiveDialog(
+    target: NutritionTarget,
+    onDismiss: () -> Unit,
+    onSave: (label: String, timerSeconds: Int, notifyEnabled: Boolean) -> Unit
+) {
+    var label by remember { mutableStateOf(target.label) }
+    var timerMinutes by remember { mutableStateOf(
+        if (target.timerSeconds > 0) (target.timerSeconds / 60).toString() else ""
+    ) }
+    var timerSecs by remember { mutableStateOf(
+        if (target.timerSeconds > 0) (target.timerSeconds % 60).toString() else ""
+    ) }
+    var notifyEnabled by remember { mutableStateOf(target.timerNotifyEnabled) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Objective") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    "Timer",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = timerMinutes,
+                        onValueChange = { timerMinutes = it.filter { c -> c.isDigit() } },
+                        label = { Text("Min") },
+                        placeholder = { Text("0") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(":", fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = timerSecs,
+                        onValueChange = {
+                            val filtered = it.filter { c -> c.isDigit() }
+                            val num = filtered.toIntOrNull() ?: 0
+                            timerSecs = if (num > 59) "59" else filtered
+                        },
+                        label = { Text("Sec") },
+                        placeholder = { Text("0") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Text(
+                    "Leave empty for no timer",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Notify when done", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = notifyEnabled, onCheckedChange = { notifyEnabled = it })
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (label.isNotBlank()) {
+                        val mins = timerMinutes.toIntOrNull() ?: 0
+                        val secs = timerSecs.toIntOrNull() ?: 0
+                        val totalSeconds = (mins * 60) + secs
+                        onSave(label.trim(), totalSeconds, notifyEnabled)
+                    }
+                }
+            ) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

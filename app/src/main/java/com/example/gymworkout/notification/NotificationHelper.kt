@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.example.gymworkout.MainActivity
@@ -84,7 +85,14 @@ object NotificationHelper {
         }
     }
 
-    fun showNotification(context: Context, notificationId: Int, title: String, text: String, channelId: String = CHANNEL_ID) {
+    fun showNotification(
+        context: Context,
+        notificationId: Int,
+        title: String,
+        text: String,
+        channelId: String = CHANNEL_ID,
+        soundUri: Uri? = null
+    ) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -93,16 +101,19 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, channelId)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(text)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
-            .build()
+
+        if (soundUri != null) {
+            builder.setSound(soundUri)
+        }
 
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.notify(notificationId, notification)
+        manager.notify(notificationId, builder.build())
     }
 }

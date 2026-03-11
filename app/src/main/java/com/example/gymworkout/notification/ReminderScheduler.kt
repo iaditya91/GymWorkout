@@ -29,6 +29,7 @@ object ReminderScheduler {
                 putExtra(ReminderReceiver.EXTRA_CUSTOM_TEXT, reminder.customText)
                 putExtra(ReminderReceiver.EXTRA_REMINDER_ID, reminder.id)
                 putExtra(ReminderReceiver.EXTRA_TIME_INDEX, index)
+                putExtra(ReminderReceiver.EXTRA_RINGTONE_URI, reminder.ringtoneUri)
             }
 
             val requestCode = reminder.id * MAX_TIMES_PER_REMINDER + index
