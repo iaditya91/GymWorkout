@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -58,7 +59,8 @@ fun FoodLogDialog(
     customFoods: List<FoodItem> = emptyList(),
     onDismiss: () -> Unit,
     onLog: (FoodItem, Float) -> Unit,
-    onSaveCustomFood: (CustomFoodItem) -> Unit = {}
+    onSaveCustomFood: (CustomFoodItem) -> Unit = {},
+    onScanBarcode: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
@@ -90,6 +92,11 @@ fun FoodLogDialog(
     var customFolate by remember { mutableStateOf("") }
     var customIron by remember { mutableStateOf("") }
     var customCalcium by remember { mutableStateOf("") }
+    var customMagnesium by remember { mutableStateOf("") }
+    var customPotassium by remember { mutableStateOf("") }
+    var customZinc by remember { mutableStateOf("") }
+    var customCopper by remember { mutableStateOf("") }
+    var customSelenium by remember { mutableStateOf("") }
 
     // Combine built-in and custom foods
     val allFoods = remember(customFoods) { FoodDatabase.foods + customFoods }
@@ -372,14 +379,66 @@ fun FoodLogDialog(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    OutlinedTextField(
-                        value = customCalcium,
-                        onValueChange = { customCalcium = it },
-                        label = { Text("Calcium (mg)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = customCalcium,
+                            onValueChange = { customCalcium = it },
+                            label = { Text("Calcium (mg)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = customMagnesium,
+                            onValueChange = { customMagnesium = it },
+                            label = { Text("Magnesium (mg)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = customPotassium,
+                            onValueChange = { customPotassium = it },
+                            label = { Text("Potassium (mg)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = customZinc,
+                            onValueChange = { customZinc = it },
+                            label = { Text("Zinc (mg)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = customCopper,
+                            onValueChange = { customCopper = it },
+                            label = { Text("Copper (mg)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = customSelenium,
+                            onValueChange = { customSelenium = it },
+                            label = { Text("Selenium (mcg)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -411,7 +470,12 @@ fun FoodLogDialog(
                                     vitKPerBase = customVitK.toFloatOrNull() ?: 0f,
                                     folatePerBase = customFolate.toFloatOrNull() ?: 0f,
                                     ironPerBase = customIron.toFloatOrNull() ?: 0f,
-                                    calciumPerBase = customCalcium.toFloatOrNull() ?: 0f
+                                    calciumPerBase = customCalcium.toFloatOrNull() ?: 0f,
+                                    magnesiumPerBase = customMagnesium.toFloatOrNull() ?: 0f,
+                                    potassiumPerBase = customPotassium.toFloatOrNull() ?: 0f,
+                                    zincPerBase = customZinc.toFloatOrNull() ?: 0f,
+                                    copperPerBase = customCopper.toFloatOrNull() ?: 0f,
+                                    seleniumPerBase = customSelenium.toFloatOrNull() ?: 0f
                                 )
                             )
                             showCustomForm = false
@@ -489,7 +553,12 @@ fun FoodLogDialog(
                                     Triple("Vitamin K", food.vitKPerBase, "mcg"),
                                     Triple("Folate", food.folatePerBase, "mcg"),
                                     Triple("Iron", food.ironPerBase, "mg"),
-                                    Triple("Calcium", food.calciumPerBase, "mg")
+                                    Triple("Calcium", food.calciumPerBase, "mg"),
+                                    Triple("Magnesium", food.magnesiumPerBase, "mg"),
+                                    Triple("Potassium", food.potassiumPerBase, "mg"),
+                                    Triple("Zinc", food.zincPerBase, "mg"),
+                                    Triple("Copper", food.copperPerBase, "mg"),
+                                    Triple("Selenium", food.seleniumPerBase, "mcg")
                                 ).filter { it.second > 0 }
 
                                 if (vitaminRows.isNotEmpty()) {
@@ -558,14 +627,28 @@ fun FoodLogDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    FilledTonalButton(
-                        onClick = { showCustomForm = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add Custom Food")
+                        FilledTonalButton(
+                            onClick = { showCustomForm = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Custom Food")
+                        }
+                        FilledTonalButton(
+                            onClick = onScanBarcode,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Scan Barcode")
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))

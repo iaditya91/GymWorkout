@@ -99,6 +99,8 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
     var customReminderTarget by remember { mutableStateOf<NutritionTarget?>(null) }
     var deleteTargetCategory by remember { mutableStateOf<String?>(null) }
     var showFoodLogDialog by remember { mutableStateOf(false) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
+    val barcodeLookupState by viewModel.barcodeLookupState.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Nutrition, 1 = Habits
     val customFoodItems by viewModel.customFoods.collectAsState(initial = emptyList())
     val customFoodsAsFoodItems = remember(customFoodItems) { customFoodItems.map { it.toFoodItem() } }
@@ -444,6 +446,39 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
             },
             onSaveCustomFood = { customFood ->
                 viewModel.saveCustomFood(customFood)
+            },
+            onScanBarcode = {
+                showFoodLogDialog = false
+                showBarcodeScanner = true
+            }
+        )
+    }
+
+    if (showBarcodeScanner) {
+        BarcodeScannerScreen(
+            onBarcodeDetected = { barcode ->
+                showBarcodeScanner = false
+                viewModel.lookupBarcode(barcode)
+            },
+            onBack = { showBarcodeScanner = false }
+        )
+    }
+
+    if (barcodeLookupState !is NutritionViewModel.BarcodeLookupState.Idle) {
+        ScannedFoodDialog(
+            state = barcodeLookupState,
+            onDismiss = { viewModel.resetBarcodeLookup() },
+            onLog = { food, qty ->
+                viewModel.logFood(selectedDate, food, qty)
+                viewModel.resetBarcodeLookup()
+            },
+            onSave = { product ->
+                viewModel.saveScannedAsCustomFood(product)
+            },
+            onSaveAndLog = { product, qty ->
+                viewModel.saveScannedAsCustomFood(product)
+                viewModel.logFood(selectedDate, product.foodItem, qty)
+                viewModel.resetBarcodeLookup()
             }
         )
     }
@@ -1086,6 +1121,11 @@ fun FoodLogSection(
     addIfPositive("Folate", foodLogs.sumOf { it.folate.toDouble() }.toFloat(), "mcg")
     addIfPositive("Iron", foodLogs.sumOf { it.iron.toDouble() }.toFloat(), "mg")
     addIfPositive("Calcium", foodLogs.sumOf { it.calcium.toDouble() }.toFloat(), "mg")
+    addIfPositive("Magnesium", foodLogs.sumOf { it.magnesium.toDouble() }.toFloat(), "mg")
+    addIfPositive("Potassium", foodLogs.sumOf { it.potassium.toDouble() }.toFloat(), "mg")
+    addIfPositive("Zinc", foodLogs.sumOf { it.zinc.toDouble() }.toFloat(), "mg")
+    addIfPositive("Copper", foodLogs.sumOf { it.copper.toDouble() }.toFloat(), "mg")
+    addIfPositive("Selenium", foodLogs.sumOf { it.selenium.toDouble() }.toFloat(), "mcg")
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -1539,6 +1579,11 @@ fun getFoodFieldValue(food: FoodItem, fieldKey: String): Float {
         "folate" -> food.folatePerBase
         "iron" -> food.ironPerBase
         "calcium" -> food.calciumPerBase
+        "magnesium" -> food.magnesiumPerBase
+        "potassium" -> food.potassiumPerBase
+        "zinc" -> food.zincPerBase
+        "copper" -> food.copperPerBase
+        "selenium" -> food.seleniumPerBase
         "calories" -> food.caloriesPerBase
         "protein" -> food.proteinPerBase
         "carbs" -> food.carbsPerBase

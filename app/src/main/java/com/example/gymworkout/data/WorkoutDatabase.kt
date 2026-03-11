@@ -66,6 +66,23 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
     }
 }
 
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Add new mineral columns to food_log
+        db.execSQL("ALTER TABLE food_log ADD COLUMN magnesium REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE food_log ADD COLUMN potassium REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE food_log ADD COLUMN zinc REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE food_log ADD COLUMN copper REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE food_log ADD COLUMN selenium REAL NOT NULL DEFAULT 0")
+        // Add new mineral columns to custom_foods
+        db.execSQL("ALTER TABLE custom_foods ADD COLUMN magnesiumPerBase REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE custom_foods ADD COLUMN potassiumPerBase REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE custom_foods ADD COLUMN zincPerBase REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE custom_foods ADD COLUMN copperPerBase REAL NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE custom_foods ADD COLUMN seleniumPerBase REAL NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [
         Exercise::class,
@@ -81,7 +98,7 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
         MotivationalQuote::class,
         CustomFoodItem::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -103,7 +120,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     WorkoutDatabase::class.java,
                     "workout_database"
                 )
-                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
+                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
