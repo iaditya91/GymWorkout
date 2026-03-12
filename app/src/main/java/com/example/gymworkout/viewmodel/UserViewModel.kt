@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.gymworkout.data.ChecklistItem
 import com.example.gymworkout.data.MotivationalQuote
 import com.example.gymworkout.data.QuotePreference
+import com.example.gymworkout.data.AiPlannerPreference
 import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WorkoutDatabase
 import com.example.gymworkout.data.WorkoutReminder
@@ -64,6 +65,7 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
     init {
         checkAndAutoReset()
         QuotePreference.init(application)
+        AiPlannerPreference.init(application)
     }
 
     private fun checkAndAutoReset() {
@@ -111,6 +113,10 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteChecklistItem(item: ChecklistItem) {
         viewModelScope.launch { dao.deleteChecklistItem(item) }
+    }
+
+    fun updateChecklistItem(item: ChecklistItem, newText: String) {
+        viewModelScope.launch { dao.updateChecklistItem(item.copy(text = newText)) }
     }
 
     fun resetDayChecklist() {

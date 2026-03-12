@@ -72,6 +72,20 @@ object NotificationHelper {
         }
     }
 
+    fun createAiPlannerNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "ai_planner_reminders",
+                "AI Planner Suggestions",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Daily AI planner tips at a random time"
+            }
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
     fun createAutoBackupNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(

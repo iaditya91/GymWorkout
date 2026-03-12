@@ -62,6 +62,7 @@ import com.example.gymworkout.ui.screens.nutrition.NutritionScreen
 import com.example.gymworkout.ui.screens.stats.StatsScreen
 import com.example.gymworkout.ui.screens.user.UserScreen
 import com.example.gymworkout.data.QuotePreference
+import com.example.gymworkout.data.AiPlannerPreference
 import com.example.gymworkout.data.ThemePreference
 import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.notification.NotificationHelper
@@ -94,9 +95,11 @@ class MainActivity : ComponentActivity() {
         NotificationHelper.createWorkoutNotificationChannel(this)
         NotificationHelper.createQuoteNotificationChannel(this)
         NotificationHelper.createAutoBackupNotificationChannel(this)
+        NotificationHelper.createAiPlannerNotificationChannel(this)
         requestNotificationPermission()
         ExerciseRepository.load(this)
         QuotePreference.init(this)
+        AiPlannerPreference.init(this)
         SyncPreference.init(this)
         setContent {
             val darkMode by ThemePreference.isDarkMode.collectAsState()

@@ -82,6 +82,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".notification.AiPlannerNotificationReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".notification.BootReceiver"
             android:exported="false">
             <intent-filter>

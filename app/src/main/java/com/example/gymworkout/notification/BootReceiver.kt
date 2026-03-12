@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.gymworkout.data.QuotePreference
+import com.example.gymworkout.data.AiPlannerPreference
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,11 @@ class BootReceiver : BroadcastReceiver() {
                 // Reschedule auto backup
                 if (AutoBackupScheduler.isEnabled(context)) {
                     AutoBackupScheduler.schedule(context)
+                }
+
+                // Reschedule AI planner notifications
+                if (AiPlannerPreference.getEnabled(context)) {
+                    AiPlannerNotificationScheduler.schedule(context)
                 }
             }
         }

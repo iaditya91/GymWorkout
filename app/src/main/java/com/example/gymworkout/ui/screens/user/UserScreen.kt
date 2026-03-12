@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.Logout
@@ -97,6 +98,8 @@ import com.example.gymworkout.data.MotivationalQuote
 import com.example.gymworkout.data.MotivationalQuotes
 import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.sync.SyncPreference
+import com.example.gymworkout.data.AiPlannerPreference
+import com.example.gymworkout.notification.AiPlannerNotificationScheduler
 import android.media.RingtoneManager
 import androidx.compose.material.icons.filled.MusicNote
 import com.example.gymworkout.data.TimerSoundPreference
@@ -117,6 +120,7 @@ fun UserScreen(viewModel: UserViewModel) {
     var showEditProfile by remember { mutableStateOf(false) }
     var showAddDo by remember { mutableStateOf(false) }
     var showAddDont by remember { mutableStateOf(false) }
+    var editingChecklistItem by remember { mutableStateOf<com.example.gymworkout.data.ChecklistItem?>(null) }
 
     // Google sync state
     val syncState by viewModel.syncState.collectAsState()
@@ -136,6 +140,9 @@ fun UserScreen(viewModel: UserViewModel) {
     val quoteSource by QuotePreference.source.collectAsState()
     val quoteTime by QuotePreference.time.collectAsState()
     val customQuotes by viewModel.getCustomQuotes().collectAsState(initial = emptyList())
+
+    // AI Planner notification state
+    val aiPlannerEnabled by AiPlannerPreference.enabled.collectAsState()
 
     // Auto-dismiss success/error after 3 seconds
     LaunchedEffect(syncState) {
@@ -239,6 +246,7 @@ fun UserScreen(viewModel: UserViewModel) {
                     accentColor = Color(0xFF66BB6A),
                     onToggle = { id, checked -> viewModel.toggleChecklistItem(id, checked) },
                     onDelete = { viewModel.deleteChecklistItem(it) },
+                    onEdit = { editingChecklistItem = it },
                     onAdd = { showAddDo = true }
                 )
             }
@@ -251,6 +259,7 @@ fun UserScreen(viewModel: UserViewModel) {
                     accentColor = Color(0xFFEF5350),
                     onToggle = { id, checked -> viewModel.toggleChecklistItem(id, checked) },
                     onDelete = { viewModel.deleteChecklistItem(it) },
+                    onEdit = { editingChecklistItem = it },
                     onAdd = { showAddDont = true }
                 )
             }
@@ -262,6 +271,20 @@ fun UserScreen(viewModel: UserViewModel) {
                     time = quoteTime,
                     customQuoteCount = customQuotes.size,
                     onClick = { showQuoteDialog = true }
+                )
+            }
+
+            item {
+                AiPlannerCard(
+                    enabled = aiPlannerEnabled,
+                    onToggle = { enabled ->
+                        AiPlannerPreference.setEnabled(context, enabled)
+                        if (enabled) {
+                            AiPlannerNotificationScheduler.schedule(context)
+                        } else {
+                            AiPlannerNotificationScheduler.cancel(context)
+                        }
+                    }
                 )
             }
 
@@ -338,6 +361,17 @@ fun UserScreen(viewModel: UserViewModel) {
             title = "Add Don't",
             onDismiss = { showAddDont = false },
             onSave = { text -> viewModel.addChecklistItem("DONT", text); showAddDont = false }
+        )
+    }
+
+    editingChecklistItem?.let { item ->
+        EditChecklistDialog(
+            item = item,
+            onDismiss = { editingChecklistItem = null },
+            onSave = { newText ->
+                viewModel.updateChecklistItem(item, newText)
+                editingChecklistItem = null
+            }
         )
     }
 
@@ -1011,7 +1045,8 @@ fun PhotosSection(
 @Composable
 fun ChecklistSection(
     title: String, subtitle: String, items: List<ChecklistItem>, accentColor: Color,
-    onToggle: (Int, Boolean) -> Unit, onDelete: (ChecklistItem) -> Unit, onAdd: () -> Unit
+    onToggle: (Int, Boolean) -> Unit, onDelete: (ChecklistItem) -> Unit,
+    onEdit: (ChecklistItem) -> Unit, onAdd: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -1043,6 +1078,7 @@ fun ChecklistSection(
                 items.forEach { item ->
                     ChecklistRow(item = item, accentColor = accentColor,
                         onToggle = { onToggle(item.id, !item.isChecked) },
+                        onEdit = { onEdit(item) },
                         onDelete = { onDelete(item) })
                 }
             }
@@ -1051,7 +1087,7 @@ fun ChecklistSection(
 }
 
 @Composable
-fun ChecklistRow(item: ChecklistItem, accentColor: Color, onToggle: () -> Unit, onDelete: () -> Unit) {
+fun ChecklistRow(item: ChecklistItem, accentColor: Color, onToggle: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1069,6 +1105,9 @@ fun ChecklistRow(item: ChecklistItem, accentColor: Color, onToggle: () -> Unit, 
             color = if (item.isChecked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis
         )
+        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+        }
         IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
             Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
         }
@@ -1177,6 +1216,29 @@ fun AddChecklistDialog(title: String, onDismiss: () -> Unit, onSave: (String) ->
             )
         },
         confirmButton = { TextButton(onClick = { if (text.isNotBlank()) onSave(text.trim()) }) { Text("Add") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+fun EditChecklistDialog(
+    item: com.example.gymworkout.data.ChecklistItem,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(item.text) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Item") },
+        text = {
+            OutlinedTextField(
+                value = text, onValueChange = { text = it }, label = { Text("Item") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = { TextButton(onClick = { if (text.isNotBlank()) onSave(text.trim()) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
@@ -1655,6 +1717,65 @@ fun MotivationalQuotesCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun AiPlannerCard(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = if (enabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "AI Daily Planner",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    if (enabled) "" else "Tap to enable daily AI tips",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                )
+            )
         }
     }
 }
