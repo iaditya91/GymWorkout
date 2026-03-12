@@ -3,7 +3,6 @@ package com.example.gymworkout.notification
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.example.gymworkout.data.TimerSoundPreference
 
 class TimerReceiver : BroadcastReceiver() {
 
@@ -20,18 +19,9 @@ class TimerReceiver : BroadcastReceiver() {
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, label.hashCode())
         val timerType = intent.getStringExtra(EXTRA_TIMER_TYPE) ?: "habit"
 
-        if (notifyEnabled) {
-            val soundUri = when (timerType) {
-                "rest" -> TimerSoundPreference.getRestTimerSoundUri(context)
-                else -> TimerSoundPreference.getHabitTimerSoundUri(context)
-            }
-            NotificationHelper.showNotification(
-                context = context,
-                notificationId = notificationId,
-                title = "$label Timer Done",
-                text = "Your $label timer has finished!",
-                soundUri = soundUri
-            )
-        }
+        if (!notifyEnabled) return
+
+        // Both habit and rest timers: continuous ring/vibrate until dismissed in-app
+        TimerAlertService.start(context, label, timerType)
     }
 }

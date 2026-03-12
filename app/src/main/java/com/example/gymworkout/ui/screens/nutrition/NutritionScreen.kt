@@ -59,6 +59,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -100,11 +101,13 @@ import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.data.NutritionReminder
+import com.example.gymworkout.notification.TimerAlertService
 import com.example.gymworkout.notification.TimerReceiver
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.compose.material3.Switch
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
@@ -113,7 +116,10 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NutritionScreen(viewModel: NutritionViewModel) {
+fun NutritionScreen(
+    viewModel: NutritionViewModel,
+    onNavigateToAiChat: () -> Unit = {}
+) {
 
     val selectedDate by viewModel.selectedDate.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
@@ -187,11 +193,35 @@ fun NutritionScreen(viewModel: NutritionViewModel) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Log intake")
+                if (Build.VERSION.SDK_INT >= 31) {
+                    FloatingActionButton(
+                        onClick = onNavigateToAiChat,
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        elevation = FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 2.dp,
+                            pressedElevation = 4.dp
+                        ),
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = "AI Chat",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Log intake")
+                }
             }
         }
     ) { padding ->
@@ -1068,6 +1098,8 @@ fun CustomCategoryCard(
     var timerRunning by remember { mutableStateOf(false) }
     var timerPaused by remember { mutableStateOf(false) }
     var timerRemaining by remember { mutableLongStateOf(target.timerSeconds.toLong()) }
+    var showTimerDialog by remember { mutableStateOf(false) }
+    var timerJustFinished by remember { mutableStateOf(false) }
 
     // Countdown effect
     if (isTrulyCustom) {
@@ -1080,6 +1112,7 @@ fun CustomCategoryCard(
                 if (timerRemaining <= 0L) {
                     timerRunning = false
                     timerPaused = false
+                    timerJustFinished = true
                     val intent = Intent(context, TimerReceiver::class.java).apply {
                         putExtra(TimerReceiver.EXTRA_LABEL, target.label)
                         putExtra(TimerReceiver.EXTRA_NOTIFY, target.timerNotifyEnabled)
@@ -1090,6 +1123,13 @@ fun CustomCategoryCard(
                     timerRemaining = target.timerSeconds.toLong()
                 }
             }
+        }
+    }
+
+    // Auto-reopen the popup when timer finishes (even if user had minimized it)
+    if (isTrulyCustom) {
+        LaunchedEffect(timerJustFinished) {
+            if (timerJustFinished) showTimerDialog = true
         }
     }
 
@@ -1128,6 +1168,36 @@ fun CustomCategoryCard(
                 )
                 timerRemaining = timerSecs.toLong()
                 showEditDialog = false
+            }
+        )
+    }
+
+    if (showTimerDialog && hasTimer) {
+        com.example.gymworkout.ui.components.HabitTimerDialog(
+            label = target.label,
+            totalSeconds = target.timerSeconds,
+            remaining = timerRemaining,
+            isRunning = timerRunning,
+            isPaused = timerPaused,
+            isFinished = timerJustFinished,
+            onPauseResume = { timerPaused = !timerPaused },
+            onReset = {
+                timerRemaining = target.timerSeconds.toLong()
+                timerRunning = true
+                timerPaused = false
+            },
+            onStop = {
+                timerRunning = false
+                timerPaused = false
+                timerRemaining = target.timerSeconds.toLong()
+                showTimerDialog = false
+            },
+            onDismiss = {
+                if (timerJustFinished) {
+                    TimerAlertService.stop(context)
+                }
+                showTimerDialog = false
+                timerJustFinished = false
             }
         )
     }
@@ -1320,7 +1390,9 @@ fun CustomCategoryCard(
                         color = if (timerRunning && !timerPaused)
                             MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(enabled = timerRunning) { showTimerDialog = true }
                     )
 
                     if (!timerRunning) {
@@ -1330,6 +1402,7 @@ fun CustomCategoryCard(
                                 timerRemaining = target.timerSeconds.toLong()
                                 timerRunning = true
                                 timerPaused = false
+                                showTimerDialog = true
                             },
                             modifier = Modifier.size(36.dp)
                         ) {

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -38,6 +39,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -77,6 +80,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.example.gymworkout.data.Exercise
+import android.os.Build
 import com.example.gymworkout.ui.components.AddExerciseDialog
 import com.example.gymworkout.ui.components.NotesDialog
 import com.example.gymworkout.ui.components.RestTimerDialog
@@ -126,7 +130,8 @@ fun DayDetailScreen(
     viewModel: WorkoutViewModel,
     onBack: () -> Unit,
     onPlayVideo: (exerciseName: String, youtubeUrl: String) -> Unit = { _, _ -> },
-    onViewExerciseDetail: (String) -> Unit = {}
+    onViewExerciseDetail: (String) -> Unit = {},
+    onNavigateToAiChat: () -> Unit = {}
 ) {
     val exercises by viewModel.getExercisesForDay(dayIndex).collectAsState(initial = emptyList())
     val groupedItems = remember(exercises) { groupExercises(exercises) }
@@ -210,15 +215,39 @@ fun DayDetailScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(16.dp)
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Exercise")
+                if (Build.VERSION.SDK_INT >= 31) {
+                    FloatingActionButton(
+                        onClick = onNavigateToAiChat,
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        elevation = FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 2.dp,
+                            pressedElevation = 4.dp
+                        ),
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = "AI Chat",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                ExtendedFloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Add Exercise")
+                }
             }
         }
     ) { padding ->

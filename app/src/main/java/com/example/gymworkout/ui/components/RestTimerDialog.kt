@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.gymworkout.notification.TimerAlertService
 import com.example.gymworkout.notification.TimerReceiver
 import kotlinx.coroutines.delay
 
@@ -81,7 +82,8 @@ fun RestTimerDialog(
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        // Prevent back-press dismissal while alert is ringing — user must tap Done
+        onDismissRequest = { if (!finished) onDismiss() },
         title = {
             Text(
                 if (finished) "Rest Complete!" else "Rest Timer",
@@ -169,7 +171,10 @@ fun RestTimerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = {
+                if (finished) TimerAlertService.stop(context)
+                onDismiss()
+            }) {
                 Text(if (finished) "Done" else "Dismiss")
             }
         }

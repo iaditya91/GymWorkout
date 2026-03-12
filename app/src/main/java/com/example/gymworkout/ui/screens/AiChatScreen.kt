@@ -74,9 +74,10 @@ fun AiChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    val totalItems = uiState.messages.size + if (uiState.isLoading) 1 else 0
+    LaunchedEffect(totalItems) {
+        if (totalItems > 0) {
+            listState.animateScrollToItem(totalItems - 1)
         }
     }
 

@@ -138,7 +138,10 @@ fun WorkoutApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomBarRoutes
-    val showFab = Build.VERSION.SDK_INT >= 31 && currentRoute != "ai_chat"
+    val showFab = Build.VERSION.SDK_INT >= 31 &&
+            currentRoute != "ai_chat" &&
+            currentRoute != "nutrition" &&
+            currentRoute?.startsWith("day/") != true
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -240,7 +243,8 @@ fun WorkoutApp() {
                     onViewExerciseDetail = { exerciseName ->
                         val encodedName = URLEncoder.encode(exerciseName, "UTF-8")
                         navController.navigate("exercise_detail/$encodedName")
-                    }
+                    },
+                    onNavigateToAiChat = { navController.navigate("ai_chat") }
                 )
             }
             composable(
@@ -279,7 +283,10 @@ fun WorkoutApp() {
                 )
             }
             composable("nutrition") {
-                NutritionScreen(viewModel = nutritionViewModel)
+                NutritionScreen(
+                    viewModel = nutritionViewModel,
+                    onNavigateToAiChat = { navController.navigate("ai_chat") }
+                )
             }
             composable("stats") {
                 StatsScreen(viewModel = statsViewModel)
