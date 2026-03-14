@@ -59,6 +59,7 @@ import com.example.gymworkout.viewmodel.AiChatViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import com.example.gymworkout.ui.screens.nutrition.NutritionScreen
+import com.example.gymworkout.ui.screens.nutrition.HabitDetailScreen
 import com.example.gymworkout.ui.screens.stats.StatsScreen
 import com.example.gymworkout.ui.screens.user.UserScreen
 import com.example.gymworkout.data.QuotePreference
@@ -288,7 +289,22 @@ fun WorkoutApp() {
             composable("nutrition") {
                 NutritionScreen(
                     viewModel = nutritionViewModel,
-                    onNavigateToAiChat = { navController.navigate("ai_chat") }
+                    onNavigateToAiChat = { navController.navigate("ai_chat") },
+                    onOpenHabit = { categoryKey ->
+                        val encoded = URLEncoder.encode(categoryKey, "UTF-8")
+                        navController.navigate("habit/$encoded")
+                    }
+                )
+            }
+            composable(
+                route = "habit/{category}",
+                arguments = listOf(navArgument("category") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val categoryKey = backStackEntry.arguments?.getString("category") ?: ""
+                HabitDetailScreen(
+                    categoryKey = URLDecoder.decode(categoryKey, "UTF-8"),
+                    viewModel = nutritionViewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("stats") {

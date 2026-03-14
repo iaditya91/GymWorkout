@@ -118,7 +118,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun NutritionScreen(
     viewModel: NutritionViewModel,
-    onNavigateToAiChat: () -> Unit = {}
+    onNavigateToAiChat: () -> Unit = {},
+    onOpenHabit: (String) -> Unit = {}
 ) {
 
     val selectedDate by viewModel.selectedDate.collectAsState()
@@ -313,7 +314,7 @@ fun NutritionScreen(
                 val nutritionCategories = listOf(
                     NutritionCategory.CALORIES,
                     NutritionCategory.PROTEIN,
-                    NutritionCategory.CARBS
+                    NutritionCategory.CARBS,
                 ).filter { cat -> allTargets.any { it.category == cat.name } }
 
                 items(nutritionCategories) { category ->
@@ -397,7 +398,8 @@ fun NutritionScreen(
                         viewModel = viewModel,
                         onReminderClick = { customReminderTarget = target },
                         onDelete = { deleteTargetCategory = target.category },
-                        isHabit = true
+                        isHabit = true,
+                        onOpenHabit = { onOpenHabit(target.category) }
                     )
                 }
 
@@ -868,17 +870,18 @@ fun AddNutritionDialog(
         it.isCustom && it.label.lowercase() !in nutritionRelatedNames
     }
 
-    // Nutrition built-ins: Water, Calories, Protein, Carbs (only those with targets set)
+    // Nutrition built-ins: Calories, Protein, Carbs (only those with targets set)
     val nutritionBuiltIns = listOf(
-        NutritionCategory.WATER,
         NutritionCategory.CALORIES,
         NutritionCategory.PROTEIN,
         NutritionCategory.CARBS
     ).filter { cat -> allTargets.any { it.category == cat.name } }
 
-    // Habit built-in: Sleep (only if target set)
-    val habitBuiltIn = if (allTargets.any { it.category == NutritionCategory.SLEEP.name })
-        NutritionCategory.SLEEP else null
+    // Habit built-ins: Water, Sleep (only those with targets set)
+    val habitBuiltIns = listOf(
+        NutritionCategory.WATER,
+        NutritionCategory.SLEEP
+    ).filter { cat -> allTargets.any { it.category == cat.name } }
 
     // Auto-select first item when switching tabs
     LaunchedEffect(dialogTab) {
@@ -891,8 +894,9 @@ fun AddNutritionDialog(
                 selectedCustomKey = customNutritionTargets.firstOrNull()?.category
             }
         } else {
-            if (habitBuiltIn != null) {
-                selectedBuiltIn = habitBuiltIn
+            val firstHabitBuiltIn = habitBuiltIns.firstOrNull()
+            if (firstHabitBuiltIn != null) {
+                selectedBuiltIn = firstHabitBuiltIn
             } else {
                 selectedCustomKey = customHabitTargets.firstOrNull()?.category
             }
@@ -959,11 +963,11 @@ fun AddNutritionDialog(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        if (habitBuiltIn != null) {
+                        habitBuiltIns.forEach { cat ->
                             CategoryChip(
-                                category = habitBuiltIn,
-                                selected = selectedBuiltIn == habitBuiltIn,
-                                onClick = { selectedBuiltIn = habitBuiltIn; selectedCustomKey = null }
+                                category = cat,
+                                selected = selectedBuiltIn == cat,
+                                onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
                             )
                         }
                         customHabitTargets.forEach { t ->
@@ -1076,7 +1080,8 @@ fun CustomCategoryCard(
     viewModel: NutritionViewModel,
     onReminderClick: () -> Unit = {},
     onDelete: () -> Unit,
-    isHabit: Boolean = false
+    isHabit: Boolean = false,
+    onOpenHabit: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val total by viewModel.getTotalForCategory(date, target.category).collectAsState(initial = 0f)
@@ -1210,10 +1215,13 @@ fun CustomCategoryCard(
         ),
         border = if (met) BorderStroke(2.dp, color) else null
     ) {
+        val columnModifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .then(if (isHabit) Modifier.clickable { onOpenHabit() } else Modifier)
+
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier = columnModifier
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

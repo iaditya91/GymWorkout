@@ -140,6 +140,45 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
     }
 }
 
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS atomic_habits (
+                category TEXT NOT NULL PRIMARY KEY DEFAULT '',
+                cue TEXT NOT NULL DEFAULT '',
+                craving TEXT NOT NULL DEFAULT '',
+                response TEXT NOT NULL DEFAULT '',
+                reward TEXT NOT NULL DEFAULT '',
+                updatedAt TEXT NOT NULL DEFAULT ''
+            )
+        """.trimIndent())
+        // Migrate existing JSON data from nutrition_targets.notes into atomic_habits
+        val cursor = db.query("SELECT category, notes FROM nutrition_targets WHERE notes LIKE '{%'")
+        while (cursor.moveToNext()) {
+            val category = cursor.getString(0)
+            val notes = cursor.getString(1)
+            try {
+                val json = org.json.JSONObject(notes)
+                val cue = json.optString("cue", "")
+                val craving = json.optString("craving", "")
+                val response = json.optString("response", "")
+                val reward = json.optString("reward", "")
+                if (cue.isNotEmpty() || craving.isNotEmpty() || response.isNotEmpty() || reward.isNotEmpty()) {
+                    db.execSQL(
+                        "INSERT OR REPLACE INTO atomic_habits (category, cue, craving, response, reward, updatedAt) VALUES (?, ?, ?, ?, ?, '')",
+                        arrayOf(category, cue, craving, response, reward)
+                    )
+                    // Clear the JSON from notes since it's now in dedicated table
+                    db.execSQL("UPDATE nutrition_targets SET notes = '' WHERE category = ?", arrayOf(category))
+                }
+            } catch (_: Exception) {
+                // Not valid JSON, skip
+            }
+        }
+        cursor.close()
+    }
+}
+
 @Database(
     entities = [
         Exercise::class,
@@ -153,9 +192,10 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
         WorkoutReminder::class,
         FoodLogEntry::class,
         MotivationalQuote::class,
-        CustomFoodItem::class
+        CustomFoodItem::class,
+        AtomicHabit::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -177,7 +217,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     WorkoutDatabase::class.java,
                     "workout_database"
                 )
-                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
+                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

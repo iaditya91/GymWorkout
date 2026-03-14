@@ -32,3 +32,14 @@ data class NutritionTarget(
     val timerSeconds: Int = 0, // Timer duration in seconds (0 = no timer)
     val timerNotifyEnabled: Boolean = true   // Show notification when timer finishes (respects device sound profile)
 )
+
+@Entity(tableName = "atomic_habits")
+data class AtomicHabit(
+    @PrimaryKey
+    val category: String = "",     // matches NutritionTarget.category
+    val cue: String = "",          // Make it obvious
+    val craving: String = "",      // Make it attractive
+    val response: String = "",     // Make it easy
+    val reward: String = "",       // Make it satisfying
+    val updatedAt: String = ""     // yyyy-MM-dd HH:mm
+)

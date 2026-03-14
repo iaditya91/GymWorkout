@@ -117,4 +117,26 @@ interface NutritionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllCustomFoods(items: List<CustomFoodItem>)
+
+    // Atomic habits
+    @Query("SELECT * FROM atomic_habits WHERE category = :category")
+    fun getAtomicHabit(category: String): Flow<AtomicHabit?>
+
+    @Query("SELECT * FROM atomic_habits WHERE category = :category")
+    suspend fun getAtomicHabitSync(category: String): AtomicHabit?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAtomicHabit(habit: AtomicHabit)
+
+    @Query("DELETE FROM atomic_habits WHERE category = :category")
+    suspend fun deleteAtomicHabit(category: String)
+
+    @Query("SELECT * FROM atomic_habits")
+    suspend fun getAllAtomicHabitsSync(): List<AtomicHabit>
+
+    @Query("DELETE FROM atomic_habits")
+    suspend fun deleteAllAtomicHabits()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllAtomicHabits(items: List<AtomicHabit>)
 }

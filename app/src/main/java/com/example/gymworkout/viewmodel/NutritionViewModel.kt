@@ -9,6 +9,7 @@ import com.example.gymworkout.data.FoodItem
 import com.example.gymworkout.data.FoodLogEntry
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.ServingUnit
+import com.example.gymworkout.data.AtomicHabit
 import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionReminder
 import com.example.gymworkout.data.NutritionTarget
@@ -118,6 +119,90 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    // --- Atomic Habit methods ---
+
+    fun getAtomicHabit(category: String): Flow<AtomicHabit?> = dao.getAtomicHabit(category)
+
+    fun saveAtomicHabit(category: String, cue: String, craving: String, response: String, reward: String) {
+        viewModelScope.launch {
+            dao.insertAtomicHabit(
+                AtomicHabit(
+                    category = category,
+                    cue = cue,
+                    craving = craving,
+                    response = response,
+                    reward = reward,
+                    updatedAt = java.time.LocalDateTime.now()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                )
+            )
+        }
+    }
+
+    fun deleteAtomicHabit(category: String) {
+        viewModelScope.launch {
+            dao.deleteAtomicHabit(category)
+        }
+    }
+
+    /**
+     * Returns habit history with streak info: List of (date, met, currentStreak, totalMet, totalDays)
+     */
+    fun getHabitHistoryDetailed(category: String, days: Int = 30) = kotlinx.coroutines.flow.flow {
+        val list = mutableListOf<HabitDayInfo>()
+        var currentStreak = 0
+        var longestStreak = 0
+        var totalMet = 0
+        var streakBroken = false
+        for (i in (days - 1) downTo 0) {
+            val date = LocalDate.now().minusDays(i.toLong()).format(formatter)
+            val total = dao.getTotalForDateAndCategorySync(date, category)
+            val target = dao.getTargetSync(category)?.targetValue ?: 0f
+            val met = target > 0f && total >= target
+            if (met) totalMet++
+            list.add(HabitDayInfo(date = date, met = met, value = total, target = target))
+        }
+        // Calculate streaks from most recent day backwards
+        currentStreak = 0
+        for (day in list.reversed()) {
+            if (day.met) currentStreak++ else break
+        }
+        longestStreak = 0
+        var tempStreak = 0
+        for (day in list) {
+            if (day.met) {
+                tempStreak++
+                if (tempStreak > longestStreak) longestStreak = tempStreak
+            } else {
+                tempStreak = 0
+            }
+        }
+        emit(HabitHistoryResult(
+            days = list,
+            currentStreak = currentStreak,
+            longestStreak = longestStreak,
+            totalMet = totalMet,
+            totalDays = days
+        ))
+    }
+
+    data class HabitDayInfo(
+        val date: String,
+        val met: Boolean,
+        val value: Float,
+        val target: Float
+    )
+
+    data class HabitHistoryResult(
+        val days: List<HabitDayInfo>,
+        val currentStreak: Int,
+        val longestStreak: Int,
+        val totalMet: Int,
+        val totalDays: Int
+    ) {
+        val completionPercent: Int get() = if (totalDays > 0) (totalMet * 100 / totalDays) else 0
+    }
+
     fun updateCustomObjective(category: String, label: String, unit: String, timerSeconds: Int, notifyEnabled: Boolean) {
         viewModelScope.launch {
             dao.updateCustomObjective(category, label, unit, timerSeconds, notifyEnabled)
@@ -163,6 +248,22 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun todayString(): String = LocalDate.now().format(formatter)
+
+    /**
+     * Returns a StateFlow containing the last [days] days (oldest->newest)
+     * indicating whether the target was met for the given category.
+     */
+    fun getHabitHistory(category: String, days: Int = 14) = kotlinx.coroutines.flow.flow {
+        val list = mutableListOf<Pair<String, Boolean>>()
+        for (i in (days - 1) downTo 0) {
+            val date = LocalDate.now().minusDays(i.toLong()).format(formatter)
+            val total = dao.getTotalForDateAndCategorySync(date, category)
+            val target = dao.getTargetSync(category)?.targetValue ?: 0f
+            val met = target > 0f && total >= target
+            list.add(Pair(date, met))
+        }
+        emit(list)
+    }
 
     // --- Reminder methods ---
 
