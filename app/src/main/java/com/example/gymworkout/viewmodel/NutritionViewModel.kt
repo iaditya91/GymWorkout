@@ -22,6 +22,7 @@ import com.example.gymworkout.ai.AiPlannerEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
@@ -37,6 +38,9 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _selectedDate = MutableStateFlow(LocalDate.now().format(formatter))
     val selectedDate: StateFlow<String> = _selectedDate
+
+    // Bumped to trigger habit history refresh
+    private val _habitRefresh = MutableStateFlow(0L)
 
     fun setDate(date: String) {
         _selectedDate.value = date
@@ -139,6 +143,17 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /**
+     * Marks a habit as done for the given date (idempotent — clears existing entries first).
+     */
+    fun markHabitDone(date: String, category: String) {
+        viewModelScope.launch {
+            dao.clearEntriesForDateAndCategory(date, category)
+            dao.insertEntry(NutritionEntry(date = date, category = category, value = 1f))
+            _habitRefresh.value = System.currentTimeMillis()
+        }
+    }
+
     fun deleteAtomicHabit(category: String) {
         viewModelScope.launch {
             dao.deleteAtomicHabit(category)
@@ -146,45 +161,45 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Returns habit history with streak info: List of (date, met, currentStreak, totalMet, totalDays)
+     * Returns habit history with streak info, re-emits when data changes.
      */
-    fun getHabitHistoryDetailed(category: String, days: Int = 30) = kotlinx.coroutines.flow.flow {
-        val list = mutableListOf<HabitDayInfo>()
-        var currentStreak = 0
-        var longestStreak = 0
-        var totalMet = 0
-        var streakBroken = false
-        for (i in (days - 1) downTo 0) {
-            val date = LocalDate.now().minusDays(i.toLong()).format(formatter)
-            val total = dao.getTotalForDateAndCategorySync(date, category)
-            val target = dao.getTargetSync(category)?.targetValue ?: 0f
-            val met = target > 0f && total >= target
-            if (met) totalMet++
-            list.add(HabitDayInfo(date = date, met = met, value = total, target = target))
-        }
-        // Calculate streaks from most recent day backwards
-        currentStreak = 0
-        for (day in list.reversed()) {
-            if (day.met) currentStreak++ else break
-        }
-        longestStreak = 0
-        var tempStreak = 0
-        for (day in list) {
-            if (day.met) {
-                tempStreak++
-                if (tempStreak > longestStreak) longestStreak = tempStreak
-            } else {
-                tempStreak = 0
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun getHabitHistoryDetailed(category: String, days: Int = 30): Flow<HabitHistoryResult> =
+        _habitRefresh.flatMapLatest {
+            kotlinx.coroutines.flow.flow {
+                val list = mutableListOf<HabitDayInfo>()
+                var totalMet = 0
+                for (i in (days - 1) downTo 0) {
+                    val date = LocalDate.now().minusDays(i.toLong()).format(formatter)
+                    val total = dao.getTotalForDateAndCategorySync(date, category)
+                    val target = dao.getTargetSync(category)?.targetValue ?: 0f
+                    val met = target > 0f && total >= target
+                    if (met) totalMet++
+                    list.add(HabitDayInfo(date = date, met = met, value = total, target = target))
+                }
+                var currentStreak = 0
+                for (day in list.reversed()) {
+                    if (day.met) currentStreak++ else break
+                }
+                var longestStreak = 0
+                var tempStreak = 0
+                for (day in list) {
+                    if (day.met) {
+                        tempStreak++
+                        if (tempStreak > longestStreak) longestStreak = tempStreak
+                    } else {
+                        tempStreak = 0
+                    }
+                }
+                emit(HabitHistoryResult(
+                    days = list,
+                    currentStreak = currentStreak,
+                    longestStreak = longestStreak,
+                    totalMet = totalMet,
+                    totalDays = days
+                ))
             }
         }
-        emit(HabitHistoryResult(
-            days = list,
-            currentStreak = currentStreak,
-            longestStreak = longestStreak,
-            totalMet = totalMet,
-            totalDays = days
-        ))
-    }
 
     data class HabitDayInfo(
         val date: String,

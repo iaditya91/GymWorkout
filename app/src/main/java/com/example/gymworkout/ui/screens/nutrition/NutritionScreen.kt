@@ -1295,7 +1295,7 @@ fun CustomCategoryCard(
                         IconButton(
                             onClick = {
                                 if (!met) {
-                                    viewModel.addEntryByKey(date, target.category, target.targetValue)
+                                    viewModel.markHabitDone(date, target.category)
                                 }
                             },
                             modifier = Modifier.size(32.dp)
