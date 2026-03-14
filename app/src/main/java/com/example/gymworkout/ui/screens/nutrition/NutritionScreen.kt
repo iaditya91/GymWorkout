@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -930,52 +931,60 @@ fun AddNutritionDialog(
             }
         },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column {
                 Text("Category", style = MaterialTheme.typography.labelMedium)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (dialogTab == 0) {
-                    // === INTAKE TAB: nutrition built-ins + custom nutrition ===
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        nutritionBuiltIns.forEach { cat ->
-                            CategoryChip(
-                                category = cat,
-                                selected = selectedBuiltIn == cat,
-                                onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
-                            )
+                // Scrollable chips area with max height so input stays visible
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (dialogTab == 0) {
+                        // === INTAKE TAB: nutrition built-ins + custom nutrition ===
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            nutritionBuiltIns.forEach { cat ->
+                                CategoryChip(
+                                    category = cat,
+                                    selected = selectedBuiltIn == cat,
+                                    onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
+                                )
+                            }
+                            customNutritionTargets.forEach { t ->
+                                CustomChip(
+                                    label = t.label,
+                                    selected = selectedCustomKey == t.category,
+                                    onClick = { selectedCustomKey = t.category; selectedBuiltIn = null }
+                                )
+                            }
                         }
-                        customNutritionTargets.forEach { t ->
-                            CustomChip(
-                                label = t.label,
-                                selected = selectedCustomKey == t.category,
-                                onClick = { selectedCustomKey = t.category; selectedBuiltIn = null }
-                            )
-                        }
-                    }
-                } else {
-                    // === HABIT TAB: Sleep + custom habits ===
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        habitBuiltIns.forEach { cat ->
-                            CategoryChip(
-                                category = cat,
-                                selected = selectedBuiltIn == cat,
-                                onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
-                            )
-                        }
-                        customHabitTargets.forEach { t ->
-                            CustomChip(
-                                label = t.label,
-                                selected = selectedCustomKey == t.category,
-                                onClick = { selectedCustomKey = t.category; selectedBuiltIn = null }
-                            )
+                    } else {
+                        // === HABIT TAB: Sleep + custom habits ===
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            habitBuiltIns.forEach { cat ->
+                                CategoryChip(
+                                    category = cat,
+                                    selected = selectedBuiltIn == cat,
+                                    onClick = { selectedBuiltIn = cat; selectedCustomKey = null }
+                                )
+                            }
+                            customHabitTargets.forEach { t ->
+                                CustomChip(
+                                    label = t.label,
+                                    selected = selectedCustomKey == t.category,
+                                    onClick = { selectedCustomKey = t.category; selectedBuiltIn = null }
+                                )
+                            }
                         }
                     }
                 }

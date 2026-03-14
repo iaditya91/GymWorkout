@@ -2,6 +2,8 @@ package com.example.gymworkout.ui.screens.nutrition
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -153,7 +155,7 @@ fun HabitDetailScreen(
     val atomicHabit by viewModel.getAtomicHabit(categoryKey).collectAsState(initial = null)
     val today = viewModel.todayString()
 
-    val historyResult by viewModel.getHabitHistoryDetailed(categoryKey, 30)
+    val historyResult by viewModel.getHabitHistoryDetailed(categoryKey, 49)
         .collectAsState(initial = null)
 
     var editingField by remember { mutableStateOf<String?>(null) } // "cue", "craving", "response", "reward"
@@ -187,10 +189,8 @@ fun HabitDetailScreen(
                 StatsRow(result)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // === IMPROVED CHART ===
-                Text("Last 30 Days", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(8.dp))
-                HabitCalendarGrid(
+                // === GITHUB-STYLE HEATMAP ===
+                HabitHeatmap(
                     days = result.days,
                     selectedIndex = selectedDayIndex,
                     onDayClick = { idx ->
@@ -234,35 +234,15 @@ fun HabitDetailScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Completion bar
-                val animatedPercent by animateFloatAsState(
-                    targetValue = result.completionPercent / 100f,
-                    label = "percent"
+                // === WEEKLY BAR CHART (last 7 days) ===
+                Text("This Week", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+                WeeklyBarChart(
+                    days = result.days.takeLast(7),
+                    unit = targetState?.unit ?: ""
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    LinearProgressIndicator(
-                        progress = { animatedPercent },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = when {
-                            result.completionPercent >= 80 -> HabitGreen
-                            result.completionPercent >= 50 -> HabitOrange
-                            else -> HabitRed
-                        },
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        strokeCap = StrokeCap.Round
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "${result.completionPercent}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -562,63 +542,294 @@ private fun StatCard(value: String, label: String, color: Color) {
     }
 }
 
+/**
+ * GitHub-style contribution heatmap.
+ * 7 rows (Mon..Sun), columns = weeks. Each cell = one day.
+ * Green intensity reflects completion; gray = missed.
+ */
 @Composable
-private fun HabitCalendarGrid(
+private fun HabitHeatmap(
     days: List<NutritionViewModel.HabitDayInfo>,
     selectedIndex: Int?,
     onDayClick: (Int) -> Unit
 ) {
-    // Show as scrollable row of day cells
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        days.forEachIndexed { index, day ->
-            val isSelected = selectedIndex == index
-            val bgColor by animateColorAsState(
-                targetValue = when {
-                    day.met -> HabitGreen
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                },
-                label = "dayColor"
-            )
-            val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+    if (days.isEmpty()) return
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onDayClick(index) }
+    val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
+
+    // Parse the first day's day-of-week to pad the grid
+    val firstDayOfWeek = try {
+        java.time.LocalDate.parse(days.first().date).dayOfWeek.value // 1=Mon..7=Sun
+    } catch (_: Exception) { 1 }
+
+    // Build grid: pad start so first day lands on correct row
+    val paddedDays = MutableList<NutritionViewModel.HabitDayInfo?>(firstDayOfWeek - 1) { null } +
+            days.map { it }
+
+    // Split into columns of 7 (weeks)
+    val weeks = paddedDays.chunked(7)
+
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(bgColor)
-                        .then(
-                            if (isSelected) Modifier.border(2.dp, borderColor, RoundedCornerShape(6.dp))
-                            else Modifier
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (day.met) {
-                        Icon(
-                            Icons.Filled.Check,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                Text("Last 7 Weeks", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                // Legend
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Less", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { level ->
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(
+                                    if (level == 0f) surfaceVariant
+                                    else HabitGreen.copy(alpha = 0.3f + level * 0.7f)
+                                )
                         )
                     }
+                    Text("More", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                // Day-of-week labels column
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    dayLabels.forEach { label ->
+                        Box(
+                            modifier = Modifier.size(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Week columns
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    weeks.forEach { week ->
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            // Pad week to 7 rows
+                            val fullWeek = week + List(7 - week.size) { null }
+                            fullWeek.forEach { dayInfo ->
+                                if (dayInfo == null) {
+                                    // Empty cell
+                                    Box(modifier = Modifier.size(24.dp))
+                                } else {
+                                    val globalIndex = days.indexOf(dayInfo)
+                                    val isSelected = selectedIndex == globalIndex
+                                    val intensity = if (dayInfo.target > 0f && dayInfo.met) {
+                                        (dayInfo.value / dayInfo.target).coerceIn(0f, 1f)
+                                    } else if (dayInfo.met) 1f else 0f
+
+                                    val bgColor by animateColorAsState(
+                                        targetValue = if (intensity > 0f)
+                                            HabitGreen.copy(alpha = 0.3f + intensity * 0.7f)
+                                        else surfaceVariant,
+                                        label = "heatCell"
+                                    )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(bgColor)
+                                            .then(
+                                                if (isSelected) Modifier.border(
+                                                    2.dp,
+                                                    primaryColor,
+                                                    RoundedCornerShape(4.dp)
+                                                ) else Modifier
+                                            )
+                                            .clickable {
+                                                if (globalIndex >= 0) onDayClick(globalIndex)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (dayInfo.met) {
+                                            Icon(
+                                                Icons.Filled.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Bar chart showing daily values for the last 7 days.
+ */
+@Composable
+private fun WeeklyBarChart(
+    days: List<NutritionViewModel.HabitDayInfo>,
+    unit: String
+) {
+    if (days.isEmpty()) return
+
+    val maxVal = days.maxOf { maxOf(it.value, it.target) }.coerceAtLeast(1f)
+    val dayAbbreviations = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                days.forEachIndexed { index, day ->
+                    val fraction by animateFloatAsState(
+                        targetValue = (day.value / maxVal).coerceIn(0f, 1f),
+                        animationSpec = tween(durationMillis = 600, delayMillis = index * 80),
+                        label = "bar$index"
+                    )
+                    val targetFraction = (day.target / maxVal).coerceIn(0f, 1f)
+                    val barColor = when {
+                        day.met -> HabitGreen
+                        day.value > 0f -> HabitOrange
+                        else -> surfaceVariant
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Value label on top
+                        if (day.value > 0f) {
+                            Text(
+                                if (day.value == day.value.toLong().toFloat()) "${day.value.toLong()}"
+                                else "${"%.1f".format(day.value)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 8.sp,
+                                color = barColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            // Target line indicator
+                            if (day.target > 0f) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height((100 * targetFraction).dp)
+                                ) {
+                                    // Dashed target line at the top of this box
+                                    Canvas(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(1.dp)
+                                            .align(Alignment.TopCenter)
+                                    ) {
+                                        val dashWidth = 4.dp.toPx()
+                                        val gapWidth = 3.dp.toPx()
+                                        var x = 0f
+                                        while (x < size.width) {
+                                            drawLine(
+                                                color = Color.Gray.copy(alpha = 0.5f),
+                                                start = androidx.compose.ui.geometry.Offset(x, 0f),
+                                                end = androidx.compose.ui.geometry.Offset(
+                                                    (x + dashWidth).coerceAtMost(size.width), 0f
+                                                ),
+                                                strokeWidth = 2f
+                                            )
+                                            x += dashWidth + gapWidth
+                                        }
+                                    }
+                                }
+                            }
+                            // Actual bar
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.6f)
+                                    .height((100 * fraction).dp.coerceAtLeast(2.dp))
+                                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                    .background(barColor)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Day labels
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                days.forEach { day ->
+                    val dayOfWeek = try {
+                        java.time.LocalDate.parse(day.date).dayOfWeek.value - 1
+                    } catch (_: Exception) { 0 }
+                    Text(
+                        dayAbbreviations.getOrElse(dayOfWeek) { "" },
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Unit label
+            if (unit.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
-                // Show day number
-                val dayNum = day.date.substring(8) // dd from yyyy-MM-dd
                 Text(
-                    dayNum,
+                    "Dashed line = target ($unit)",
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 9.sp,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
