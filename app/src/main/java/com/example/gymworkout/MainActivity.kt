@@ -145,7 +145,8 @@ fun WorkoutApp() {
     val showFab = Build.VERSION.SDK_INT >= 31 &&
             currentRoute != "ai_chat" &&
             currentRoute != "nutrition" &&
-            currentRoute?.startsWith("day/") != true
+            currentRoute?.startsWith("day/") != true &&
+            currentRoute?.startsWith("habit/") != true
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -304,7 +305,8 @@ fun WorkoutApp() {
                 HabitDetailScreen(
                     categoryKey = URLDecoder.decode(categoryKey, "UTF-8"),
                     viewModel = nutritionViewModel,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onChatClick = if (Build.VERSION.SDK_INT >= 31) {{ navController.navigate("ai_chat") }} else null
                 )
             }
             composable("stats") {

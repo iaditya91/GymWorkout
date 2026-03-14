@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Check
@@ -161,7 +162,8 @@ private val rewardTemplates = listOf(
 fun HabitDetailScreen(
     categoryKey: String,
     viewModel: NutritionViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onChatClick: (() -> Unit)? = null
 ) {
     val targetState by viewModel.getTarget(categoryKey).collectAsState(initial = null)
     val atomicHabit by viewModel.getAtomicHabit(categoryKey).collectAsState(initial = null)
@@ -196,15 +198,31 @@ fun HabitDetailScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { viewModel.markHabitDone(today, categoryKey) },
-                shape = RoundedCornerShape(16.dp),
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Filled.Check, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Mark Done", fontWeight = FontWeight.SemiBold)
+                if (onChatClick != null) {
+                    androidx.compose.material3.FloatingActionButton(
+                        onClick = onChatClick,
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = "AI Chat", modifier = Modifier.size(22.dp))
+                    }
+                }
+                ExtendedFloatingActionButton(
+                    onClick = { viewModel.markHabitDone(today, categoryKey) },
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Mark Done", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     ) { padding ->
