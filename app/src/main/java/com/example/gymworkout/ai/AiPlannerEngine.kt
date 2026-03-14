@@ -1176,12 +1176,36 @@ object AiPlannerEngine {
                 "Write it down — thinking it isn't as effective as putting pen to paper",
                 "Do it at the same time daily to make it automatic"
             )
-            else -> listOf(
-                "Set a specific time for ${target.label} to build a consistent routine",
-                "Track your streak — visual progress is a powerful motivator",
-                "Start small and increase gradually rather than going all-in from day one",
-                "Pair ${target.label.lowercase()} with an existing habit for automatic reminders"
-            )
+            else -> {
+                val name = target.label
+                val nameLower = name.lowercase()
+                val pool = listOf(
+                    "Set a specific time for $name every day — consistency beats intensity",
+                    "Track your $name streak visually — seeing the chain grow is addictive",
+                    "Start with a tiny version of $name and increase gradually over weeks",
+                    "Pair $nameLower with an existing habit you never skip (like brushing teeth)",
+                    "Do $nameLower at the same time daily — your brain will start craving it automatically",
+                    "Prepare everything for $nameLower the night before to eliminate morning excuses",
+                    "Use the 2-minute rule: if $nameLower feels hard, commit to just 2 minutes",
+                    "Tell someone about your $nameLower goal — social pressure works wonders",
+                    "Keep a dedicated log for $nameLower — writing it down makes it real",
+                    "Celebrate every single $nameLower completion — even a fist pump reinforces the habit",
+                    "Remove friction: make $nameLower the easiest thing to do next",
+                    "After completing $nameLower, immediately note how good it made you feel",
+                    "Set a phone reminder with a motivating message about $nameLower",
+                    "Never miss $nameLower twice in a row — one skip is an accident, two is a pattern",
+                    "Design your environment to make $nameLower obvious and unavoidable",
+                    "Link $nameLower to your identity: \"I am someone who does $nameLower every day\""
+                )
+                val seed = nameLower.hashCode().toUInt()
+                val indices = pool.indices.toMutableList()
+                // Deterministic shuffle based on habit name
+                for (i in indices.size - 1 downTo 1) {
+                    val j = ((seed + i.toUInt()) % (i + 1).toUInt()).toInt()
+                    indices[i] = indices[j].also { indices[j] = indices[i] }
+                }
+                indices.take(4).map { pool[it] }
+            }
         }
     }
 
@@ -1317,13 +1341,35 @@ object AiPlannerEngine {
                 "\uD83D\uDE00 Before meals, pause and appreciate the food, the effort behind it, and who you share it with",
                 "\uD83D\uDCDD End of day: \"What made me smile today?\" — it reframes your entire day"
             )
-            else -> listOf(
-                "\uD83D\uDD17 Stack ${target.label} with a habit you already love — it'll feel effortless",
-                "\uD83C\uDFC6 Start a streak tracker — seeing the chain grow becomes its own motivation",
-                "\uD83D\uDCF1 Set a creative phone reminder with an encouraging message to yourself",
-                "\uD83D\uDC65 Find an accountability partner for ${target.label.lowercase()} — share your daily progress",
-                "\uD83C\uDFAF Reward yourself after hitting the target 7 days in a row — you've earned it"
-            )
+            else -> {
+                val name = target.label
+                val nameLower = name.lowercase()
+                val pool = listOf(
+                    "\uD83D\uDD17 Stack $name with a habit you already love — it'll feel effortless",
+                    "\uD83C\uDFC6 Create a visual streak calendar for $name — cross off each day with a big red X",
+                    "\uD83D\uDCF1 Set a creative phone wallpaper that reminds you about $nameLower",
+                    "\uD83D\uDC65 Find an accountability partner for $nameLower — share your daily progress",
+                    "\uD83C\uDFAF Reward yourself after hitting $name 7 days in a row — you've earned it",
+                    "\uD83C\uDFB2 Add variety to $nameLower — try a different approach or setting each week",
+                    "\uD83D\uDCDD Journal about how $nameLower makes you feel — emotional awareness builds commitment",
+                    "\u23F0 Try $nameLower at a completely different time of day and see if it clicks better",
+                    "\uD83C\uDFAE Gamify $name: set mini-challenges, levels, or personal records to beat",
+                    "\uD83D\uDE80 Pair $nameLower with something fun — music, a podcast, or a favorite drink",
+                    "\uD83D\uDCA1 Teach someone else about $nameLower — teaching deepens your own commitment",
+                    "\uD83D\uDCF8 Take a before/after photo or log to visually track your $name journey",
+                    "\uD83C\uDF1F Create a \"$name ritual\" — a special routine that makes it feel like an event",
+                    "\uD83E\uDDD8 Practice mindful $nameLower — fully focus on the experience without distractions",
+                    "\uD83C\uDFE0 Designate a specific spot in your home as your \"$name zone\"",
+                    "\uD83D\uDCCA Review your $name data weekly — patterns reveal what works and what doesn't"
+                )
+                val seed = nameLower.hashCode().toUInt()
+                val indices = pool.indices.toMutableList()
+                for (i in indices.size - 1 downTo 1) {
+                    val j = ((seed + i.toUInt()) % (i + 1).toUInt()).toInt()
+                    indices[i] = indices[j].also { indices[j] = indices[i] }
+                }
+                indices.take(5).map { pool[it] }
+            }
         }
     }
 
