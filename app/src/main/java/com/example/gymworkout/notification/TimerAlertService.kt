@@ -17,6 +17,7 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.gymworkout.MainActivity
 import com.example.gymworkout.R
@@ -54,6 +55,12 @@ class TimerAlertService : Service() {
     private var vibrator: Vibrator? = null
     private var ringtone: Ringtone? = null
 
+    // Auto-stop alert after 60 seconds to prevent shortService timeout crash
+    private val autoStopRunnable = Runnable {
+        Log.d("TimerAlertService", "Auto-stopping alert after timeout")
+        stopSelf()
+    }
+
     // Loops ringtone on API < 28 where isLooping isn't available
     private val ringtoneLooper = object : Runnable {
         override fun run() {
@@ -75,6 +82,9 @@ class TimerAlertService : Service() {
 
         startForeground(ALERT_NOTIFICATION_ID, buildNotification(label))
         startAlertForProfile(timerType)
+
+        // Auto-stop after 60 seconds to stay well under shortService 3-min limit
+        handler.postDelayed(autoStopRunnable, 60_000L)
 
         return START_NOT_STICKY
     }
@@ -125,8 +135,15 @@ class TimerAlertService : Service() {
         }
     }
 
+    // Handle shortService timeout on Android 14+ — stop gracefully instead of crashing
+    override fun onTimeout(startId: Int) {
+        Log.d("TimerAlertService", "Service timed out, stopping gracefully")
+        stopSelf()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(autoStopRunnable)
         handler.removeCallbacks(ringtoneLooper)
         ringtone?.stop()
         ringtone = null

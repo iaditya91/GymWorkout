@@ -82,8 +82,10 @@ fun RestTimerDialog(
     }
 
     AlertDialog(
-        // Prevent back-press dismissal while alert is ringing — user must tap Done
-        onDismissRequest = { if (!finished) onDismiss() },
+        onDismissRequest = {
+            if (finished) TimerAlertService.stop(context)
+            onDismiss()
+        },
         title = {
             Text(
                 if (finished) "Rest Complete!" else "Rest Timer",
