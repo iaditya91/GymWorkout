@@ -38,13 +38,16 @@ interface ExerciseDao {
     @Query("UPDATE exercises SET isCompleted = :completed WHERE id = :id")
     suspend fun updateCompleted(id: Int, completed: Boolean)
 
+    @Query("UPDATE exercises SET completedSets = :completedSets, isCompleted = :isCompleted WHERE id = :id")
+    suspend fun updateCompletedSets(id: Int, completedSets: Int, isCompleted: Boolean)
+
     @Query("UPDATE exercises SET notes = :notes WHERE id = :id")
     suspend fun updateNotes(id: Int, notes: String)
 
-    @Query("UPDATE exercises SET isCompleted = 0 WHERE dayOfWeek = :day")
+    @Query("UPDATE exercises SET isCompleted = 0, completedSets = 0 WHERE dayOfWeek = :day")
     suspend fun resetDay(day: Int)
 
-    @Query("UPDATE exercises SET isCompleted = 0")
+    @Query("UPDATE exercises SET isCompleted = 0, completedSets = 0")
     suspend fun resetAllDays()
 
     @Query("SELECT * FROM exercises WHERE supersetGroupId = :groupId")

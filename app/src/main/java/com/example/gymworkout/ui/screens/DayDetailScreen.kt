@@ -35,8 +35,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
@@ -360,7 +358,8 @@ fun DayDetailScreen(
                                 ExerciseCard(
                                     index = item.displayIndex,
                                     exercise = item.exercise,
-                                    onToggleCompleted = { viewModel.toggleCompleted(item.exercise.id, !item.exercise.isCompleted) },
+                                    onIncrementSet = { viewModel.incrementSet(item.exercise) },
+                                    onDecrementSet = { viewModel.decrementSet(item.exercise) },
                                     onPlayVideo = { onPlayVideo(item.exercise.name, item.exercise.youtubeUrl) },
                                     onExerciseClick = { onViewExerciseDetail(item.exercise.name) },
                                     onEditNotes = { notesExercise = item.exercise },
@@ -373,7 +372,8 @@ fun DayDetailScreen(
                                 SupersetCard(
                                     displayIndex = item.displayIndex,
                                     exercises = item.exercises,
-                                    onToggleCompleted = { ex -> viewModel.toggleCompleted(ex.id, !ex.isCompleted) },
+                                    onIncrementSet = { ex -> viewModel.incrementSet(ex) },
+                                    onDecrementSet = { ex -> viewModel.decrementSet(ex) },
                                     onPlayVideo = { ex -> onPlayVideo(ex.name, ex.youtubeUrl) },
                                     onExerciseClick = { ex -> onViewExerciseDetail(ex.name) },
                                     onEditNotes = { ex -> notesExercise = ex },
@@ -503,7 +503,8 @@ fun DayHeadingDialog(
 fun SupersetCard(
     displayIndex: Int,
     exercises: List<Exercise>,
-    onToggleCompleted: (Exercise) -> Unit,
+    onIncrementSet: (Exercise) -> Unit,
+    onDecrementSet: (Exercise) -> Unit,
     onPlayVideo: (Exercise) -> Unit,
     onExerciseClick: (Exercise) -> Unit,
     onEditNotes: (Exercise) -> Unit,
@@ -558,7 +559,8 @@ fun SupersetCard(
                 SupersetExerciseRow(
                     exercise = exercise,
                     label = if (exercises.size > 1) "${('A' + idx)}" else null,
-                    onToggleCompleted = { onToggleCompleted(exercise) },
+                    onIncrementSet = { onIncrementSet(exercise) },
+                    onDecrementSet = { onDecrementSet(exercise) },
                     onPlayVideo = { onPlayVideo(exercise) },
                     onExerciseClick = { onExerciseClick(exercise) },
                     onEditNotes = { onEditNotes(exercise) },
@@ -614,13 +616,16 @@ fun SupersetCard(
 fun SupersetExerciseRow(
     exercise: Exercise,
     label: String?,
-    onToggleCompleted: () -> Unit,
+    onIncrementSet: () -> Unit,
+    onDecrementSet: () -> Unit,
     onPlayVideo: () -> Unit,
     onExerciseClick: () -> Unit,
     onEditNotes: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val allSetsDone = exercise.completedSets >= exercise.sets
+
     Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -644,15 +649,15 @@ fun SupersetExerciseRow(
                 Spacer(modifier = Modifier.width(6.dp))
             }
 
-            Checkbox(
-                checked = exercise.isCompleted,
-                onCheckedChange = { onToggleCompleted() },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.tertiary,
-                    checkmarkColor = MaterialTheme.colorScheme.onPrimary
-                ),
-                modifier = Modifier.size(36.dp)
+            // Set counter
+            SetCounter(
+                completedSets = exercise.completedSets,
+                totalSets = exercise.sets,
+                onIncrement = onIncrementSet,
+                onDecrement = onDecrementSet
             )
+
+            Spacer(modifier = Modifier.width(6.dp))
 
             Column(
                 modifier = Modifier
@@ -663,7 +668,8 @@ fun SupersetExerciseRow(
                     text = exercise.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    textDecoration = if (exercise.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                    textDecoration = if (allSetsDone) TextDecoration.LineThrough else TextDecoration.None,
+                    color = if (allSetsDone) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -745,7 +751,8 @@ fun SupersetExerciseRow(
 fun ExerciseCard(
     index: Int,
     exercise: Exercise,
-    onToggleCompleted: () -> Unit,
+    onIncrementSet: () -> Unit,
+    onDecrementSet: () -> Unit,
     onPlayVideo: () -> Unit,
     onExerciseClick: () -> Unit = {},
     onEditNotes: () -> Unit,
@@ -753,12 +760,14 @@ fun ExerciseCard(
     onDelete: () -> Unit,
     onStartRest: () -> Unit = {}
 ) {
+    val allSetsDone = exercise.completedSets >= exercise.sets
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = if (exercise.isCompleted) BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer) else null
+        border = if (allSetsDone) BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer) else null
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -770,7 +779,7 @@ fun ExerciseCard(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(
-                            if (exercise.isCompleted) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                            if (allSetsDone) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
                             else MaterialTheme.colorScheme.primaryContainer
                         ),
                     contentAlignment = Alignment.Center
@@ -779,19 +788,21 @@ fun ExerciseCard(
                         "$index",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (exercise.isCompleted) MaterialTheme.colorScheme.tertiary
+                        color = if (allSetsDone) MaterialTheme.colorScheme.tertiary
                         else MaterialTheme.colorScheme.primary
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Checkbox(
-                    checked = exercise.isCompleted,
-                    onCheckedChange = { onToggleCompleted() },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = MaterialTheme.colorScheme.tertiary,
-                        checkmarkColor = MaterialTheme.colorScheme.onPrimary
-                    )
+
+                // Set counter
+                SetCounter(
+                    completedSets = exercise.completedSets,
+                    totalSets = exercise.sets,
+                    onIncrement = onIncrementSet,
+                    onDecrement = onDecrementSet
                 )
+
+                Spacer(modifier = Modifier.width(8.dp))
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -801,7 +812,8 @@ fun ExerciseCard(
                         text = exercise.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        textDecoration = if (exercise.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                        textDecoration = if (allSetsDone) TextDecoration.LineThrough else TextDecoration.None,
+                        color = if (allSetsDone) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -877,6 +889,84 @@ fun ExerciseCard(
                     Icon(Icons.Default.Delete, contentDescription = "Delete exercise", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SetCounter(
+    completedSets: Int,
+    totalSets: Int,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit
+) {
+    val allDone = completedSets >= totalSets
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        // Minus button
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(
+                    if (completedSets > 0) MaterialTheme.colorScheme.errorContainer
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+                .clickable(enabled = completedSets > 0) { onDecrement() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "−",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (completedSets > 0) MaterialTheme.colorScheme.onErrorContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        }
+
+        // Count display
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    if (allDone) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "$completedSets/$totalSets",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (allDone) MaterialTheme.colorScheme.tertiary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Plus button
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(
+                    if (!allDone) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+                .clickable(enabled = !allDone) { onIncrement() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "+",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (!allDone) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
         }
     }
 }

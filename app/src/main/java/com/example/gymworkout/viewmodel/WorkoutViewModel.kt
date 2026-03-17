@@ -61,6 +61,21 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun incrementSet(exercise: Exercise) {
+        viewModelScope.launch {
+            val newCompleted = (exercise.completedSets + 1).coerceAtMost(exercise.sets)
+            val isDone = newCompleted >= exercise.sets
+            dao.updateCompletedSets(exercise.id, newCompleted, isDone)
+        }
+    }
+
+    fun decrementSet(exercise: Exercise) {
+        viewModelScope.launch {
+            val newCompleted = (exercise.completedSets - 1).coerceAtLeast(0)
+            dao.updateCompletedSets(exercise.id, newCompleted, false)
+        }
+    }
+
     fun updateNotes(id: Int, notes: String) {
         viewModelScope.launch {
             dao.updateNotes(id, notes)

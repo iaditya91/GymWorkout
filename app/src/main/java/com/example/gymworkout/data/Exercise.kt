@@ -13,6 +13,7 @@ data class Exercise(
     val sets: Int = 3,
     val reps: String = "10-12",
     val restTimeSeconds: Int = 0, // rest time in seconds, 0 = not set
+    val completedSets: Int = 0,
     val isCompleted: Boolean = false,
     val notes: String = "",
     val orderIndex: Int = 0,
