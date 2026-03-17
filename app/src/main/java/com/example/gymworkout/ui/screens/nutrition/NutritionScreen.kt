@@ -1930,7 +1930,12 @@ fun SetTargetsDialog(
         onDismissRequest = onDismiss,
         title = { Text("Set Daily Targets") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 NutritionCategory.entries.forEach { cat ->
                     val state = builtInValues[cat.name]
                     if (state != null) {

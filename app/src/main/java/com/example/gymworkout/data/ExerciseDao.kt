@@ -84,4 +84,8 @@ interface ExerciseDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllDayHeadings(items: List<DayHeading>)
+
+    // Rollover: shift all exercises' dayOfWeek by N days (wraps around 0-6)
+    @Query("UPDATE exercises SET dayOfWeek = (dayOfWeek + :shift % 7 + 7) % 7")
+    suspend fun shiftAllExercisesDayOfWeek(shift: Int)
 }

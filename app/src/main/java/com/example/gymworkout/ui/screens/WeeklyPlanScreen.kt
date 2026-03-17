@@ -19,7 +19,11 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,7 +46,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import com.example.gymworkout.viewmodel.WorkoutViewModel
 
 val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
@@ -55,6 +62,7 @@ fun WeeklyPlanScreen(
     onDayClick: (Int) -> Unit
 ) {
     var showResetConfirm by remember { mutableStateOf(false) }
+    var showRolloverDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -74,6 +82,9 @@ fun WeeklyPlanScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showRolloverDialog = true }) {
+                        Icon(Icons.Default.SwapHoriz, contentDescription = "Rollover plan")
+                    }
                     IconButton(onClick = { showResetConfirm = true }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Reset all completed")
                     }
@@ -121,6 +132,16 @@ fun WeeklyPlanScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showRolloverDialog) {
+        RolloverDialog(
+            onDismiss = { showRolloverDialog = false },
+            onConfirm = { days, forward ->
+                showRolloverDialog = false
+                viewModel.rolloverPlan(days, forward)
             }
         )
     }
@@ -250,4 +271,121 @@ fun DayCard(
             )
         }
     }
+}
+
+@Composable
+fun RolloverDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (days: Int, forward: Boolean) -> Unit
+) {
+    var selectedDays by remember { mutableStateOf(1) }
+    var isForward by remember { mutableStateOf(true) }
+    var directionExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rollover Workout Plan") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    "Shift your entire weekly plan by a number of days.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Days selector
+                Text("Number of days", style = MaterialTheme.typography.labelMedium)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    (1..6).forEach { day ->
+                        val selected = selectedDays == day
+                        Card(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { selectedDays = day },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (selected)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Text(
+                                text = "$day",
+                                modifier = Modifier
+                                    .padding(vertical = 10.dp)
+                                    .fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected)
+                                    MaterialTheme.colorScheme.onPrimary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Direction dropdown
+                Text("Direction", style = MaterialTheme.typography.labelMedium)
+                Box {
+                    OutlinedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { directionExpanded = true },
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(if (isForward) "Forward" else "Backward")
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = directionExpanded,
+                        onDismissRequest = { directionExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Forward") },
+                            onClick = { isForward = true; directionExpanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Backward") },
+                            onClick = { isForward = false; directionExpanded = false }
+                        )
+                    }
+                }
+
+                // Preview
+                val dirLabel = if (isForward) "forward" else "backward"
+                Text(
+                    text = "Monday's plan moves to ${dayNames[((if (isForward) selectedDays else 7 - selectedDays)) % 7]}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selectedDays, isForward) }) {
+                Text("Rollover")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

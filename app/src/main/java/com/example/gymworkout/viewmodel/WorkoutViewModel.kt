@@ -94,4 +94,17 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
             dao.upsertDayHeading(DayHeading(dayOfWeek = day, heading = heading.trim()))
         }
     }
+
+    fun rolloverPlan(days: Int, forward: Boolean) {
+        viewModelScope.launch {
+            val shift = if (forward) days else -days
+            // Shift exercises
+            dao.shiftAllExercisesDayOfWeek(shift)
+            // Shift day headings (PK is dayOfWeek, so fetch -> delete -> re-insert)
+            val headings = dao.getAllDayHeadingsSync()
+            dao.deleteAllDayHeadings()
+            val shifted = headings.map { it.copy(dayOfWeek = ((it.dayOfWeek + shift) % 7 + 7) % 7) }
+            dao.insertAllDayHeadings(shifted)
+        }
+    }
 }
