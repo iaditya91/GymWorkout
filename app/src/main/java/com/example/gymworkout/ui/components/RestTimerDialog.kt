@@ -1,6 +1,10 @@
 package com.example.gymworkout.ui.components
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -41,6 +46,39 @@ import com.example.gymworkout.notification.TimerAlertService
 import com.example.gymworkout.notification.TimerReceiver
 import kotlinx.coroutines.delay
 
+private const val REST_TIMER_REQUEST_CODE = 7700
+
+private fun buildTimerPendingIntent(context: Context, exerciseName: String): PendingIntent {
+    val intent = Intent(context, TimerReceiver::class.java).apply {
+        putExtra(TimerReceiver.EXTRA_LABEL, "Rest - $exerciseName")
+        putExtra(TimerReceiver.EXTRA_NOTIFY, true)
+        putExtra(TimerReceiver.EXTRA_NOTIFICATION_ID, "rest_$exerciseName".hashCode())
+        putExtra(TimerReceiver.EXTRA_TIMER_TYPE, "rest")
+    }
+    return PendingIntent.getBroadcast(
+        context,
+        REST_TIMER_REQUEST_CODE,
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+}
+
+private fun scheduleTimerAlarm(context: Context, exerciseName: String, seconds: Int) {
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    val pendingIntent = buildTimerPendingIntent(context, exerciseName)
+    val triggerAt = SystemClock.elapsedRealtime() + seconds * 1000L
+    alarmManager.setExactAndAllowWhileIdle(
+        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+        triggerAt,
+        pendingIntent
+    )
+}
+
+private fun cancelTimerAlarm(context: Context, exerciseName: String) {
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    alarmManager.cancel(buildTimerPendingIntent(context, exerciseName))
+}
+
 @Composable
 fun RestTimerDialog(
     exerciseName: String,
@@ -53,6 +91,18 @@ fun RestTimerDialog(
     val progress = if (totalSeconds > 0) remainingSeconds.toFloat() / totalSeconds else 0f
     val finished = remainingSeconds <= 0
 
+    // Schedule AlarmManager alarm on first composition
+    DisposableEffect(Unit) {
+        scheduleTimerAlarm(context, exerciseName, totalSeconds)
+        onDispose {
+            // Cancel alarm if dialog is dismissed without finishing
+            if (!finished) {
+                cancelTimerAlarm(context, exerciseName)
+            }
+        }
+    }
+
+    // Manage alarm when running state changes
     LaunchedEffect(isRunning, remainingSeconds) {
         if (isRunning && remainingSeconds > 0) {
             delay(1000L)
@@ -60,16 +110,16 @@ fun RestTimerDialog(
         }
     }
 
-    // Notify when timer finishes
+    // Cancel alarm when timer finishes in foreground (alarm already handled it or will)
     LaunchedEffect(finished) {
         if (finished) {
-            val intent = Intent(context, TimerReceiver::class.java).apply {
-                putExtra(TimerReceiver.EXTRA_LABEL, "Rest - $exerciseName")
-                putExtra(TimerReceiver.EXTRA_NOTIFY, true)
-                putExtra(TimerReceiver.EXTRA_NOTIFICATION_ID, "rest_$exerciseName".hashCode())
-                putExtra(TimerReceiver.EXTRA_TIMER_TYPE, "rest")
+            cancelTimerAlarm(context, exerciseName)
+            // Fire alert directly when app is in foreground
+            try {
+                TimerAlertService.start(context, "Rest - $exerciseName", "rest")
+            } catch (_: Exception) {
+                // Already handled by AlarmManager if we're in background
             }
-            context.sendBroadcast(intent)
         }
     }
 
@@ -138,7 +188,14 @@ fun RestTimerDialog(
                     ) {
                         // Pause/Resume
                         IconButton(
-                            onClick = { isRunning = !isRunning },
+                            onClick = {
+                                isRunning = !isRunning
+                                if (isRunning) {
+                                    scheduleTimerAlarm(context, exerciseName, remainingSeconds)
+                                } else {
+                                    cancelTimerAlarm(context, exerciseName)
+                                }
+                            },
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
@@ -156,6 +213,7 @@ fun RestTimerDialog(
                             onClick = {
                                 remainingSeconds = totalSeconds
                                 isRunning = true
+                                scheduleTimerAlarm(context, exerciseName, totalSeconds)
                             },
                             modifier = Modifier
                                 .size(48.dp)

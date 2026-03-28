@@ -39,10 +39,17 @@ class TimerAlertService : Service() {
                 putExtra(EXTRA_LABEL, label)
                 putExtra(EXTRA_TIMER_TYPE, timerType)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                // Android 12+ may block foreground service start from background.
+                // AlarmManager-triggered receivers have the exemption, so this catch
+                // is only a safety net for direct calls from background composables.
+                Log.w("TimerAlertService", "Could not start foreground service", e)
             }
         }
 
