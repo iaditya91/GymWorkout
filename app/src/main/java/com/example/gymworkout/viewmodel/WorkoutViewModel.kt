@@ -20,7 +20,8 @@ data class RestTimerState(
     val pausedRemainingMs: Long = 0L,   // remaining ms when paused
     val isRunning: Boolean = true,
     val isInline: Boolean = false,
-    val dayIndex: Int = -1
+    val dayIndex: Int = -1,
+    val alertFired: Boolean = false     // true once the finish alert has been triggered
 ) {
     fun remainingSeconds(): Int {
         return if (isRunning) {
@@ -47,6 +48,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     val restTimerState: StateFlow<RestTimerState?> = _restTimerState.asStateFlow()
 
     fun startRestTimer(exerciseName: String, totalSeconds: Int, dayIndex: Int, inline: Boolean = false) {
+        com.example.gymworkout.notification.TimerAlertService.clearAcknowledged()
         _restTimerState.value = RestTimerState(
             exerciseName = exerciseName,
             totalSeconds = totalSeconds,
@@ -91,6 +93,12 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun setRestTimerInline(inline: Boolean) {
         _restTimerState.value?.let { state ->
             _restTimerState.value = state.copy(isInline = inline)
+        }
+    }
+
+    fun markRestTimerAlertFired() {
+        _restTimerState.value?.let { state ->
+            _restTimerState.value = state.copy(alertFired = true)
         }
     }
 

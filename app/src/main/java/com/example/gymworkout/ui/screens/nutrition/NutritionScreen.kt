@@ -460,6 +460,7 @@ fun NutritionScreen(
 
     if (showAddObjectiveDialog) {
         AddObjectiveDialog(
+            existingTargets = allTargets,
             onDismiss = { showAddObjectiveDialog = false },
             onSave = { name, unit, target, timerSeconds, notifyEnabled ->
                 viewModel.addCustomObjective(name, unit, target, timerSeconds, notifyEnabled)
@@ -1739,6 +1740,7 @@ private val nutritionRelatedNames = setOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddObjectiveDialog(
+    existingTargets: List<NutritionTarget> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (name: String, unit: String, target: Float, timerSeconds: Int, notifyEnabled: Boolean) -> Unit
 ) {
@@ -1752,6 +1754,11 @@ fun AddObjectiveDialog(
     var timerMinutes by remember { mutableStateOf("") }
     var timerSecs by remember { mutableStateOf("") }
     var notifyEnabled by remember { mutableStateOf(true) }
+
+    // Check if objective already exists
+    val isDuplicate = selectedName.trim().lowercase().let { trimmedName ->
+        trimmedName.isNotBlank() && existingTargets.any { it.label.trim().lowercase() == trimmedName }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1778,8 +1785,35 @@ fun AddObjectiveDialog(
                         onDismissRequest = { expanded = false }
                     ) {
                         objectivePresets.forEach { (name, presetUnit) ->
+                            val exists = existingTargets.any { it.label.trim().lowercase() == name.trim().lowercase() }
                             DropdownMenuItem(
-                                text = { Text(name) },
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            name,
+                                            color = if (exists) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                            else Color.Unspecified
+                                        )
+                                        if (exists) {
+                                            Text(
+                                                "Added",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier
+                                                    .background(
+                                                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                                        RoundedCornerShape(4.dp)
+                                                    )
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                },
                                 onClick = {
                                     selectedName = name
                                     unit = presetUnit
@@ -1839,6 +1873,30 @@ fun AddObjectiveDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                if (isDuplicate) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                        Text(
+                            "\"${selectedName.trim()}\" is already added",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                }
+
                 // Timer options (only for custom objectives)
                 if (isCustom) {
                     Text(
@@ -1890,13 +1948,14 @@ fun AddObjectiveDialog(
             TextButton(
                 onClick = {
                     val v = target.toFloatOrNull()
-                    if (selectedName.isNotBlank() && unit.isNotBlank() && v != null && v > 0) {
+                    if (!isDuplicate && selectedName.isNotBlank() && unit.isNotBlank() && v != null && v > 0) {
                         val mins = timerMinutes.toIntOrNull() ?: 0
                         val secs = timerSecs.toIntOrNull() ?: 0
                         val totalTimerSeconds = if (isCustom) (mins * 60) + secs else 0
                         onSave(selectedName.trim(), unit.trim(), v, totalTimerSeconds, notifyEnabled)
                     }
-                }
+                },
+                enabled = !isDuplicate
             ) { Text("Add") }
         },
         dismissButton = {

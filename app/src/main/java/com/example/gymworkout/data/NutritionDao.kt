@@ -36,6 +36,9 @@ interface NutritionDao {
     @Query("SELECT * FROM nutrition_targets WHERE category = :category")
     suspend fun getTargetSync(category: String): NutritionTarget?
 
+    @Query("SELECT * FROM nutrition_targets WHERE isCustom = 1 AND LOWER(TRIM(label)) = LOWER(TRIM(:label)) LIMIT 1")
+    suspend fun getCustomTargetByLabel(label: String): NutritionTarget?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTarget(target: NutritionTarget)
 

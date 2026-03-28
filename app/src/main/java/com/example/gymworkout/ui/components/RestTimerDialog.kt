@@ -134,13 +134,16 @@ fun RestTimerDialog(
         onDispose {}
     }
 
-    // Handle finish
+    // Handle finish — only fire alert once
     LaunchedEffect(finished) {
-        if (finished) {
+        if (finished && !timerState.alertFired) {
             cancelRestTimerAlarm(context, timerState.exerciseName)
-            try {
-                TimerAlertService.start(context, "Rest - ${timerState.exerciseName}", "rest")
-            } catch (_: Exception) {}
+            // Only start alert if not already stopped via notification
+            if (!TimerAlertService.alertAcknowledged) {
+                try {
+                    TimerAlertService.start(context, "Rest - ${timerState.exerciseName}", "rest")
+                } catch (_: Exception) {}
+            }
             onFinished()
         }
     }
@@ -280,7 +283,8 @@ fun InlineRestTimer(
     onResume: () -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
-    onSwitchToPopup: () -> Unit
+    onSwitchToPopup: () -> Unit,
+    onFinished: () -> Unit
 ) {
     val context = LocalContext.current
     val remainingSeconds = rememberTimerTick(timerState)
@@ -296,13 +300,17 @@ fun InlineRestTimer(
         onDispose {}
     }
 
-    // Handle finish
+    // Handle finish — only fire alert once
     LaunchedEffect(finished) {
-        if (finished) {
+        if (finished && !timerState.alertFired) {
             cancelRestTimerAlarm(context, timerState.exerciseName)
-            try {
-                TimerAlertService.start(context, "Rest - ${timerState.exerciseName}", "rest")
-            } catch (_: Exception) {}
+            // Only start alert if not already stopped via notification
+            if (!TimerAlertService.alertAcknowledged) {
+                try {
+                    TimerAlertService.start(context, "Rest - ${timerState.exerciseName}", "rest")
+                } catch (_: Exception) {}
+            }
+            onFinished()
         }
     }
 

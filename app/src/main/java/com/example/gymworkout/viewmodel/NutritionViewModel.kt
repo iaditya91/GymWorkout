@@ -102,6 +102,10 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         timerSeconds: Int = 0, timerNotifyEnabled: Boolean = true
     ) {
         viewModelScope.launch {
+            // Skip if a custom objective with the same label already exists
+            val existing = dao.getCustomTargetByLabel(name)
+            if (existing != null) return@launch
+
             val key = "CUSTOM_${name.uppercase().replace(" ", "_")}_${System.currentTimeMillis()}"
             dao.insertTarget(
                 NutritionTarget(

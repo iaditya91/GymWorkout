@@ -264,7 +264,8 @@ fun DayDetailScreen(
                         onResume = { viewModel.resumeRestTimer() },
                         onReset = { viewModel.resetRestTimer() },
                         onDismiss = { viewModel.dismissRestTimer() },
-                        onSwitchToPopup = { viewModel.setRestTimerInline(false) }
+                        onSwitchToPopup = { viewModel.setRestTimerInline(false) },
+                        onFinished = { viewModel.markRestTimerAlertFired() }
                     )
                 }
             }
@@ -472,7 +473,7 @@ fun DayDetailScreen(
                 onReset = { viewModel.resetRestTimer() },
                 onDismiss = { viewModel.dismissRestTimer() },
                 onSetInline = { viewModel.setRestTimerInline(true) },
-                onFinished = { /* timer finished, alert started */ }
+                onFinished = { viewModel.markRestTimerAlertFired() }
             )
         }
     }

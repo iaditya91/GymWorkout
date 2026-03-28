@@ -34,6 +34,16 @@ class TimerAlertService : Service() {
         // Vibration: 800ms on, 600ms off, repeat
         private val VIBRATION_PATTERN = longArrayOf(0L, 800L, 600L)
 
+        /**
+         * True once an alert has been stopped/acknowledged (via notification or auto-stop).
+         * Prevents the UI from re-triggering the alert when recomposing.
+         * Call [clearAcknowledged] when starting a new timer.
+         */
+        @Volatile
+        var alertAcknowledged = false
+
+        fun clearAcknowledged() { alertAcknowledged = false }
+
         fun start(context: Context, label: String, timerType: String) {
             val intent = Intent(context, TimerAlertService::class.java).apply {
                 putExtra(EXTRA_LABEL, label)
@@ -150,6 +160,7 @@ class TimerAlertService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        alertAcknowledged = true
         handler.removeCallbacks(autoStopRunnable)
         handler.removeCallbacks(ringtoneLooper)
         ringtone?.stop()
