@@ -1,17 +1,102 @@
 package com.example.gymworkout.viewmodel
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gymworkout.data.DayHeading
 import com.example.gymworkout.data.Exercise
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+data class RestTimerState(
+    val exerciseName: String,
+    val totalSeconds: Int,
+    val endElapsedRealtime: Long,       // SystemClock.elapsedRealtime() when timer ends
+    val pausedRemainingMs: Long = 0L,   // remaining ms when paused
+    val isRunning: Boolean = true,
+    val isInline: Boolean = false,
+    val dayIndex: Int = -1
+) {
+    fun remainingSeconds(): Int {
+        return if (isRunning) {
+            ((endElapsedRealtime - SystemClock.elapsedRealtime()) / 1000).toInt().coerceAtLeast(0)
+        } else {
+            (pausedRemainingMs / 1000).toInt().coerceAtLeast(0)
+        }
+    }
+
+    val isFinished: Boolean
+        get() = if (isRunning) {
+            SystemClock.elapsedRealtime() >= endElapsedRealtime
+        } else {
+            pausedRemainingMs <= 0
+        }
+}
 
 class WorkoutViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = WorkoutDatabase.getDatabase(application).exerciseDao()
+
+    // Rest timer state — survives navigation
+    private val _restTimerState = MutableStateFlow<RestTimerState?>(null)
+    val restTimerState: StateFlow<RestTimerState?> = _restTimerState.asStateFlow()
+
+    fun startRestTimer(exerciseName: String, totalSeconds: Int, dayIndex: Int, inline: Boolean = false) {
+        _restTimerState.value = RestTimerState(
+            exerciseName = exerciseName,
+            totalSeconds = totalSeconds,
+            endElapsedRealtime = SystemClock.elapsedRealtime() + totalSeconds * 1000L,
+            isRunning = true,
+            isInline = inline,
+            dayIndex = dayIndex
+        )
+    }
+
+    fun pauseRestTimer() {
+        _restTimerState.value?.let { state ->
+            if (state.isRunning) {
+                val remaining = (state.endElapsedRealtime - SystemClock.elapsedRealtime()).coerceAtLeast(0)
+                _restTimerState.value = state.copy(isRunning = false, pausedRemainingMs = remaining)
+            }
+        }
+    }
+
+    fun resumeRestTimer() {
+        _restTimerState.value?.let { state ->
+            if (!state.isRunning && state.pausedRemainingMs > 0) {
+                _restTimerState.value = state.copy(
+                    isRunning = true,
+                    endElapsedRealtime = SystemClock.elapsedRealtime() + state.pausedRemainingMs,
+                    pausedRemainingMs = 0
+                )
+            }
+        }
+    }
+
+    fun resetRestTimer() {
+        _restTimerState.value?.let { state ->
+            _restTimerState.value = state.copy(
+                isRunning = true,
+                endElapsedRealtime = SystemClock.elapsedRealtime() + state.totalSeconds * 1000L,
+                pausedRemainingMs = 0
+            )
+        }
+    }
+
+    fun setRestTimerInline(inline: Boolean) {
+        _restTimerState.value?.let { state ->
+            _restTimerState.value = state.copy(isInline = inline)
+        }
+    }
+
+    fun dismissRestTimer() {
+        _restTimerState.value = null
+    }
 
     fun getExercisesForDay(day: Int): Flow<List<Exercise>> = dao.getExercisesForDay(day)
 

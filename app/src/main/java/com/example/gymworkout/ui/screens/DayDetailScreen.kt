@@ -81,6 +81,7 @@ import com.example.gymworkout.data.Exercise
 import android.os.Build
 import com.example.gymworkout.ui.components.AddExerciseDialog
 import com.example.gymworkout.ui.components.NotesDialog
+import com.example.gymworkout.ui.components.InlineRestTimer
 import com.example.gymworkout.ui.components.RestTimerDialog
 import com.example.gymworkout.viewmodel.WorkoutViewModel
 
@@ -138,7 +139,7 @@ fun DayDetailScreen(
     var showHeadingDialog by remember { mutableStateOf(false) }
     var editingExercise by remember { mutableStateOf<Exercise?>(null) }
     var notesExercise by remember { mutableStateOf<Exercise?>(null) }
-    var restTimerExercise by remember { mutableStateOf<Exercise?>(null) }
+    val restTimerState by viewModel.restTimerState.collectAsState()
 
     // Drag-and-drop state
     val listState = rememberLazyListState()
@@ -249,11 +250,29 @@ fun DayDetailScreen(
             }
         }
     ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Inline rest timer bar (shown when checkbox is ticked)
+            restTimerState?.let { timerState ->
+                if (timerState.isInline && timerState.dayIndex == dayIndex) {
+                    InlineRestTimer(
+                        timerState = timerState,
+                        onPause = { viewModel.pauseRestTimer() },
+                        onResume = { viewModel.resumeRestTimer() },
+                        onReset = { viewModel.resetRestTimer() },
+                        onDismiss = { viewModel.dismissRestTimer() },
+                        onSwitchToPopup = { viewModel.setRestTimerInline(false) }
+                    )
+                }
+            }
+
         if (exercises.isEmpty()) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                    .fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -274,7 +293,6 @@ fun DayDetailScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -365,7 +383,7 @@ fun DayDetailScreen(
                                     onEditNotes = { notesExercise = item.exercise },
                                     onEdit = { editingExercise = item.exercise },
                                     onDelete = { viewModel.deleteExercise(item.exercise) },
-                                    onStartRest = { restTimerExercise = item.exercise }
+                                    onStartRest = { viewModel.startRestTimer(item.exercise.name, item.exercise.restTimeSeconds, dayIndex) }
                                 )
                             }
                             is ExerciseItem.Superset -> {
@@ -379,7 +397,7 @@ fun DayDetailScreen(
                                     onEditNotes = { ex -> notesExercise = ex },
                                     onEdit = { ex -> editingExercise = ex },
                                     onDelete = { ex -> viewModel.deleteExercise(ex) },
-                                    onStartRest = { ex -> restTimerExercise = ex }
+                                    onStartRest = { ex -> viewModel.startRestTimer(ex.name, ex.restTimeSeconds, dayIndex) }
                                 )
                             }
                         }
@@ -388,6 +406,7 @@ fun DayDetailScreen(
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
+        } // Column
     }
 
     if (showAddDialog) {
@@ -444,12 +463,18 @@ fun DayDetailScreen(
         )
     }
 
-    if (restTimerExercise != null) {
-        RestTimerDialog(
-            exerciseName = restTimerExercise!!.name,
-            totalSeconds = restTimerExercise!!.restTimeSeconds,
-            onDismiss = { restTimerExercise = null }
-        )
+    restTimerState?.let { timerState ->
+        if (!timerState.isInline) {
+            RestTimerDialog(
+                timerState = timerState,
+                onPause = { viewModel.pauseRestTimer() },
+                onResume = { viewModel.resumeRestTimer() },
+                onReset = { viewModel.resetRestTimer() },
+                onDismiss = { viewModel.dismissRestTimer() },
+                onSetInline = { viewModel.setRestTimerInline(true) },
+                onFinished = { /* timer finished, alert started */ }
+            )
+        }
     }
 
     if (showHeadingDialog) {
