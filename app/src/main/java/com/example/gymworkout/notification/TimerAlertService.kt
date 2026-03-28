@@ -159,6 +159,13 @@ class TimerAlertService : Service() {
     }
 
     private fun buildNotification(label: String): Notification {
+        // Tapping the notification stops the alert and opens the app
+        val stopAndOpenIntent = PendingIntent.getBroadcast(
+            this, 0,
+            Intent(this, AcknowledgeReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val openIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).apply {
@@ -170,10 +177,12 @@ class TimerAlertService : Service() {
         return NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("$label Timer Done!")
-            .setContentText("Open the app and tap Done to stop the alert")
+            .setContentText("Tap to stop the alert")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setContentIntent(openIntent)
+            .setContentIntent(stopAndOpenIntent)
+            .setFullScreenIntent(openIntent, true)
+            .addAction(0, "Stop", stopAndOpenIntent)
             .setOngoing(true)
             .setAutoCancel(false)
             .build()
