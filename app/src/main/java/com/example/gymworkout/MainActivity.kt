@@ -83,6 +83,12 @@ import com.example.gymworkout.ui.screens.social.StreakBattleScreen
 import com.example.gymworkout.ui.screens.social.WeeklyChallengeScreen
 import com.example.gymworkout.ui.screens.social.ProgressShareScreen
 import com.example.gymworkout.ui.screens.social.JourneyTimelineScreen
+import com.example.gymworkout.ui.screens.social.AccountabilityScreen
+import com.example.gymworkout.ui.screens.social.TeamGoalsScreen
+import com.example.gymworkout.ui.screens.social.NutritionDuelScreen
+import com.example.gymworkout.ui.screens.social.LeaderboardScreen
+import com.example.gymworkout.ui.screens.social.WorkoutTemplatesScreen
+import com.example.gymworkout.ui.screens.social.AchievementBadgesScreen
 
 class MainActivity : ComponentActivity() {
     private fun requestNotificationPermission() {
@@ -133,7 +139,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem("workout", "Workout", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter),
-    BottomNavItem("nutrition", "Nutrition & Habits", Icons.Filled.Restaurant, Icons.Outlined.Restaurant),
+    BottomNavItem("nutrition", "Objectives", Icons.Filled.Restaurant, Icons.Outlined.Restaurant),
     BottomNavItem("stats", "Stats", Icons.Filled.BarChart, Icons.Outlined.BarChart),
     BottomNavItem("social", "Social", Icons.Filled.Group, Icons.Outlined.Group),
     BottomNavItem("user", "Profile", Icons.Filled.Person, Icons.Outlined.Person)
@@ -368,7 +374,13 @@ fun WorkoutApp() {
                     onNavigateToBattles = { navController.navigate("social/battles") },
                     onNavigateToChallenges = { navController.navigate("social/challenges") },
                     onNavigateToTimeline = { navController.navigate("social/timeline") },
-                    onNavigateToShare = { navController.navigate("social/share") }
+                    onNavigateToShare = { navController.navigate("social/share") },
+                    onNavigateToAccountability = { navController.navigate("social/accountability") },
+                    onNavigateToTeamGoals = { navController.navigate("social/team_goals") },
+                    onNavigateToNutritionDuels = { navController.navigate("social/duels") },
+                    onNavigateToLeaderboard = { navController.navigate("social/leaderboard") },
+                    onNavigateToTemplates = { navController.navigate("social/templates") },
+                    onNavigateToBadges = { navController.navigate("social/badges") }
                 )
             }
             composable("social/friends") {
@@ -397,6 +409,42 @@ fun WorkoutApp() {
             }
             composable("social/timeline") {
                 JourneyTimelineScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/accountability") {
+                AccountabilityScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/team_goals") {
+                TeamGoalsScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/duels") {
+                NutritionDuelScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/leaderboard") {
+                LeaderboardScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/templates") {
+                WorkoutTemplatesScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/badges") {
+                AchievementBadgesScreen(
                     socialViewModel = socialViewModel,
                     onBack = { navController.popBackStack() }
                 )

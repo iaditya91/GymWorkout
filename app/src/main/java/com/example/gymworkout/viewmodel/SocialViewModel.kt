@@ -66,6 +66,39 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     private val _shareData = MutableStateFlow<ProgressShareData?>(null)
     val shareData: StateFlow<ProgressShareData?> = _shareData
 
+    // ── Accountability Partners ──
+    private val _partnerships = MutableStateFlow<List<AccountabilityPartnership>>(emptyList())
+    val partnerships: StateFlow<List<AccountabilityPartnership>> = _partnerships
+
+    // ── Team Goals ──
+    private val _teamGoals = MutableStateFlow<List<TeamGoal>>(emptyList())
+    val teamGoals: StateFlow<List<TeamGoal>> = _teamGoals
+
+    // ── Nutrition Duels ──
+    private val _duels = MutableStateFlow<List<NutritionDuel>>(emptyList())
+    val duels: StateFlow<List<NutritionDuel>> = _duels
+
+    // ── Leaderboard ──
+    private val _leaderboard = MutableStateFlow<List<LeaderboardEntry>>(emptyList())
+    val leaderboard: StateFlow<List<LeaderboardEntry>> = _leaderboard
+
+    private val _isProfilePublic = MutableStateFlow(false)
+    val isProfilePublic: StateFlow<Boolean> = _isProfilePublic
+
+    // ── Workout Templates ──
+    private val _templates = MutableStateFlow<List<WorkoutTemplate>>(emptyList())
+    val templates: StateFlow<List<WorkoutTemplate>> = _templates
+
+    private val _myTemplates = MutableStateFlow<List<WorkoutTemplate>>(emptyList())
+    val myTemplates: StateFlow<List<WorkoutTemplate>> = _myTemplates
+
+    private val _templateReviews = MutableStateFlow<List<TemplateReview>>(emptyList())
+    val templateReviews: StateFlow<List<TemplateReview>> = _templateReviews
+
+    // ── Achievement Badges ──
+    private val _badges = MutableStateFlow<List<AchievementBadge>>(emptyList())
+    val badges: StateFlow<List<AchievementBadge>> = _badges
+
     // ── Loading / Error ──
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
@@ -187,6 +220,22 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
             _availableChallenges.value = withContext(Dispatchers.IO) {
                 repo.getAvailableChallenges(friendIds)
             }
+        }
+        // Observe accountability partners
+        viewModelScope.launch {
+            repo.observePartnerships(uid).collect { _partnerships.value = it }
+        }
+        // Observe team goals
+        viewModelScope.launch {
+            repo.observeTeamGoals(uid).collect { _teamGoals.value = it }
+        }
+        // Observe nutrition duels
+        viewModelScope.launch {
+            repo.observeDuels(uid).collect { _duels.value = it }
+        }
+        // Load badges
+        viewModelScope.launch {
+            _badges.value = withContext(Dispatchers.IO) { repo.getUserBadges(uid) }
         }
     }
 
@@ -634,6 +683,364 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // ═══════════════════════════════════════════
+    // ACCOUNTABILITY PARTNERS
+    // ═══════════════════════════════════════════
+
+    fun createPartnership(partnerId: String, partnerName: String) {
+        val myUid = authManager.currentUserId ?: return
+        val myName = _currentSocialUser.value?.displayName ?: ""
+        viewModelScope.launch {
+            val partnership = AccountabilityPartnership(
+                user1Id = myUid, user1Name = myName,
+                user2Id = partnerId, user2Name = partnerName,
+                status = "pending", createdAt = Timestamp.now()
+            )
+            withContext(Dispatchers.IO) { repo.createPartnership(partnership) }
+        }
+    }
+
+    fun acceptPartnership(partnershipId: String) {
+        viewModelScope.launch { withContext(Dispatchers.IO) { repo.acceptPartnership(partnershipId) } }
+    }
+
+    fun declinePartnership(partnershipId: String) {
+        viewModelScope.launch { withContext(Dispatchers.IO) { repo.declinePartnership(partnershipId) } }
+    }
+
+    fun removePartnership(partnershipId: String) {
+        viewModelScope.launch { withContext(Dispatchers.IO) { repo.removePartnership(partnershipId) } }
+    }
+
+    // ═══════════════════════════════════════════
+    // TEAM GOALS
+    // ═══════════════════════════════════════════
+
+    fun createTeamGoal(title: String, category: String, targetValue: Float, targetUnit: String, durationDays: Int = 7) {
+        val myUid = authManager.currentUserId ?: return
+        val myName = _currentSocialUser.value?.displayName ?: ""
+        val startDate = LocalDate.now().format(formatter)
+        val endDate = LocalDate.now().plusDays(durationDays.toLong()).format(formatter)
+        viewModelScope.launch {
+            val goal = TeamGoal(
+                creatorId = myUid, creatorName = myName,
+                title = title, category = category,
+                targetValue = targetValue, targetUnit = targetUnit,
+                startDate = startDate, endDate = endDate,
+                members = listOf(TeamMember(userId = myUid, displayName = myName, joinedAt = Timestamp.now())),
+                createdAt = Timestamp.now()
+            )
+            withContext(Dispatchers.IO) { repo.createTeamGoal(goal) }
+        }
+    }
+
+    fun joinTeamGoal(goalId: String) {
+        val myUid = authManager.currentUserId ?: return
+        val myName = _currentSocialUser.value?.displayName ?: ""
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                repo.joinTeamGoal(goalId, TeamMember(userId = myUid, displayName = myName, joinedAt = Timestamp.now()))
+            }
+        }
+    }
+
+    fun syncTeamGoalProgress() {
+        val uid = authManager.currentUserId ?: return
+        viewModelScope.launch {
+            for (goal in _teamGoals.value) {
+                val isMember = goal.members.any { it.userId == uid }
+                if (!isMember) continue
+                val myContribution = withContext(Dispatchers.IO) {
+                    computeChallengeProgressForGoal(goal)
+                }
+                val newTotal = goal.members.sumOf { (if (it.userId == uid) myContribution else it.contribution).toDouble() }.toFloat()
+                withContext(Dispatchers.IO) {
+                    repo.updateTeamGoalProgress(goal.id, uid, myContribution, newTotal)
+                }
+            }
+        }
+    }
+
+    private suspend fun computeChallengeProgressForGoal(goal: TeamGoal): Float {
+        val start = LocalDate.parse(goal.startDate, formatter)
+        val today = LocalDate.now()
+        var total = 0f
+        when (goal.category) {
+            "WORKOUT" -> {
+                var d = start
+                while (!d.isAfter(today)) {
+                    val checkIn = checkInDao.getCheckInSync(d.format(formatter))
+                    if (checkIn?.workoutDone == true) total += 1f
+                    d = d.plusDays(1)
+                }
+            }
+            else -> {
+                var d = start
+                while (!d.isAfter(today)) {
+                    total += nutritionDao.getTotalForDateAndCategorySync(d.format(formatter), goal.category)
+                    d = d.plusDays(1)
+                }
+            }
+        }
+        return total
+    }
+
+    // ═══════════════════════════════════════════
+    // NUTRITION DUELS
+    // ═══════════════════════════════════════════
+
+    fun createDuel(opponentId: String, opponentName: String, category: String, duration: String = "day") {
+        val myUid = authManager.currentUserId ?: return
+        val myName = _currentSocialUser.value?.displayName ?: ""
+        val startDate = LocalDate.now().format(formatter)
+        val durationDays = if (duration == "week") 7L else 1L
+        val endDate = LocalDate.now().plusDays(durationDays).format(formatter)
+        viewModelScope.launch {
+            val duel = NutritionDuel(
+                challengerId = myUid, challengerName = myName,
+                opponentId = opponentId, opponentName = opponentName,
+                category = category, duration = duration,
+                startDate = startDate, endDate = endDate,
+                status = "pending", createdAt = Timestamp.now()
+            )
+            withContext(Dispatchers.IO) { repo.createDuel(duel) }
+        }
+    }
+
+    fun acceptDuel(duelId: String) {
+        viewModelScope.launch { withContext(Dispatchers.IO) { repo.acceptDuel(duelId) } }
+    }
+
+    fun declineDuel(duelId: String) {
+        viewModelScope.launch { withContext(Dispatchers.IO) { repo.declineDuel(duelId) } }
+    }
+
+    fun syncDuelProgress() {
+        val uid = authManager.currentUserId ?: return
+        viewModelScope.launch {
+            for (duel in _duels.value.filter { it.status == "active" }) {
+                val isChallenger = duel.challengerId == uid
+                val start = LocalDate.parse(duel.startDate, formatter)
+                val today = LocalDate.now()
+                var total = 0f
+                var d = start
+                while (!d.isAfter(today)) {
+                    total += withContext(Dispatchers.IO) {
+                        nutritionDao.getTotalForDateAndCategorySync(d.format(formatter), duel.category)
+                    }
+                    d = d.plusDays(1)
+                }
+                withContext(Dispatchers.IO) { repo.updateDuelProgress(duel.id, isChallenger, total) }
+
+                val endDate = LocalDate.parse(duel.endDate, formatter)
+                if (today.isAfter(endDate) || today.isEqual(endDate)) {
+                    val updatedDuel = if (isChallenger) duel.copy(challengerProgress = total) else duel.copy(opponentProgress = total)
+                    val winnerId = when {
+                        updatedDuel.challengerProgress > updatedDuel.opponentProgress -> updatedDuel.challengerId
+                        updatedDuel.opponentProgress > updatedDuel.challengerProgress -> updatedDuel.opponentId
+                        else -> "tie"
+                    }
+                    withContext(Dispatchers.IO) { repo.completeDuel(duel.id, winnerId) }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // LEADERBOARDS
+    // ═══════════════════════════════════════════
+
+    fun loadLeaderboard(fitnessLevel: String? = null) {
+        viewModelScope.launch {
+            _leaderboard.value = withContext(Dispatchers.IO) { repo.getLeaderboard(fitnessLevel) }
+        }
+    }
+
+    fun toggleProfilePublic() {
+        val uid = authManager.currentUserId ?: return
+        val newValue = !_isProfilePublic.value
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { repo.setProfilePublic(uid, newValue) }
+            _isProfilePublic.value = newValue
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // WORKOUT TEMPLATES
+    // ═══════════════════════════════════════════
+
+    fun publishWorkoutTemplate(title: String, description: String, fitnessLevel: String) {
+        val myUid = authManager.currentUserId ?: return
+        val myName = _currentSocialUser.value?.displayName ?: ""
+        viewModelScope.launch {
+            val exercises = withContext(Dispatchers.IO) { exerciseDao.getAllSync() }
+            val templateExercises = exercises.map { ex ->
+                TemplateExercise(
+                    dayOfWeek = ex.dayOfWeek, name = ex.name,
+                    sets = ex.sets, reps = ex.reps,
+                    restTimeSeconds = ex.restTimeSeconds, orderIndex = ex.orderIndex
+                )
+            }
+            val daysUsed = exercises.map { it.dayOfWeek }.distinct().size
+            val template = WorkoutTemplate(
+                creatorId = myUid, creatorName = myName,
+                title = title, description = description,
+                fitnessLevel = fitnessLevel, daysPerWeek = daysUsed,
+                exercises = templateExercises, createdAt = Timestamp.now()
+            )
+            withContext(Dispatchers.IO) { repo.publishTemplate(template) }
+            loadTemplates()
+        }
+    }
+
+    fun loadTemplates(fitnessLevel: String? = null) {
+        viewModelScope.launch {
+            _templates.value = withContext(Dispatchers.IO) { repo.getTemplates(fitnessLevel) }
+        }
+    }
+
+    fun loadMyTemplates() {
+        val uid = authManager.currentUserId ?: return
+        viewModelScope.launch {
+            _myTemplates.value = withContext(Dispatchers.IO) { repo.getMyTemplates(uid) }
+        }
+    }
+
+    fun downloadTemplate(template: WorkoutTemplate) {
+        viewModelScope.launch {
+            // Replace local exercises with template exercises
+            withContext(Dispatchers.IO) {
+                exerciseDao.deleteAll()
+                for (ex in template.exercises) {
+                    exerciseDao.insert(
+                        com.example.gymworkout.data.Exercise(
+                            dayOfWeek = ex.dayOfWeek, name = ex.name,
+                            sets = ex.sets, reps = ex.reps,
+                            restTimeSeconds = ex.restTimeSeconds, orderIndex = ex.orderIndex
+                        )
+                    )
+                }
+                repo.incrementTemplateDownloads(template.id)
+            }
+            loadTemplates()
+        }
+    }
+
+    fun addTemplateReview(templateId: String, rating: Int, comment: String) {
+        val myUid = authManager.currentUserId ?: return
+        val myName = _currentSocialUser.value?.displayName ?: ""
+        viewModelScope.launch {
+            val review = TemplateReview(
+                templateId = templateId, userId = myUid, userName = myName,
+                rating = rating, comment = comment, createdAt = Timestamp.now()
+            )
+            withContext(Dispatchers.IO) { repo.addTemplateReview(review) }
+            loadReviewsForTemplate(templateId)
+        }
+    }
+
+    fun loadReviewsForTemplate(templateId: String) {
+        viewModelScope.launch {
+            _templateReviews.value = withContext(Dispatchers.IO) { repo.getTemplateReviews(templateId) }
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // ACHIEVEMENT BADGES
+    // ═══════════════════════════════════════════
+
+    fun checkAndAwardBadges() {
+        val uid = authManager.currentUserId ?: return
+        val user = _currentSocialUser.value ?: return
+        viewModelScope.launch {
+            val badgeDefs = listOf(
+                Triple("streak_7", "First 7-Day Streak", "Maintained a 7-day streak in any category") to "🔥",
+                Triple("streak_30", "30-Day Warrior", "Maintained a 30-day streak") to "💪",
+                Triple("streak_100", "100-Day Legend", "Maintained a 100-day streak") to "🏆",
+                Triple("workouts_10", "Getting Started", "Logged 10 workouts") to "🏋️",
+                Triple("workouts_50", "Dedicated Athlete", "Logged 50 workouts") to "⭐",
+                Triple("workouts_100", "Century Club", "Logged 100 workouts") to "💯",
+                Triple("macros_month", "Macro Master", "Tracked every macro for 30 days") to "🥩",
+                Triple("journey_30", "One Month In", "30 days on fitness journey") to "📅",
+                Triple("journey_90", "Quarter Champion", "90 days on fitness journey") to "🗓️",
+                Triple("journey_365", "Year-Round Athlete", "365 days on fitness journey") to "🎉",
+                Triple("first_duel_win", "Duelist", "Won your first nutrition duel") to "⚔️",
+                Triple("first_battle_win", "Battle Victor", "Won your first streak battle") to "🥇",
+                Triple("template_shared", "Sharing is Caring", "Shared a workout template") to "📤",
+                Triple("five_friends", "Social Butterfly", "Made 5 friends") to "🦋"
+            )
+
+            for ((info, emoji) in badgeDefs) {
+                val (key, title, description) = info
+                val hasBadge = withContext(Dispatchers.IO) { repo.hasBadge(uid, key) }
+                if (hasBadge) continue
+
+                val earned = withContext(Dispatchers.IO) { checkBadgeCondition(key) }
+                if (earned) {
+                    val badge = AchievementBadge(key = key, title = title, description = description, icon = emoji, earnedAt = Timestamp.now())
+                    withContext(Dispatchers.IO) { repo.awardBadge(uid, badge) }
+                    postEvent(type = "goal_reached", title = "Badge Earned: $title!", description = description, value = 0f)
+                }
+            }
+            _badges.value = withContext(Dispatchers.IO) { repo.getUserBadges(uid) }
+        }
+    }
+
+    private suspend fun checkBadgeCondition(key: String): Boolean {
+        val categories = listOf("WATER", "PROTEIN", "CALORIES", "SLEEP")
+        return when (key) {
+            "streak_7" -> categories.any { computeStreakForCategory(it, LocalDate.now().minusDays(365).format(formatter)) >= 7 }
+            "streak_30" -> categories.any { computeStreakForCategory(it, LocalDate.now().minusDays(365).format(formatter)) >= 30 }
+            "streak_100" -> categories.any { computeStreakForCategory(it, LocalDate.now().minusDays(365).format(formatter)) >= 100 }
+            "workouts_10", "workouts_50", "workouts_100" -> {
+                val target = key.split("_")[1].toInt()
+                val count = countTotalWorkouts()
+                count >= target
+            }
+            "macros_month" -> {
+                // Check if protein was tracked every day for last 30 days
+                var d = LocalDate.now().minusDays(29)
+                var allTracked = true
+                while (!d.isAfter(LocalDate.now())) {
+                    val total = nutritionDao.getTotalForDateAndCategorySync(d.format(formatter), "PROTEIN")
+                    if (total <= 0f) { allTracked = false; break }
+                    d = d.plusDays(1)
+                }
+                allTracked
+            }
+            "journey_30", "journey_90", "journey_365" -> {
+                val target = key.split("_")[1].toInt()
+                val profile = userDao.getProfileSync()
+                if (profile?.journeyStartDate?.isNotEmpty() == true) {
+                    val days = ChronoUnit.DAYS.between(LocalDate.parse(profile.journeyStartDate, formatter), LocalDate.now()).toInt()
+                    days >= target
+                } else false
+            }
+            "first_duel_win" -> _duels.value.any { it.status == "completed" && it.winnerId == authManager.currentUserId }
+            "first_battle_win" -> _battles.value.any { it.status == "completed" && it.winnerId == authManager.currentUserId }
+            "template_shared" -> _myTemplates.value.isNotEmpty()
+            "five_friends" -> _friends.value.count { !it.isPending } >= 5
+            else -> false
+        }
+    }
+
+    private suspend fun countTotalWorkouts(): Int {
+        var count = 0
+        var d = LocalDate.now().minusDays(365)
+        while (!d.isAfter(LocalDate.now())) {
+            val checkIn = checkInDao.getCheckInSync(d.format(formatter))
+            if (checkIn?.workoutDone == true) count++
+            d = d.plusDays(1)
+        }
+        return count
+    }
+
+    fun loadBadgesForUser(uid: String) {
+        viewModelScope.launch {
+            _badges.value = withContext(Dispatchers.IO) { repo.getUserBadges(uid) }
+        }
+    }
+
+    // ═══════════════════════════════════════════
     // SYNC STREAKS TO CLOUD
     // ═══════════════════════════════════════════
 
@@ -672,7 +1079,10 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
             // Also sync battle streaks and challenge progress
             syncBattleStreaks()
             syncChallengeProgress()
+            syncDuelProgress()
+            syncTeamGoalProgress()
             checkAndPostMilestones()
+            checkAndAwardBadges()
         }
     }
 

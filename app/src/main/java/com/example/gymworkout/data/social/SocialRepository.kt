@@ -291,6 +291,251 @@ class SocialRepository {
         timelineCol.add(event.toMap()).await()
     }
 
+    // ═══════════════════════════════════════════
+    // ACCOUNTABILITY PARTNERS
+    // ═══════════════════════════════════════════
+
+    private val partnershipsCol get() = db.collection("accountability_partners")
+
+    suspend fun createPartnership(partnership: AccountabilityPartnership): String {
+        val docRef = partnershipsCol.add(partnership.toMap()).await()
+        return docRef.id
+    }
+
+    suspend fun acceptPartnership(partnershipId: String) {
+        partnershipsCol.document(partnershipId).update("status", "active").await()
+    }
+
+    suspend fun declinePartnership(partnershipId: String) {
+        partnershipsCol.document(partnershipId).delete().await()
+    }
+
+    suspend fun removePartnership(partnershipId: String) {
+        partnershipsCol.document(partnershipId).delete().await()
+    }
+
+    fun observePartnerships(uid: String): Flow<List<AccountabilityPartnership>> = callbackFlow {
+        val reg1 = partnershipsCol.whereEqualTo("user1Id", uid)
+            .addSnapshotListener { snap1, _ ->
+                if (snap1 == null) return@addSnapshotListener
+                val list1 = snap1.documents.mapNotNull { doc ->
+                    doc.toObject(AccountabilityPartnership::class.java)?.copy(id = doc.id)
+                }
+                partnershipsCol.whereEqualTo("user2Id", uid).get()
+                    .addOnSuccessListener { snap2 ->
+                        val list2 = snap2.documents.mapNotNull { doc ->
+                            doc.toObject(AccountabilityPartnership::class.java)?.copy(id = doc.id)
+                        }
+                        trySend((list1 + list2).sortedByDescending { it.createdAt })
+                    }
+            }
+        val reg2 = partnershipsCol.whereEqualTo("user2Id", uid)
+            .addSnapshotListener { _, _ -> }
+        awaitClose { reg1.remove(); reg2.remove() }
+    }
+
+    // ═══════════════════════════════════════════
+    // TEAM GOALS
+    // ═══════════════════════════════════════════
+
+    private val teamGoalsCol get() = db.collection("team_goals")
+
+    suspend fun createTeamGoal(goal: TeamGoal): String {
+        val docRef = teamGoalsCol.add(goal.toMap()).await()
+        return docRef.id
+    }
+
+    suspend fun joinTeamGoal(goalId: String, member: TeamMember) {
+        teamGoalsCol.document(goalId).update(
+            "members", FieldValue.arrayUnion(member.toMap())
+        ).await()
+    }
+
+    suspend fun updateTeamGoalProgress(goalId: String, userId: String, contribution: Float, newTotal: Float) {
+        val doc = teamGoalsCol.document(goalId).get().await()
+        val goal = doc.toObject(TeamGoal::class.java) ?: return
+        val updatedMembers = goal.members.map {
+            if (it.userId == userId) it.copy(contribution = contribution) else it
+        }
+        teamGoalsCol.document(goalId).update(
+            mapOf("members" to updatedMembers.map { it.toMap() }, "currentTotal" to newTotal)
+        ).await()
+    }
+
+    fun observeTeamGoals(uid: String): Flow<List<TeamGoal>> = callbackFlow {
+        val reg = teamGoalsCol.whereEqualTo("status", "active")
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot == null) return@addSnapshotListener
+                val goals = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(TeamGoal::class.java)?.copy(id = doc.id)
+                }.filter { goal ->
+                    goal.creatorId == uid || goal.members.any { it.userId == uid }
+                }
+                trySend(goals)
+            }
+        awaitClose { reg.remove() }
+    }
+
+    // ═══════════════════════════════════════════
+    // NUTRITION DUELS
+    // ═══════════════════════════════════════════
+
+    private val duelsCol get() = db.collection("nutrition_duels")
+
+    suspend fun createDuel(duel: NutritionDuel): String {
+        val docRef = duelsCol.add(duel.toMap()).await()
+        return docRef.id
+    }
+
+    suspend fun acceptDuel(duelId: String) {
+        duelsCol.document(duelId).update("status", "active").await()
+    }
+
+    suspend fun declineDuel(duelId: String) {
+        duelsCol.document(duelId).delete().await()
+    }
+
+    suspend fun updateDuelProgress(duelId: String, isChallenger: Boolean, progress: Float) {
+        val field = if (isChallenger) "challengerProgress" else "opponentProgress"
+        duelsCol.document(duelId).update(field, progress).await()
+    }
+
+    suspend fun completeDuel(duelId: String, winnerId: String) {
+        duelsCol.document(duelId).update(
+            mapOf("status" to "completed", "winnerId" to winnerId)
+        ).await()
+    }
+
+    fun observeDuels(uid: String): Flow<List<NutritionDuel>> = callbackFlow {
+        val reg1 = duelsCol.whereEqualTo("challengerId", uid)
+            .addSnapshotListener { snap1, _ ->
+                if (snap1 == null) return@addSnapshotListener
+                val list1 = snap1.documents.mapNotNull { doc ->
+                    doc.toObject(NutritionDuel::class.java)?.copy(id = doc.id)
+                }
+                duelsCol.whereEqualTo("opponentId", uid).get()
+                    .addOnSuccessListener { snap2 ->
+                        val list2 = snap2.documents.mapNotNull { doc ->
+                            doc.toObject(NutritionDuel::class.java)?.copy(id = doc.id)
+                        }
+                        trySend((list1 + list2).sortedByDescending { it.createdAt })
+                    }
+            }
+        val reg2 = duelsCol.whereEqualTo("opponentId", uid)
+            .addSnapshotListener { _, _ -> }
+        awaitClose { reg1.remove(); reg2.remove() }
+    }
+
+    // ═══════════════════════════════════════════
+    // LEADERBOARDS
+    // ═══════════════════════════════════════════
+
+    suspend fun getLeaderboard(fitnessLevel: String? = null, limit: Long = 50): List<LeaderboardEntry> {
+        var query = usersCol.whereEqualTo("isPublic", true)
+            .orderBy("dmgs", Query.Direction.DESCENDING)
+            .limit(limit)
+        if (fitnessLevel != null) {
+            query = usersCol.whereEqualTo("isPublic", true)
+                .whereEqualTo("fitnessLevel", fitnessLevel)
+                .orderBy("dmgs", Query.Direction.DESCENDING)
+                .limit(limit)
+        }
+        val snapshot = query.get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            val user = doc.toObject(SocialUser::class.java)?.copy(uid = doc.id) ?: return@mapNotNull null
+            LeaderboardEntry(
+                uid = user.uid, displayName = user.displayName,
+                photoUrl = user.photoUrl, fitnessLevel = user.fitnessLevel,
+                dmgs = user.dmgs, streaks = user.streaks, isPublic = true
+            )
+        }
+    }
+
+    suspend fun setProfilePublic(uid: String, isPublic: Boolean) {
+        usersCol.document(uid).update("isPublic", isPublic).await()
+    }
+
+    // ═══════════════════════════════════════════
+    // WORKOUT TEMPLATES
+    // ═══════════════════════════════════════════
+
+    private val templatesCol get() = db.collection("workout_templates")
+    private val reviewsCol get() = db.collection("template_reviews")
+
+    suspend fun publishTemplate(template: WorkoutTemplate): String {
+        val docRef = templatesCol.add(template.toMap()).await()
+        return docRef.id
+    }
+
+    suspend fun getTemplates(fitnessLevel: String? = null): List<WorkoutTemplate> {
+        var query = templatesCol.orderBy("downloads", Query.Direction.DESCENDING).limit(50)
+        if (fitnessLevel != null) {
+            query = templatesCol.whereEqualTo("fitnessLevel", fitnessLevel)
+                .orderBy("downloads", Query.Direction.DESCENDING).limit(50)
+        }
+        val snapshot = query.get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            doc.toObject(WorkoutTemplate::class.java)?.copy(id = doc.id)
+        }
+    }
+
+    suspend fun getMyTemplates(uid: String): List<WorkoutTemplate> {
+        val snapshot = templatesCol.whereEqualTo("creatorId", uid)
+            .orderBy("createdAt", Query.Direction.DESCENDING).get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            doc.toObject(WorkoutTemplate::class.java)?.copy(id = doc.id)
+        }
+    }
+
+    suspend fun incrementTemplateDownloads(templateId: String) {
+        templatesCol.document(templateId).update("downloads", FieldValue.increment(1)).await()
+    }
+
+    suspend fun addTemplateReview(review: TemplateReview) {
+        reviewsCol.add(review.toMap()).await()
+        // Update average rating
+        val reviews = reviewsCol.whereEqualTo("templateId", review.templateId).get().await()
+        val allReviews = reviews.documents.mapNotNull { it.toObject(TemplateReview::class.java) }
+        val avgRating = if (allReviews.isNotEmpty()) allReviews.map { it.rating }.average().toFloat() else 0f
+        templatesCol.document(review.templateId).update(
+            mapOf("rating" to avgRating, "ratingCount" to allReviews.size)
+        ).await()
+    }
+
+    suspend fun getTemplateReviews(templateId: String): List<TemplateReview> {
+        val snapshot = reviewsCol.whereEqualTo("templateId", templateId)
+            .orderBy("createdAt", Query.Direction.DESCENDING).get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            doc.toObject(TemplateReview::class.java)?.copy(id = doc.id)
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // ACHIEVEMENT BADGES
+    // ═══════════════════════════════════════════
+
+    suspend fun awardBadge(uid: String, badge: AchievementBadge) {
+        usersCol.document(uid).collection("badges").document(badge.key)
+            .set(badge.toMap()).await()
+    }
+
+    suspend fun getUserBadges(uid: String): List<AchievementBadge> {
+        val snapshot = usersCol.document(uid).collection("badges").get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            doc.toObject(AchievementBadge::class.java)?.copy(id = doc.id)
+        }
+    }
+
+    suspend fun hasBadge(uid: String, key: String): Boolean {
+        val doc = usersCol.document(uid).collection("badges").document(key).get().await()
+        return doc.exists()
+    }
+
+    // ═══════════════════════════════════════════
+    // JOURNEY TIMELINE
+    // ═══════════════════════════════════════════
+
     fun observeTimeline(friendIds: List<String>, myUid: String): Flow<List<TimelineEvent>> = callbackFlow {
         val allIds = (friendIds + myUid).distinct()
         if (allIds.isEmpty()) {

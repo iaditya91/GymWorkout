@@ -162,7 +162,7 @@ fun NutritionScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Nutrition & Habits", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text("Objectives", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text(
                             "Track your daily intake & habits",
                             style = MaterialTheme.typography.bodySmall,

@@ -1,8 +1,8 @@
 package com.example.gymworkout.ui.screens.social
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -25,7 +25,13 @@ fun SocialHubScreen(
     onNavigateToBattles: () -> Unit,
     onNavigateToChallenges: () -> Unit,
     onNavigateToTimeline: () -> Unit,
-    onNavigateToShare: () -> Unit
+    onNavigateToShare: () -> Unit,
+    onNavigateToAccountability: () -> Unit,
+    onNavigateToTeamGoals: () -> Unit,
+    onNavigateToNutritionDuels: () -> Unit,
+    onNavigateToLeaderboard: () -> Unit,
+    onNavigateToTemplates: () -> Unit,
+    onNavigateToBadges: () -> Unit
 ) {
     // Refresh sign-in state each time this screen appears
     LaunchedEffect(Unit) {
@@ -38,20 +44,32 @@ fun SocialHubScreen(
     val battles by socialViewModel.battles.collectAsState()
     val challenges by socialViewModel.myChallenges.collectAsState()
     val timeline by socialViewModel.timeline.collectAsState()
+    val partnerships by socialViewModel.partnerships.collectAsState()
+    val duels by socialViewModel.duels.collectAsState()
+    val badges by socialViewModel.badges.collectAsState()
     val isLoading by socialViewModel.isLoading.collectAsState()
     val error by socialViewModel.error.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Social", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                title = {
+                    Column {
+                        Text(
+                            "Social",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Connect & compete with friends",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -95,120 +113,116 @@ fun SocialHubScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // User info card
                 currentUser?.let { user ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Filled.Person,
-                                contentDescription = null,
-                                modifier = Modifier.size(40.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                            Icon(Icons.Filled.Person, null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    user.displayName.ifEmpty { "Athlete" },
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "Friend Code: ${user.friendCode}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                )
+                                Text(user.displayName.ifEmpty { "Athlete" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("Friend Code: ${user.friendCode}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
                             }
-                            // DMGS badge
-                            Surface(
-                                shape = MaterialTheme.shapes.small,
-                                color = MaterialTheme.colorScheme.primary
-                            ) {
-                                Text(
-                                    "${(user.dmgs * 100).toInt()}%",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primary) {
+                                Text("${(user.dmgs * 100).toInt()}%", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
 
-                // Feature cards grid
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                // Row 1: Friends + Streak Battles
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SocialFeatureCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Filled.Group,
-                        title = "Friends",
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.Group, title = "Friends",
                         subtitle = "${friends.count { !it.isPending }} friends",
                         pendingCount = friends.count { it.isPending && it.isIncoming },
                         onClick = onNavigateToFriends
                     )
                     SocialFeatureCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Filled.LocalFireDepartment,
-                        title = "Streak Battles",
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.LocalFireDepartment, title = "Streak Battles",
                         subtitle = "${battles.count { it.status == "active" }} active",
                         pendingCount = battles.count { it.status == "pending" && it.opponentId == (currentUser?.uid ?: "") },
                         onClick = onNavigateToBattles
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                // Row 2: Challenges + Nutrition Duels
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SocialFeatureCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Filled.EmojiEvents,
-                        title = "Challenges",
-                        subtitle = "${challenges.size} active",
-                        onClick = onNavigateToChallenges
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.EmojiEvents, title = "Challenges",
+                        subtitle = "${challenges.size} active", onClick = onNavigateToChallenges
                     )
                     SocialFeatureCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Filled.Share,
-                        title = "Share Progress",
-                        subtitle = "Daily card",
-                        onClick = onNavigateToShare
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.Restaurant, title = "Nutrition Duels",
+                        subtitle = "${duels.count { it.status == "active" }} active",
+                        pendingCount = duels.count { it.status == "pending" && it.opponentId == (currentUser?.uid ?: "") },
+                        onClick = onNavigateToNutritionDuels
+                    )
+                }
+
+                // Row 3: Accountability + Team Goals
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SocialFeatureCard(
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.Handshake, title = "Accountability",
+                        subtitle = "${partnerships.count { it.status == "active" }} partners",
+                        pendingCount = partnerships.count { it.status == "pending" && it.user2Id == (currentUser?.uid ?: "") },
+                        onClick = onNavigateToAccountability
+                    )
+                    SocialFeatureCard(
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.Groups, title = "Team Goals",
+                        subtitle = "${socialViewModel.teamGoals.collectAsState().value.size} active",
+                        onClick = onNavigateToTeamGoals
+                    )
+                }
+
+                // Row 4: Leaderboard + Templates
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SocialFeatureCard(
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.Leaderboard, title = "Leaderboards",
+                        subtitle = "Global rankings", onClick = onNavigateToLeaderboard
+                    )
+                    SocialFeatureCard(
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.FitnessCenter, title = "Templates",
+                        subtitle = "Share & download", onClick = onNavigateToTemplates
+                    )
+                }
+
+                // Row 5: Badges + Share Progress
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SocialFeatureCard(
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.MilitaryTech, title = "Badges",
+                        subtitle = "${badges.size} earned", onClick = onNavigateToBadges
+                    )
+                    SocialFeatureCard(
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.Share, title = "Share Progress",
+                        subtitle = "Daily card", onClick = onNavigateToShare
                     )
                 }
 
                 // Timeline card (full width)
                 SocialFeatureCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = Icons.Filled.Timeline,
-                    title = "Journey Timeline",
-                    subtitle = "${timeline.size} recent events from you & friends",
-                    onClick = onNavigateToTimeline
+                    modifier = Modifier.fillMaxWidth(), icon = Icons.Filled.Timeline, title = "Journey Timeline",
+                    subtitle = "${timeline.size} recent events from you & friends", onClick = onNavigateToTimeline
                 )
 
                 // Sync button
-                OutlinedButton(
-                    onClick = { socialViewModel.syncStreaksToCloud() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                OutlinedButton(onClick = { socialViewModel.syncStreaksToCloud() }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Sync, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Sync Progress")
                 }
+
+                Spacer(Modifier.height(8.dp))
             }
         }
 
