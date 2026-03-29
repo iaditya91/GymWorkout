@@ -121,7 +121,7 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
             .getLastSignedInAccount(getApplication()) != null
         val wasSignedIn = _isSignedIn.value
         _isSignedIn.value = authManager.isSignedIn || googleSignedIn
-        if (_isSignedIn.value && !wasSignedIn) {
+        if (_isSignedIn.value && (!wasSignedIn || _currentSocialUser.value == null)) {
             // Build a basic social user from Google account if Firebase isn't available
             if (!authManager.isSignedIn && googleSignedIn) {
                 val account = com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -189,9 +189,23 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     private fun loadSocialData() {
         val uid = authManager.currentUserId ?: return
         viewModelScope.launch {
-            // Load user profile
+            // Load user profile, create if missing
             withContext(Dispatchers.IO) {
-                _currentSocialUser.value = repo.getUser(uid)
+                var user = repo.getUser(uid)
+                if (user == null) {
+                    val firebaseUser = authManager.currentUser
+                    val localProfile = userDao.getProfileSync()
+                    user = SocialUser(
+                        uid = uid,
+                        displayName = localProfile?.name ?: firebaseUser?.displayName ?: "",
+                        photoUrl = firebaseUser?.photoUrl?.toString() ?: "",
+                        fitnessLevel = localProfile?.fitnessLevel ?: "beginner",
+                        friendCode = authManager.generateFriendCode(),
+                        joinedAt = Timestamp.now()
+                    )
+                    repo.createOrUpdateUser(user)
+                }
+                _currentSocialUser.value = user
                 repo.updateOnlineStatus(uid, true)
             }
             // Sync local streaks to cloud
