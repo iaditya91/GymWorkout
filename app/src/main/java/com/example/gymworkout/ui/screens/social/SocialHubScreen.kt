@@ -51,6 +51,7 @@ fun SocialHubScreen(
     val error by socialViewModel.error.collectAsState()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
