@@ -1108,26 +1108,32 @@ fun CustomCategoryCard(
     var showNotesDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
 
-    // Timer state (only for truly custom objectives)
+    // Timer state (only for truly custom objectives) — backed by ViewModel
     val hasTimer = isTrulyCustom && target.timerSeconds > 0
-    var timerRunning by remember { mutableStateOf(false) }
-    var timerPaused by remember { mutableStateOf(false) }
-    var timerRemaining by remember { mutableLongStateOf(target.timerSeconds.toLong()) }
+    val habitTimers by viewModel.habitTimers.collectAsState()
+    val habitTimerState = habitTimers[target.category]
+    val timerRunning = habitTimerState?.isRunning == true && habitTimerState.isFinished != true
+    val timerPaused = habitTimerState?.isPaused == true
+    val timerJustFinished = habitTimerState?.isFinished == true
     var showTimerDialog by remember { mutableStateOf(false) }
-    var timerJustFinished by remember { mutableStateOf(false) }
 
-    // Countdown effect
-    if (isTrulyCustom) {
-        LaunchedEffect(timerRunning, timerPaused) {
-            if (timerRunning && !timerPaused) {
-                while (timerRemaining > 0) {
-                    delay(1000L)
-                    timerRemaining--
-                }
-                if (timerRemaining <= 0L) {
-                    timerRunning = false
-                    timerPaused = false
-                    timerJustFinished = true
+    // Local tick state — drives recomposition every second (same pattern as rest timer)
+    var timerTick by remember { mutableLongStateOf(habitTimerState?.remainingSeconds() ?: target.timerSeconds.toLong()) }
+    val timerRemaining = timerTick
+
+    LaunchedEffect(
+        habitTimerState?.isRunning,
+        habitTimerState?.isPaused,
+        habitTimerState?.endElapsedRealtime,
+        habitTimerState?.pausedRemainingMs,
+        habitTimerState?.isFinished
+    ) {
+        if (habitTimerState != null && habitTimerState.isRunning && !habitTimerState.isPaused && !habitTimerState.isFinished) {
+            while (true) {
+                val remaining = habitTimerState.remainingSeconds()
+                timerTick = remaining
+                if (remaining <= 0) {
+                    viewModel.markHabitTimerFinished(target.category)
                     val intent = Intent(context, TimerReceiver::class.java).apply {
                         putExtra(TimerReceiver.EXTRA_LABEL, target.label)
                         putExtra(TimerReceiver.EXTRA_NOTIFY, target.timerNotifyEnabled)
@@ -1135,14 +1141,17 @@ fun CustomCategoryCard(
                         putExtra(TimerReceiver.EXTRA_TIMER_TYPE, "habit")
                     }
                     context.sendBroadcast(intent)
-                    timerRemaining = target.timerSeconds.toLong()
+                    break
                 }
+                delay(1000L)
             }
+        } else {
+            timerTick = habitTimerState?.remainingSeconds() ?: target.timerSeconds.toLong()
         }
     }
 
     // Auto-reopen the popup when timer finishes (even if user had minimized it)
-    if (isTrulyCustom) {
+    if (hasTimer) {
         LaunchedEffect(timerJustFinished) {
             if (timerJustFinished) showTimerDialog = true
         }
@@ -1181,7 +1190,10 @@ fun CustomCategoryCard(
                 viewModel.updateCustomObjective(
                     target.category, label, unit, timerSecs, notifyOn
                 )
-                timerRemaining = timerSecs.toLong()
+                // If timer is active, reset it with the new duration
+                if (habitTimerState != null) {
+                    viewModel.stopHabitTimer(target.category)
+                }
                 showEditDialog = false
             }
         )
@@ -1195,24 +1207,23 @@ fun CustomCategoryCard(
             isRunning = timerRunning,
             isPaused = timerPaused,
             isFinished = timerJustFinished,
-            onPauseResume = { timerPaused = !timerPaused },
+            onPauseResume = {
+                if (timerPaused) viewModel.resumeHabitTimer(target.category)
+                else viewModel.pauseHabitTimer(target.category)
+            },
             onReset = {
-                timerRemaining = target.timerSeconds.toLong()
-                timerRunning = true
-                timerPaused = false
+                viewModel.resetHabitTimer(target.category)
             },
             onStop = {
-                timerRunning = false
-                timerPaused = false
-                timerRemaining = target.timerSeconds.toLong()
+                viewModel.stopHabitTimer(target.category)
                 showTimerDialog = false
             },
             onDismiss = {
                 if (timerJustFinished) {
                     TimerAlertService.stop(context)
+                    viewModel.clearHabitTimerFinished(target.category)
                 }
                 showTimerDialog = false
-                timerJustFinished = false
             }
         )
     }
@@ -1417,9 +1428,10 @@ fun CustomCategoryCard(
                         // Start button
                         IconButton(
                             onClick = {
-                                timerRemaining = target.timerSeconds.toLong()
-                                timerRunning = true
-                                timerPaused = false
+                                viewModel.startHabitTimer(
+                                    target.category, target.label,
+                                    target.timerSeconds, target.timerNotifyEnabled
+                                )
                                 showTimerDialog = true
                             },
                             modifier = Modifier.size(36.dp)
@@ -1434,7 +1446,10 @@ fun CustomCategoryCard(
                     } else {
                         // Pause/Resume
                         IconButton(
-                            onClick = { timerPaused = !timerPaused },
+                            onClick = {
+                                if (timerPaused) viewModel.resumeHabitTimer(target.category)
+                                else viewModel.pauseHabitTimer(target.category)
+                            },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
@@ -1447,9 +1462,7 @@ fun CustomCategoryCard(
                         // Stop
                         IconButton(
                             onClick = {
-                                timerRunning = false
-                                timerPaused = false
-                                timerRemaining = target.timerSeconds.toLong()
+                                viewModel.stopHabitTimer(target.category)
                             },
                             modifier = Modifier.size(36.dp)
                         ) {

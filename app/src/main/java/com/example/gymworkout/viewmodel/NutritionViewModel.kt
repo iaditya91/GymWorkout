@@ -1,6 +1,7 @@
 package com.example.gymworkout.viewmodel
 
 import android.app.Application
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -30,6 +31,26 @@ import java.net.URL
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+data class HabitTimerState(
+    val category: String,           // unique key for the objective
+    val label: String,
+    val totalSeconds: Int,
+    val endElapsedRealtime: Long,   // SystemClock.elapsedRealtime() when timer ends
+    val pausedRemainingMs: Long = 0L,
+    val isRunning: Boolean = true,
+    val isPaused: Boolean = false,
+    val isFinished: Boolean = false,
+    val notifyEnabled: Boolean = true
+) {
+    fun remainingSeconds(): Long {
+        return if (isRunning && !isPaused) {
+            ((endElapsedRealtime - SystemClock.elapsedRealtime()) / 1000).coerceAtLeast(0)
+        } else {
+            (pausedRemainingMs / 1000).coerceAtLeast(0)
+        }
+    }
+}
+
 class NutritionViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = WorkoutDatabase.getDatabase(application).nutritionDao()
@@ -41,6 +62,85 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
 
     // Bumped to trigger habit history refresh
     private val _habitRefresh = MutableStateFlow(0L)
+
+    // Habit timer states — keyed by category, survives navigation
+    private val _habitTimers = MutableStateFlow<Map<String, HabitTimerState>>(emptyMap())
+    val habitTimers: StateFlow<Map<String, HabitTimerState>> = _habitTimers
+
+    fun startHabitTimer(category: String, label: String, totalSeconds: Int, notifyEnabled: Boolean) {
+        val map = _habitTimers.value.toMutableMap()
+        map[category] = HabitTimerState(
+            category = category,
+            label = label,
+            totalSeconds = totalSeconds,
+            endElapsedRealtime = SystemClock.elapsedRealtime() + totalSeconds * 1000L,
+            isRunning = true,
+            isPaused = false,
+            notifyEnabled = notifyEnabled
+        )
+        _habitTimers.value = map
+    }
+
+    fun pauseHabitTimer(category: String) {
+        val map = _habitTimers.value.toMutableMap()
+        map[category]?.let { state ->
+            if (state.isRunning && !state.isPaused) {
+                val remaining = (state.endElapsedRealtime - SystemClock.elapsedRealtime()).coerceAtLeast(0)
+                map[category] = state.copy(isPaused = true, pausedRemainingMs = remaining)
+                _habitTimers.value = map
+            }
+        }
+    }
+
+    fun resumeHabitTimer(category: String) {
+        val map = _habitTimers.value.toMutableMap()
+        map[category]?.let { state ->
+            if (state.isPaused && state.pausedRemainingMs > 0) {
+                map[category] = state.copy(
+                    isPaused = false,
+                    endElapsedRealtime = SystemClock.elapsedRealtime() + state.pausedRemainingMs,
+                    pausedRemainingMs = 0
+                )
+                _habitTimers.value = map
+            }
+        }
+    }
+
+    fun resetHabitTimer(category: String) {
+        val map = _habitTimers.value.toMutableMap()
+        map[category]?.let { state ->
+            map[category] = state.copy(
+                isRunning = true,
+                isPaused = false,
+                isFinished = false,
+                endElapsedRealtime = SystemClock.elapsedRealtime() + state.totalSeconds * 1000L,
+                pausedRemainingMs = 0
+            )
+            _habitTimers.value = map
+        }
+    }
+
+    fun stopHabitTimer(category: String) {
+        val map = _habitTimers.value.toMutableMap()
+        map.remove(category)
+        _habitTimers.value = map
+    }
+
+    fun markHabitTimerFinished(category: String) {
+        val map = _habitTimers.value.toMutableMap()
+        map[category]?.let { state ->
+            map[category] = state.copy(isRunning = false, isPaused = false, isFinished = true)
+            _habitTimers.value = map
+        }
+    }
+
+    fun clearHabitTimerFinished(category: String) {
+        val map = _habitTimers.value.toMutableMap()
+        map[category]?.let { state ->
+            map[category] = state.copy(isFinished = false)
+            _habitTimers.value = map
+        }
+    }
 
     fun setDate(date: String) {
         _selectedDate.value = date
