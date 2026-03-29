@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -71,7 +74,15 @@ import com.example.gymworkout.ui.theme.GymWorkoutTheme
 import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.viewmodel.StatsViewModel
 import com.example.gymworkout.viewmodel.UserViewModel
+import com.example.gymworkout.viewmodel.SocialViewModel
 import com.example.gymworkout.viewmodel.WorkoutViewModel
+import com.example.gymworkout.ui.screens.auth.LoginScreen
+import com.example.gymworkout.ui.screens.social.SocialHubScreen
+import com.example.gymworkout.ui.screens.social.FriendsScreen
+import com.example.gymworkout.ui.screens.social.StreakBattleScreen
+import com.example.gymworkout.ui.screens.social.WeeklyChallengeScreen
+import com.example.gymworkout.ui.screens.social.ProgressShareScreen
+import com.example.gymworkout.ui.screens.social.JourneyTimelineScreen
 
 class MainActivity : ComponentActivity() {
     private fun requestNotificationPermission() {
@@ -124,11 +135,12 @@ val bottomNavItems = listOf(
     BottomNavItem("workout", "Workout", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter),
     BottomNavItem("nutrition", "Nutrition & Habits", Icons.Filled.Restaurant, Icons.Outlined.Restaurant),
     BottomNavItem("stats", "Stats", Icons.Filled.BarChart, Icons.Outlined.BarChart),
+    BottomNavItem("social", "Social", Icons.Filled.Group, Icons.Outlined.Group),
     BottomNavItem("user", "Profile", Icons.Filled.Person, Icons.Outlined.Person)
 )
 
 // Routes where bottom bar should be visible
-val bottomBarRoutes = setOf("workout", "nutrition", "stats", "user")
+val bottomBarRoutes = setOf("workout", "nutrition", "stats", "social", "user")
 
 @Composable
 fun WorkoutApp() {
@@ -138,6 +150,13 @@ fun WorkoutApp() {
     val statsViewModel: StatsViewModel = viewModel()
     val userViewModel: UserViewModel = viewModel()
     val aiChatViewModel: AiChatViewModel = viewModel()
+    val socialViewModel: SocialViewModel = viewModel()
+
+    // Check if user is already signed in or has previously skipped/signed in
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val loginPrefs = remember { context.getSharedPreferences("login_prefs", android.content.Context.MODE_PRIVATE) }
+    val hasCompletedLogin = remember { loginPrefs.getBoolean("has_completed_login", false) }
+    val startDestination = if (hasCompletedLogin) "workout" else "login"
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -145,6 +164,7 @@ fun WorkoutApp() {
     val showFab = Build.VERSION.SDK_INT >= 31 &&
             currentRoute != "ai_chat" &&
             currentRoute != "nutrition" &&
+            currentRoute != "login" &&
             currentRoute?.startsWith("day/") != true &&
             currentRoute?.startsWith("habit/") != true
 
@@ -220,9 +240,27 @@ fun WorkoutApp() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = "workout",
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable("login") {
+                LoginScreen(
+                    userViewModel = userViewModel,
+                    socialViewModel = socialViewModel,
+                    onSignInComplete = {
+                        loginPrefs.edit().putBoolean("has_completed_login", true).apply()
+                        navController.navigate("workout") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    },
+                    onSkip = {
+                        loginPrefs.edit().putBoolean("has_completed_login", true).apply()
+                        navController.navigate("workout") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable("workout") {
                 WeeklyPlanScreen(
                     viewModel = workoutViewModel,
@@ -318,6 +356,48 @@ fun WorkoutApp() {
             composable("ai_chat") {
                 AiChatScreen(
                     viewModel = aiChatViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social") {
+                SocialHubScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToLogin = { navController.navigate("login") },
+                    onNavigateToFriends = { navController.navigate("social/friends") },
+                    onNavigateToBattles = { navController.navigate("social/battles") },
+                    onNavigateToChallenges = { navController.navigate("social/challenges") },
+                    onNavigateToTimeline = { navController.navigate("social/timeline") },
+                    onNavigateToShare = { navController.navigate("social/share") }
+                )
+            }
+            composable("social/friends") {
+                FriendsScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/battles") {
+                StreakBattleScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/challenges") {
+                WeeklyChallengeScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/share") {
+                ProgressShareScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("social/timeline") {
+                JourneyTimelineScreen(
+                    socialViewModel = socialViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }

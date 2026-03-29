@@ -19,6 +19,9 @@ interface UserDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertProfile(profile: UserProfile)
 
+    @Query("SELECT * FROM user_profile WHERE id = 1")
+    suspend fun getProfileSync(): UserProfile?
+
     // Checklist
     @Query("SELECT * FROM checklist_items WHERE type = :type ORDER BY id ASC")
     fun getChecklistItems(type: String): Flow<List<ChecklistItem>>
