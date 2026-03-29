@@ -1059,7 +1059,7 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     // ═══════════════════════════════════════════
 
     fun syncStreaksToCloud() {
-        val uid = authManager.currentUserId ?: return
+        val uid = authManager.currentUserId
         viewModelScope.launch {
             val streaks = mutableMapOf<String, Int>()
             for (cat in listOf("WATER", "PROTEIN", "CALORIES", "SLEEP")) {
@@ -1086,17 +1086,28 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                     (min(sleepActual / sleepTarget, 1f) * 0.15f) +
                     (min(waterActual / waterTarget, 1f) * 0.10f)
 
-            withContext(Dispatchers.IO) {
-                repo.updateUserStreaks(uid, streaks, dmgs)
+            // Sync to Firestore if Firebase auth is available
+            if (uid != null) {
+                withContext(Dispatchers.IO) {
+                    repo.updateUserStreaks(uid, streaks, dmgs)
+                }
             }
 
-            // Also sync battle streaks and challenge progress
-            syncBattleStreaks()
-            syncChallengeProgress()
-            syncDuelProgress()
-            syncTeamGoalProgress()
-            checkAndPostMilestones()
-            checkAndAwardBadges()
+            // Always update local social user so UI reflects new dmgs
+            _currentSocialUser.value = _currentSocialUser.value?.copy(
+                streaks = streaks,
+                dmgs = dmgs
+            )
+
+            // Cloud-dependent features
+            if (uid != null) {
+                syncBattleStreaks()
+                syncChallengeProgress()
+                syncDuelProgress()
+                syncTeamGoalProgress()
+                checkAndPostMilestones()
+                checkAndAwardBadges()
+            }
         }
     }
 

@@ -33,9 +33,10 @@ fun SocialHubScreen(
     onNavigateToTemplates: () -> Unit,
     onNavigateToBadges: () -> Unit
 ) {
-    // Refresh sign-in state each time this screen appears
+    // Refresh sign-in state and sync progress each time this screen appears
     LaunchedEffect(Unit) {
         socialViewModel.refreshSignInState()
+        socialViewModel.syncStreaksToCloud()
     }
 
     val isSignedIn by socialViewModel.isSignedIn.collectAsState()
