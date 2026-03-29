@@ -156,16 +156,35 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun incrementSet(exercise: Exercise) {
         viewModelScope.launch {
-            val newCompleted = (exercise.completedSets + 1).coerceAtMost(exercise.sets)
-            val isDone = newCompleted >= exercise.sets
-            dao.updateCompletedSets(exercise.id, newCompleted, isDone)
+            if (exercise.supersetGroupId.isNotBlank()) {
+                // Increment all exercises in the superset group together
+                val group = dao.getExercisesByGroupId(exercise.supersetGroupId)
+                for (ex in group) {
+                    val newCompleted = (ex.completedSets + 1).coerceAtMost(ex.sets)
+                    val isDone = newCompleted >= ex.sets
+                    dao.updateCompletedSets(ex.id, newCompleted, isDone)
+                }
+            } else {
+                val newCompleted = (exercise.completedSets + 1).coerceAtMost(exercise.sets)
+                val isDone = newCompleted >= exercise.sets
+                dao.updateCompletedSets(exercise.id, newCompleted, isDone)
+            }
         }
     }
 
     fun decrementSet(exercise: Exercise) {
         viewModelScope.launch {
-            val newCompleted = (exercise.completedSets - 1).coerceAtLeast(0)
-            dao.updateCompletedSets(exercise.id, newCompleted, false)
+            if (exercise.supersetGroupId.isNotBlank()) {
+                // Decrement all exercises in the superset group together
+                val group = dao.getExercisesByGroupId(exercise.supersetGroupId)
+                for (ex in group) {
+                    val newCompleted = (ex.completedSets - 1).coerceAtLeast(0)
+                    dao.updateCompletedSets(ex.id, newCompleted, false)
+                }
+            } else {
+                val newCompleted = (exercise.completedSets - 1).coerceAtLeast(0)
+                dao.updateCompletedSets(exercise.id, newCompleted, false)
+            }
         }
     }
 

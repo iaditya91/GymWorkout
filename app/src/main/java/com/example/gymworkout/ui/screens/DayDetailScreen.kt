@@ -578,6 +578,15 @@ fun SupersetCard(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+                Spacer(modifier = Modifier.weight(1f))
+                // Combined set counter for the whole superset
+                val refExercise = exercises.first()
+                SetCounter(
+                    completedSets = refExercise.completedSets,
+                    totalSets = refExercise.sets,
+                    onIncrement = { onIncrementSet(refExercise) },
+                    onDecrement = { onDecrementSet(refExercise) }
+                )
             }
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -585,8 +594,6 @@ fun SupersetCard(
                 SupersetExerciseRow(
                     exercise = exercise,
                     label = if (exercises.size > 1) "${('A' + idx)}" else null,
-                    onIncrementSet = { onIncrementSet(exercise) },
-                    onDecrementSet = { onDecrementSet(exercise) },
                     onPlayVideo = { onPlayVideo(exercise) },
                     onExerciseClick = { onExerciseClick(exercise) },
                     onEditNotes = { onEditNotes(exercise) },
@@ -642,8 +649,6 @@ fun SupersetCard(
 fun SupersetExerciseRow(
     exercise: Exercise,
     label: String?,
-    onIncrementSet: () -> Unit,
-    onDecrementSet: () -> Unit,
     onPlayVideo: () -> Unit,
     onExerciseClick: () -> Unit,
     onEditNotes: () -> Unit,
@@ -675,16 +680,6 @@ fun SupersetExerciseRow(
                 Spacer(modifier = Modifier.width(6.dp))
             }
 
-            // Set counter
-            SetCounter(
-                completedSets = exercise.completedSets,
-                totalSets = exercise.sets,
-                onIncrement = onIncrementSet,
-                onDecrement = onDecrementSet
-            )
-
-            Spacer(modifier = Modifier.width(6.dp))
-
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -713,7 +708,7 @@ fun SupersetExerciseRow(
 
         // Badges
         Row(
-            modifier = Modifier.padding(start = if (label != null) 64.dp else 44.dp, top = 2.dp),
+            modifier = Modifier.padding(start = if (label != null) 28.dp else 0.dp, top = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -741,7 +736,7 @@ fun SupersetExerciseRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = if (label != null) 64.dp else 44.dp, top = 4.dp)
+                modifier = Modifier.padding(start = if (label != null) 28.dp else 0.dp, top = 4.dp)
             )
         }
 
@@ -749,7 +744,7 @@ fun SupersetExerciseRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = if (label != null) 56.dp else 36.dp, top = 2.dp),
+                .padding(start = if (label != null) 20.dp else 0.dp, top = 2.dp),
             horizontalArrangement = Arrangement.End
         ) {
             IconButton(onClick = onEditNotes, modifier = Modifier.size(32.dp)) {
