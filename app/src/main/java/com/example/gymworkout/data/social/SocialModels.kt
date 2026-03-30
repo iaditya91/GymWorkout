@@ -14,6 +14,7 @@ data class SocialUser(
     val streaks: Map<String, Int> = emptyMap(),
     val dmgs: Float = 0f,
     val isOnline: Boolean = false,
+    val isPublic: Boolean = false,
     val lastSeen: Timestamp = Timestamp.now()
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
@@ -26,6 +27,7 @@ data class SocialUser(
         "streaks" to streaks,
         "dmgs" to dmgs,
         "isOnline" to isOnline,
+        "isPublic" to isPublic,
         "lastSeen" to lastSeen
     )
 }

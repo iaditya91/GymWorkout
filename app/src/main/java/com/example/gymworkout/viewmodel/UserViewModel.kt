@@ -271,7 +271,8 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
                     SyncPreference.setLastSyncTime(getApplication(), now)
                     _syncState.value = SyncState.Success("Backup complete")
                 } else {
-                    _syncState.value = SyncState.Error("Upload failed")
+                    val detail = driveSync.getLastError() ?: "Unknown error"
+                    _syncState.value = SyncState.Error("Upload failed: $detail")
                 }
             } catch (e: Exception) {
                 _syncState.value = SyncState.Error(e.message ?: "Backup failed")
@@ -288,7 +289,8 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
                 val json = driveSync.downloadBackup()
 
                 if (json == null) {
-                    _syncState.value = SyncState.Error("No backup found on Google Drive")
+                    val detail = driveSync.getLastError()
+                    _syncState.value = SyncState.Error(detail ?: "No backup found on Google Drive")
                     return@launch
                 }
 

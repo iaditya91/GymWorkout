@@ -104,8 +104,11 @@ import com.example.gymworkout.notification.AiPlannerNotificationScheduler
 import android.media.RingtoneManager
 import androidx.compose.material.icons.filled.MusicNote
 import com.example.gymworkout.data.TimerSoundPreference
+import com.example.gymworkout.viewmodel.SocialViewModel
 import com.example.gymworkout.viewmodel.SyncState
 import com.example.gymworkout.viewmodel.UserViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -113,7 +116,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserScreen(viewModel: UserViewModel) {
+fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel) {
     val context = LocalContext.current
     val profile by viewModel.getProfile().collectAsState(initial = null)
     val dos by viewModel.getDos().collectAsState(initial = emptyList())
@@ -156,7 +159,16 @@ fun UserScreen(viewModel: UserViewModel) {
     val signInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        // Sign in for backup (UserViewModel)
         viewModel.handleSignInResult(result.data)
+        // Sign in for social (SocialViewModel / Firebase)
+        try {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            val account = task.getResult(ApiException::class.java)
+            if (account != null) {
+                socialViewModel.signInWithGoogle(account)
+            }
+        } catch (_: ApiException) { }
     }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -210,6 +222,7 @@ fun UserScreen(viewModel: UserViewModel) {
                     onRestore = { showRestoreConfirm = true },
                     onSignOut = {
                         viewModel.signOut(context)
+                        socialViewModel.signOut()
                         autoBackupEnabled = false
                     },
                     onAutoBackupToggle = {

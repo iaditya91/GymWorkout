@@ -357,7 +357,7 @@ fun WorkoutApp() {
                 StatsScreen(viewModel = statsViewModel)
             }
             composable("user") {
-                UserScreen(viewModel = userViewModel)
+                UserScreen(viewModel = userViewModel, socialViewModel = socialViewModel)
             }
             composable("ai_chat") {
                 AiChatScreen(

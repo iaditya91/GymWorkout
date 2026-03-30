@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "633409218041",
-    "project_id": "gym-workout-e0dc7",
-    "storage_bucket": "gym-workout-e0dc7.firebasestorage.app"
+    "project_number": "1046187913075",
+    "project_id": "gym-workout-2660f",
+    "storage_bucket": "gym-workout-2660f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:633409218041:android:4dda6803161f80e2f14928",
+        "mobilesdk_app_id": "1:1046187913075:android:088b5451361fad73b5df06",
         "android_client_info": {
           "package_name": "com.example.gymworkout"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1046187913075-2hibmv4lehq5a2tq48infcbasup38jhk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.gymworkout",
+            "certificate_hash": "4aff99b2037c0d35ee16b6ec8b3360181cba8d83"
+          }
+        },
+        {
+          "client_id": "1046187913075-qolq3fnhr0r89gqjcrtmrj1pq7v61dcv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAiEwj6JF2SXzCAuqpSlKI4LSc05f9GuHY"
+          "current_key": "AIzaSyBgbYDm8sW37ccAUdw2fs_hotzKpNLp0-w"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1046187913075-1uojlqjp5ptn8l5bulv8vfmnr4uhdeug.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
