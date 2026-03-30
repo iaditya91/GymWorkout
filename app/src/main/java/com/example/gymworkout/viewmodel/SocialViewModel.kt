@@ -410,6 +410,9 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                 createdAt = Timestamp.now()
             )
             withContext(Dispatchers.IO) { repo.createStreakBattle(battle) }
+            // Refresh battles list so the new pending battle appears in UI
+            val updated = withContext(Dispatchers.IO) { repo.getBattlesList(myUid) }
+            _battles.value = updated
         }
     }
 
@@ -542,6 +545,9 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                 createdAt = Timestamp.now()
             )
             withContext(Dispatchers.IO) { repo.createChallenge(challenge) }
+            // Refresh challenges list so the new challenge appears in UI
+            val friendIds = withContext(Dispatchers.IO) { repo.getAcceptedFriendIds(myUid) }
+            _availableChallenges.value = withContext(Dispatchers.IO) { repo.getAvailableChallenges(friendIds) }
 
             postEvent(
                 type = "challenge_created",
@@ -826,6 +832,9 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                 status = "pending", createdAt = Timestamp.now()
             )
             withContext(Dispatchers.IO) { repo.createPartnership(partnership) }
+            // Refresh partnerships list so the new pending partnership appears in UI
+            val updated = withContext(Dispatchers.IO) { repo.getPartnershipsList(myUid) }
+            _partnerships.value = updated
         }
     }
 
@@ -900,6 +909,9 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                 createdAt = Timestamp.now()
             )
             withContext(Dispatchers.IO) { repo.createTeamGoal(goal) }
+            // Refresh team goals list so the new goal appears in UI
+            val updated = withContext(Dispatchers.IO) { repo.getTeamGoalsList(myUid) }
+            _teamGoals.value = updated
         }
     }
 
@@ -979,6 +991,9 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                 status = "pending", createdAt = Timestamp.now()
             )
             withContext(Dispatchers.IO) { repo.createDuel(duel) }
+            // Refresh duels list so the new pending duel appears in UI
+            val updated = withContext(Dispatchers.IO) { repo.getDuelsList(myUid) }
+            _duels.value = updated
         }
     }
 

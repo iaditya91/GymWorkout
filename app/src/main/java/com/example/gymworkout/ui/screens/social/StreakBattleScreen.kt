@@ -107,6 +107,8 @@ fun StreakBattleScreen(
             // Pending invites (incoming)
             val myUid = currentUser?.uid ?: ""
             val incomingBattles = pendingBattles.filter { it.opponentId == myUid }
+            val outgoingBattles = pendingBattles.filter { it.creatorId == myUid }
+
             if (incomingBattles.isNotEmpty()) {
                 item {
                     Text(
@@ -122,6 +124,21 @@ fun StreakBattleScreen(
                         onAccept = { socialViewModel.acceptBattle(battle.id) },
                         onDecline = { socialViewModel.declineBattle(battle.id) }
                     )
+                }
+            }
+
+            // Pending outgoing (waiting for opponent to accept)
+            if (outgoingBattles.isNotEmpty()) {
+                item {
+                    Text(
+                        "Pending \u2013 Waiting for Accept",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                items(outgoingBattles, key = { it.id }) { battle ->
+                    PendingSentCard(battle = battle)
                 }
             }
 
@@ -240,6 +257,50 @@ private fun BattleInviteCard(
                 OutlinedButton(onClick = onDecline, modifier = Modifier.weight(1f)) {
                     Text("Decline")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingSentCard(battle: StreakBattle) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(categoryEmoji(battle.category), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "${battle.category} Battle vs ${battle.opponentName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "${daysBetween(battle.startDate, battle.endDate)} days",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Text(
+                    "Pending",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             }
         }
     }

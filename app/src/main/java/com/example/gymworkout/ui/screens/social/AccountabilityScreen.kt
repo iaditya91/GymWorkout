@@ -72,6 +72,27 @@ fun AccountabilityScreen(
                 }
             }
 
+            // Outgoing pending requests
+            val outgoing = pending.filter { it.user1Id == myUid }
+            if (outgoing.isNotEmpty()) {
+                item { Text("Pending \u2013 Waiting for Accept", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                items(outgoing) { p ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(12.dp))
+                            Text(p.user2Name, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Text("Pending", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            }
+                        }
+                    }
+                }
+            }
+
             // Incoming requests
             val incoming = pending.filter { it.user2Id == myUid }
             if (incoming.isNotEmpty()) {
@@ -134,7 +155,7 @@ fun AccountabilityScreen(
             }
 
             // Empty state
-            if (active.isEmpty() && incoming.isEmpty()) {
+            if (partnerships.isEmpty()) {
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(32.dp),

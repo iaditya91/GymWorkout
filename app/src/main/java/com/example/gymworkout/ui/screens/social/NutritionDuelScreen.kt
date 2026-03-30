@@ -31,6 +31,7 @@ fun NutritionDuelScreen(
 
     val acceptedFriends = friends.filter { !it.isPending }
     val pendingIncoming = duels.filter { it.status == "pending" && it.opponentId == myUid }
+    val pendingOutgoing = duels.filter { it.status == "pending" && it.challengerId == myUid }
     val active = duels.filter { it.status == "active" }
     val completed = duels.filter { it.status == "completed" }
 
@@ -84,6 +85,24 @@ fun NutritionDuelScreen(
                             }
                             IconButton(onClick = { socialViewModel.declineDuel(duel.id) }) {
                                 Icon(Icons.Default.Close, "Decline", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Outgoing pending duels
+            if (pendingOutgoing.isNotEmpty()) {
+                item { Text("Pending \u2013 Waiting for Accept", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                items(pendingOutgoing) { duel ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("${categoryEmoji(duel.category)} ${duel.category} vs ${duel.opponentName}", fontWeight = FontWeight.SemiBold)
+                                Text(duel.duration, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Text("Pending", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
                             }
                         }
                     }
