@@ -357,7 +357,11 @@ fun WorkoutApp() {
                 StatsScreen(viewModel = statsViewModel)
             }
             composable("user") {
-                UserScreen(viewModel = userViewModel, socialViewModel = socialViewModel)
+                UserScreen(
+                    viewModel = userViewModel,
+                    socialViewModel = socialViewModel,
+                    onNavigateToLogin = { navController.navigate("login") }
+                )
             }
             composable("ai_chat") {
                 AiChatScreen(

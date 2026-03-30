@@ -116,7 +116,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel) {
+fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNavigateToLogin: () -> Unit = {}) {
     val context = LocalContext.current
     val profile by viewModel.getProfile().collectAsState(initial = null)
     val dos by viewModel.getDos().collectAsState(initial = emptyList())
@@ -208,28 +208,36 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel) {
         ) {
             item { ProfileCard(profile = profile, onEdit = { showEditProfile = true }) }
 
-            // Google Sync card
+            // Sign in / Sign out button (always visible, toggles based on state)
             item {
-                GoogleSyncCard(
+                GoogleSignInButton(
+                    isSignedIn = accountEmail != null,
                     accountEmail = accountEmail,
-                    lastSyncTime = lastSyncTime,
-                    syncState = syncState,
-                    autoBackupEnabled = autoBackupEnabled,
-                    onSignIn = {
-                        signInLauncher.launch(viewModel.getGoogleSignInClient(context).signInIntent)
-                    },
-                    onBackup = { viewModel.backupToGoogleDrive() },
-                    onRestore = { showRestoreConfirm = true },
+                    onSignIn = onNavigateToLogin,
                     onSignOut = {
                         viewModel.signOut(context)
                         socialViewModel.signOut()
                         autoBackupEnabled = false
-                    },
-                    onAutoBackupToggle = {
-                        viewModel.setAutoBackupEnabled(it)
-                        autoBackupEnabled = it
                     }
                 )
+            }
+
+            // Google Sync card (shown when signed in)
+            if (accountEmail != null) {
+                item {
+                    GoogleSyncCard(
+                        accountEmail = accountEmail!!,
+                        lastSyncTime = lastSyncTime,
+                        syncState = syncState,
+                        autoBackupEnabled = autoBackupEnabled,
+                        onBackup = { viewModel.backupToGoogleDrive() },
+                        onRestore = { showRestoreConfirm = true },
+                        onAutoBackupToggle = {
+                            viewModel.setAutoBackupEnabled(it)
+                            autoBackupEnabled = it
+                        }
+                    )
+                }
             }
 
             item { ThemeToggleCard() }
@@ -441,18 +449,82 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel) {
 // --- Google Sync Card ---
 
 @Composable
-fun GoogleSyncCard(
+fun GoogleSignInButton(
+    isSignedIn: Boolean,
     accountEmail: String?,
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit
+) {
+    val googleBlue = Color(0xFF4285F4)
+    val googleRed = Color(0xFFEA4335)
+
+    if (!isSignedIn) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(googleBlue)
+                .clickable(onClick = onSignIn)
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "G",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    "Sign in with Google",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(googleRed.copy(alpha = 0.12f))
+                .clickable(onClick = onSignOut)
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Logout,
+                    contentDescription = null,
+                    tint = googleRed,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Sign out (${accountEmail})",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = googleRed,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun GoogleSyncCard(
+    accountEmail: String,
     lastSyncTime: Long,
     syncState: SyncState,
     autoBackupEnabled: Boolean,
-    onSignIn: () -> Unit,
     onBackup: () -> Unit,
     onRestore: () -> Unit,
-    onSignOut: () -> Unit,
     onAutoBackupToggle: (Boolean) -> Unit
 ) {
-    val isSignedIn = accountEmail != null
     val googleBlue = Color(0xFF4285F4)
 
     Card(
@@ -461,104 +533,41 @@ fun GoogleSyncCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            if (!isSignedIn) {
-                // Sign-in state
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(googleBlue.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "G",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = googleBlue
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Google Backup",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            "Sign in to backup & sync your data",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
+            // Header with account info
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(googleBlue)
-                        .clickable(onClick = onSignIn)
-                        .padding(vertical = 12.dp),
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(googleBlue.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "Sign in with Google",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        accountEmail.first().uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = googleBlue
                     )
                 }
-            } else {
-                // Signed-in state
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(googleBlue.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            accountEmail.first().uppercase(),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = googleBlue
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Google Backup",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            accountEmail,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    IconButton(
-                        onClick = onSignOut,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Logout,
-                            contentDescription = "Sign out",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Google Backup",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        accountEmail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+            }
 
                 // Sync status
                 if (syncState is SyncState.Loading) {
@@ -726,7 +735,6 @@ fun GoogleSyncCard(
                         )
                     )
                 }
-            }
         }
     }
 }
