@@ -95,7 +95,7 @@ class SocialRepository {
     }
 
     suspend fun removeFriend(friendshipId: String) {
-        try { friendshipsCol.document(friendshipId).delete().await() } catch (_: Exception) { }
+        friendshipsCol.document(friendshipId).delete().await()
     }
 
     suspend fun getFriendsList(uid: String): List<FriendInfo> {
@@ -237,11 +237,23 @@ class SocialRepository {
     }
 
     suspend fun acceptStreakBattle(battleId: String) {
-        try { battlesCol.document(battleId).update("status", "active").await() } catch (_: Exception) { }
+        battlesCol.document(battleId).update("status", "active").await()
     }
 
     suspend fun declineStreakBattle(battleId: String) {
-        try { battlesCol.document(battleId).delete().await() } catch (_: Exception) { }
+        battlesCol.document(battleId).delete().await()
+    }
+
+    suspend fun getBattlesList(uid: String): List<StreakBattle> {
+        val snap1 = battlesCol.whereEqualTo("creatorId", uid).get().await()
+        val snap2 = battlesCol.whereEqualTo("opponentId", uid).get().await()
+        val list1 = snap1.documents.mapNotNull { doc ->
+            doc.toObject(StreakBattle::class.java)?.copy(id = doc.id)
+        }
+        val list2 = snap2.documents.mapNotNull { doc ->
+            doc.toObject(StreakBattle::class.java)?.copy(id = doc.id)
+        }
+        return (list1 + list2).sortedByDescending { it.createdAt }
     }
 
     suspend fun updateBattleStreak(battleId: String, isCreator: Boolean, streak: Int) {
@@ -293,11 +305,9 @@ class SocialRepository {
     }
 
     suspend fun joinChallenge(challengeId: String, participant: ChallengeParticipant) {
-        try {
-            challengesCol.document(challengeId).update(
-                "participants", FieldValue.arrayUnion(participant.toMap())
-            ).await()
-        } catch (_: Exception) { }
+        challengesCol.document(challengeId).update(
+            "participants", FieldValue.arrayUnion(participant.toMap())
+        ).await()
     }
 
     suspend fun updateChallengeProgress(challengeId: String, userId: String, newProgress: Float) {
@@ -365,15 +375,31 @@ class SocialRepository {
     }
 
     suspend fun acceptPartnership(partnershipId: String) {
-        try { partnershipsCol.document(partnershipId).update("status", "active").await() } catch (_: Exception) { }
+        partnershipsCol.document(partnershipId).update("status", "active").await()
     }
 
     suspend fun declinePartnership(partnershipId: String) {
-        try { partnershipsCol.document(partnershipId).delete().await() } catch (_: Exception) { }
+        partnershipsCol.document(partnershipId).delete().await()
     }
 
     suspend fun removePartnership(partnershipId: String) {
-        try { partnershipsCol.document(partnershipId).delete().await() } catch (_: Exception) { }
+        partnershipsCol.document(partnershipId).delete().await()
+    }
+
+    suspend fun getPartnershipsList(uid: String): List<AccountabilityPartnership> {
+        val snap1 = partnershipsCol.whereEqualTo("user1Id", uid).get().await()
+        val snap2 = partnershipsCol.whereEqualTo("user2Id", uid).get().await()
+        val list1 = snap1.documents.mapNotNull { doc ->
+            doc.toObject(AccountabilityPartnership::class.java)?.copy(id = doc.id)
+        }
+        val list2 = snap2.documents.mapNotNull { doc ->
+            doc.toObject(AccountabilityPartnership::class.java)?.copy(id = doc.id)
+        }
+        return (list1 + list2).sortedByDescending { it.createdAt }
+    }
+
+    suspend fun updatePartnershipNotify(partnershipId: String, field: String, value: Boolean) {
+        partnershipsCol.document(partnershipId).update(field, value).await()
     }
 
     fun observePartnerships(uid: String): Flow<List<AccountabilityPartnership>> = callbackFlow {
@@ -410,11 +436,18 @@ class SocialRepository {
     }
 
     suspend fun joinTeamGoal(goalId: String, member: TeamMember) {
-        try {
-            teamGoalsCol.document(goalId).update(
-                "members", FieldValue.arrayUnion(member.toMap())
-            ).await()
-        } catch (_: Exception) { }
+        teamGoalsCol.document(goalId).update(
+            "members", FieldValue.arrayUnion(member.toMap())
+        ).await()
+    }
+
+    suspend fun getTeamGoalsList(uid: String): List<TeamGoal> {
+        val snapshot = teamGoalsCol.whereEqualTo("status", "active").get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            doc.toObject(TeamGoal::class.java)?.copy(id = doc.id)
+        }.filter { goal ->
+            goal.creatorId == uid || goal.members.any { it.userId == uid }
+        }.sortedByDescending { it.createdAt }
     }
 
     suspend fun updateTeamGoalProgress(goalId: String, userId: String, contribution: Float, newTotal: Float) {
@@ -458,11 +491,23 @@ class SocialRepository {
     }
 
     suspend fun acceptDuel(duelId: String) {
-        try { duelsCol.document(duelId).update("status", "active").await() } catch (_: Exception) { }
+        duelsCol.document(duelId).update("status", "active").await()
     }
 
     suspend fun declineDuel(duelId: String) {
-        try { duelsCol.document(duelId).delete().await() } catch (_: Exception) { }
+        duelsCol.document(duelId).delete().await()
+    }
+
+    suspend fun getDuelsList(uid: String): List<NutritionDuel> {
+        val snap1 = duelsCol.whereEqualTo("challengerId", uid).get().await()
+        val snap2 = duelsCol.whereEqualTo("opponentId", uid).get().await()
+        val list1 = snap1.documents.mapNotNull { doc ->
+            doc.toObject(NutritionDuel::class.java)?.copy(id = doc.id)
+        }
+        val list2 = snap2.documents.mapNotNull { doc ->
+            doc.toObject(NutritionDuel::class.java)?.copy(id = doc.id)
+        }
+        return (list1 + list2).sortedByDescending { it.createdAt }
     }
 
     suspend fun updateDuelProgress(duelId: String, isChallenger: Boolean, progress: Float) {

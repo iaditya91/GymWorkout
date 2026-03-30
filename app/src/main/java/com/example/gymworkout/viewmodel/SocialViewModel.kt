@@ -371,7 +371,14 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
 
     fun removeFriend(friendshipId: String) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { repo.removeFriend(friendshipId) }
+            try {
+                withContext(Dispatchers.IO) { repo.removeFriend(friendshipId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getFriendsList(uid) }
+                _friends.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "removeFriend FAILED", e)
+            }
         }
     }
 
@@ -408,13 +415,27 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
 
     fun acceptBattle(battleId: String) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { repo.acceptStreakBattle(battleId) }
+            try {
+                withContext(Dispatchers.IO) { repo.acceptStreakBattle(battleId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getBattlesList(uid) }
+                _battles.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "acceptBattle FAILED", e)
+            }
         }
     }
 
     fun declineBattle(battleId: String) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { repo.declineStreakBattle(battleId) }
+            try {
+                withContext(Dispatchers.IO) { repo.declineStreakBattle(battleId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getBattlesList(uid) }
+                _battles.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "declineBattle FAILED", e)
+            }
         }
     }
 
@@ -536,13 +557,21 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         val myUid = effectiveUserId ?: return
         val myName = _currentSocialUser.value?.displayName ?: ""
         viewModelScope.launch {
-            val participant = ChallengeParticipant(
-                userId = myUid,
-                displayName = myName,
-                progress = 0f,
-                joinedAt = Timestamp.now()
-            )
-            withContext(Dispatchers.IO) { repo.joinChallenge(challengeId, participant) }
+            try {
+                val participant = ChallengeParticipant(
+                    userId = myUid,
+                    displayName = myName,
+                    progress = 0f,
+                    joinedAt = Timestamp.now()
+                )
+                withContext(Dispatchers.IO) { repo.joinChallenge(challengeId, participant) }
+                // Refresh available challenges to remove joined one
+                val friendIds = withContext(Dispatchers.IO) { repo.getAcceptedFriendIds(myUid) }
+                val available = withContext(Dispatchers.IO) { repo.getAvailableChallenges(friendIds) }
+                _availableChallenges.value = available.filter { c -> c.participants.none { it.userId == myUid } }
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "joinChallenge FAILED", e)
+            }
         }
     }
 
@@ -801,15 +830,55 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun acceptPartnership(partnershipId: String) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { repo.acceptPartnership(partnershipId) } }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.acceptPartnership(partnershipId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getPartnershipsList(uid) }
+                _partnerships.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "acceptPartnership FAILED", e)
+            }
+        }
     }
 
     fun declinePartnership(partnershipId: String) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { repo.declinePartnership(partnershipId) } }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.declinePartnership(partnershipId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getPartnershipsList(uid) }
+                _partnerships.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "declinePartnership FAILED", e)
+            }
+        }
+    }
+
+    fun togglePartnershipNotify(partnershipId: String, field: String, currentValue: Boolean) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.updatePartnershipNotify(partnershipId, field, !currentValue) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getPartnershipsList(uid) }
+                _partnerships.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "togglePartnershipNotify FAILED", e)
+            }
+        }
     }
 
     fun removePartnership(partnershipId: String) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { repo.removePartnership(partnershipId) } }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.removePartnership(partnershipId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getPartnershipsList(uid) }
+                _partnerships.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "removePartnership FAILED", e)
+            }
+        }
     }
 
     // ═══════════════════════════════════════════
@@ -838,8 +907,14 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         val myUid = effectiveUserId ?: return
         val myName = _currentSocialUser.value?.displayName ?: ""
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                repo.joinTeamGoal(goalId, TeamMember(userId = myUid, displayName = myName, joinedAt = Timestamp.now()))
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.joinTeamGoal(goalId, TeamMember(userId = myUid, displayName = myName, joinedAt = Timestamp.now()))
+                }
+                val updated = withContext(Dispatchers.IO) { repo.getTeamGoalsList(myUid) }
+                _teamGoals.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "joinTeamGoal FAILED", e)
             }
         }
     }
@@ -908,11 +983,29 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun acceptDuel(duelId: String) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { repo.acceptDuel(duelId) } }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.acceptDuel(duelId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getDuelsList(uid) }
+                _duels.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "acceptDuel FAILED", e)
+            }
+        }
     }
 
     fun declineDuel(duelId: String) {
-        viewModelScope.launch { withContext(Dispatchers.IO) { repo.declineDuel(duelId) } }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.declineDuel(duelId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getDuelsList(uid) }
+                _duels.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "declineDuel FAILED", e)
+            }
+        }
     }
 
     fun syncDuelProgress() {

@@ -111,12 +111,18 @@ fun AccountabilityScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(partnerName, fontWeight = FontWeight.SemiBold)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (p.notifyWorkout) {
-                                        AssistChip(onClick = {}, label = { Text("Workout") }, leadingIcon = { Icon(Icons.Default.FitnessCenter, null, modifier = Modifier.size(14.dp)) })
-                                    }
-                                    if (p.notifyHabits) {
-                                        AssistChip(onClick = {}, label = { Text("Habits") }, leadingIcon = { Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(14.dp)) })
-                                    }
+                                    FilterChip(
+                                        selected = p.notifyWorkout,
+                                        onClick = { socialViewModel.togglePartnershipNotify(p.id, "notifyWorkout", p.notifyWorkout) },
+                                        label = { Text("Workout") },
+                                        leadingIcon = { Icon(Icons.Default.FitnessCenter, null, modifier = Modifier.size(14.dp)) }
+                                    )
+                                    FilterChip(
+                                        selected = p.notifyHabits,
+                                        onClick = { socialViewModel.togglePartnershipNotify(p.id, "notifyHabits", p.notifyHabits) },
+                                        label = { Text("Habits") },
+                                        leadingIcon = { Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(14.dp)) }
+                                    )
                                 }
                             }
                             IconButton(onClick = { socialViewModel.removePartnership(p.id) }) {
