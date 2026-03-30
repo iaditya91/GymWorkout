@@ -344,13 +344,28 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
 
     fun acceptFriendRequest(friendshipId: String) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { repo.acceptFriendRequest(friendshipId) }
+            try {
+                withContext(Dispatchers.IO) { repo.acceptFriendRequest(friendshipId) }
+                // Reload friends to reflect the change
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getFriendsList(uid) }
+                _friends.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "acceptFriendRequest FAILED", e)
+            }
         }
     }
 
     fun declineFriendRequest(friendshipId: String) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { repo.declineFriendRequest(friendshipId) }
+            try {
+                withContext(Dispatchers.IO) { repo.declineFriendRequest(friendshipId) }
+                val uid = effectiveUserId ?: return@launch
+                val updated = withContext(Dispatchers.IO) { repo.getFriendsList(uid) }
+                _friends.value = updated
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "declineFriendRequest FAILED", e)
+            }
         }
     }
 

@@ -87,15 +87,39 @@ class SocialRepository {
     }
 
     suspend fun acceptFriendRequest(friendshipId: String) {
-        try { friendshipsCol.document(friendshipId).update("status", "accepted").await() } catch (_: Exception) { }
+        friendshipsCol.document(friendshipId).update("status", "accepted").await()
     }
 
     suspend fun declineFriendRequest(friendshipId: String) {
-        try { friendshipsCol.document(friendshipId).delete().await() } catch (_: Exception) { }
+        friendshipsCol.document(friendshipId).delete().await()
     }
 
     suspend fun removeFriend(friendshipId: String) {
         try { friendshipsCol.document(friendshipId).delete().await() } catch (_: Exception) { }
+    }
+
+    suspend fun getFriendsList(uid: String): List<FriendInfo> {
+        val friendInfos = mutableListOf<FriendInfo>()
+        val snap1 = friendshipsCol.whereEqualTo("user1Id", uid).get().await()
+        val snap2 = friendshipsCol.whereEqualTo("user2Id", uid).get().await()
+        val combined = (snap1.documents + snap2.documents).mapNotNull { doc ->
+            doc.toObject(Friendship::class.java)?.copy(id = doc.id)
+        }
+        for (f in combined) {
+            val friendUid = if (f.user1Id == uid) f.user2Id else f.user1Id
+            val userDoc = usersCol.document(friendUid).get().await()
+            val friendUser = userDoc.toObject(SocialUser::class.java)
+                ?.copy(uid = userDoc.id) ?: SocialUser(uid = friendUid)
+            friendInfos.add(
+                FriendInfo(
+                    user = friendUser,
+                    friendshipId = f.id,
+                    isPending = f.status == "pending",
+                    isIncoming = f.requestedBy != uid && f.status == "pending"
+                )
+            )
+        }
+        return friendInfos
     }
 
     fun observeFriends(uid: String): Flow<List<FriendInfo>> = callbackFlow {
