@@ -32,7 +32,7 @@ fun WorkoutTemplatesScreen(
     var showDownloadConfirm by remember { mutableStateOf<WorkoutTemplate?>(null) }
     var filterLevel by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(currentUser) {
         socialViewModel.loadTemplates()
         socialViewModel.loadMyTemplates()
     }

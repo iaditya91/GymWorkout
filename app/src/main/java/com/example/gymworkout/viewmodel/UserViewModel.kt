@@ -191,6 +191,7 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getGoogleSignInClient(context: Context): GoogleSignInClient {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken("1046187913075-qolq3fnhr0r89gqjcrtmrj1pq7v61dcv.apps.googleusercontent.com")
             .requestEmail()
             .requestScopes(Scope(DRIVE_APPDATA_SCOPE))
             .build()

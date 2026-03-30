@@ -112,6 +112,7 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     val error: StateFlow<String?> = _error
 
     init {
+        android.util.Log.d("SocialVM", "init: isSignedIn=${_isSignedIn.value}, firebaseUid=${authManager.currentUserId}, firebaseSignedIn=${authManager.isSignedIn}")
         if (_isSignedIn.value) {
             loadSocialData()
         }
@@ -122,33 +123,29 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     // ═══════════════════════════════════════════
 
     fun refreshSignInState() {
-        val googleSignedIn = com.google.android.gms.auth.api.signin.GoogleSignIn
-            .getLastSignedInAccount(getApplication()) != null
+        val googleAccount = com.google.android.gms.auth.api.signin.GoogleSignIn
+            .getLastSignedInAccount(getApplication())
+        val googleSignedIn = googleAccount != null
         val wasSignedIn = _isSignedIn.value
         _isSignedIn.value = authManager.isSignedIn || googleSignedIn
         if (_isSignedIn.value && (!wasSignedIn || _currentSocialUser.value == null)) {
-            // Build a basic social user from Google account if Firebase isn't available
-            if (!authManager.isSignedIn && googleSignedIn) {
-                val account = com.google.android.gms.auth.api.signin.GoogleSignIn
-                    .getLastSignedInAccount(getApplication())
-                account?.let {
-                    _currentSocialUser.value = SocialUser(
-                        uid = it.id ?: "",
-                        displayName = it.displayName ?: "",
-                        photoUrl = it.photoUrl?.toString() ?: "",
-                        friendCode = (it.id ?: "").takeLast(8).uppercase()
-                    )
-                }
+            if (!authManager.isSignedIn && googleAccount != null) {
+                // Google is signed in but Firebase isn't — sign into Firebase properly
+                signInWithGoogle(googleAccount)
+            } else if (authManager.isSignedIn) {
+                loadSocialData()
             }
-            loadSocialData()
         }
     }
 
-    fun signInWithGoogle(account: GoogleSignInAccount) {
+    fun signInWithGoogle(account: GoogleSignInAccount, onComplete: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             _isLoading.value = true
+            android.util.Log.d("SocialVM", "signInWithGoogle: idToken=${account.idToken?.take(20)}..., id=${account.id}")
             val result = authManager.signInWithGoogle(account)
+            android.util.Log.d("SocialVM", "signInWithGoogle result: isSuccess=${result.isSuccess}, error=${result.exceptionOrNull()?.message}")
             result.onSuccess { firebaseUser ->
+                android.util.Log.d("SocialVM", "signInWithGoogle SUCCESS: firebaseUid=${firebaseUser.uid}")
                 _isSignedIn.value = true
                 // Create or update social profile
                 val localProfile = withContext(Dispatchers.IO) {
@@ -167,8 +164,10 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 _currentSocialUser.value = socialUser
                 loadSocialData()
+                onComplete(true)
             }.onFailure {
                 _error.value = "Sign-in failed: ${it.message}"
+                onComplete(false)
             }
             _isLoading.value = false
         }
@@ -187,12 +186,28 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
             _friends.value = emptyList()
             _battles.value = emptyList()
             _myChallenges.value = emptyList()
+            _availableChallenges.value = emptyList()
             _timeline.value = emptyList()
+            _partnerships.value = emptyList()
+            _teamGoals.value = emptyList()
+            _duels.value = emptyList()
+            _badges.value = emptyList()
+            _templates.value = emptyList()
+            _myTemplates.value = emptyList()
+            _templateReviews.value = emptyList()
+            _leaderboard.value = emptyList()
+            _shareData.value = null
+            _isProfilePublic.value = false
+            _error.value = null
         }
     }
 
     private fun loadSocialData() {
-        val uid = effectiveUserId ?: return
+        val uid = effectiveUserId ?: run {
+            android.util.Log.e("SocialVM", "loadSocialData: effectiveUserId is NULL, firebaseUid=${authManager.currentUserId}, socialUser=${_currentSocialUser.value?.uid}")
+            return
+        }
+        android.util.Log.d("SocialVM", "loadSocialData: uid=$uid")
         viewModelScope.launch {
             try {
                 // Load user profile, create if missing
@@ -273,6 +288,18 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         // Load badges
         viewModelScope.launch {
             try { _badges.value = withContext(Dispatchers.IO) { repo.getUserBadges(uid) } } catch (_: Exception) {}
+        }
+        // Load user's own templates
+        viewModelScope.launch {
+            try { _myTemplates.value = withContext(Dispatchers.IO) { repo.getMyTemplates(uid) } } catch (_: Exception) {}
+        }
+        // Load all templates
+        viewModelScope.launch {
+            try { _templates.value = withContext(Dispatchers.IO) { repo.getTemplates(null) } } catch (_: Exception) {}
+        }
+        // Load leaderboard
+        viewModelScope.launch {
+            try { _leaderboard.value = withContext(Dispatchers.IO) { repo.getLeaderboard() } } catch (_: Exception) {}
         }
     }
 
@@ -928,40 +955,60 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     // ═══════════════════════════════════════════
 
     fun publishWorkoutTemplate(title: String, description: String, fitnessLevel: String) {
-        val myUid = effectiveUserId ?: return
+        val myUid = effectiveUserId ?: run {
+            android.util.Log.e("SocialVM", "publishWorkoutTemplate: effectiveUserId is null, not signed in")
+            return
+        }
         val myName = _currentSocialUser.value?.displayName ?: ""
         viewModelScope.launch {
-            val exercises = withContext(Dispatchers.IO) { exerciseDao.getAllSync() }
-            val templateExercises = exercises.map { ex ->
-                TemplateExercise(
-                    dayOfWeek = ex.dayOfWeek, name = ex.name,
-                    sets = ex.sets, reps = ex.reps,
-                    restTimeSeconds = ex.restTimeSeconds, orderIndex = ex.orderIndex
+            try {
+                val exercises = withContext(Dispatchers.IO) { exerciseDao.getAllSync() }
+                android.util.Log.d("SocialVM", "publishWorkoutTemplate: uid=$myUid, exercises=${exercises.size}")
+                if (exercises.isEmpty()) {
+                    android.util.Log.e("SocialVM", "publishWorkoutTemplate: no exercises to publish")
+                    return@launch
+                }
+                val templateExercises = exercises.map { ex ->
+                    TemplateExercise(
+                        dayOfWeek = ex.dayOfWeek, name = ex.name,
+                        sets = ex.sets, reps = ex.reps,
+                        restTimeSeconds = ex.restTimeSeconds, orderIndex = ex.orderIndex
+                    )
+                }
+                val daysUsed = exercises.map { it.dayOfWeek }.distinct().size
+                val template = WorkoutTemplate(
+                    creatorId = myUid, creatorName = myName,
+                    title = title, description = description,
+                    fitnessLevel = fitnessLevel, daysPerWeek = daysUsed,
+                    exercises = templateExercises, createdAt = Timestamp.now()
                 )
+                withContext(Dispatchers.IO) { repo.publishTemplate(template) }
+                loadTemplates()
+                loadMyTemplates()
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "publishWorkoutTemplate FAILED", e)
             }
-            val daysUsed = exercises.map { it.dayOfWeek }.distinct().size
-            val template = WorkoutTemplate(
-                creatorId = myUid, creatorName = myName,
-                title = title, description = description,
-                fitnessLevel = fitnessLevel, daysPerWeek = daysUsed,
-                exercises = templateExercises, createdAt = Timestamp.now()
-            )
-            withContext(Dispatchers.IO) { repo.publishTemplate(template) }
-            loadTemplates()
-            loadMyTemplates()
         }
     }
 
     fun loadTemplates(fitnessLevel: String? = null) {
         viewModelScope.launch {
-            _templates.value = withContext(Dispatchers.IO) { repo.getTemplates(fitnessLevel) }
+            try {
+                _templates.value = withContext(Dispatchers.IO) { repo.getTemplates(fitnessLevel) }
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "loadTemplates FAILED", e)
+            }
         }
     }
 
     fun loadMyTemplates() {
         val uid = effectiveUserId ?: return
         viewModelScope.launch {
-            _myTemplates.value = withContext(Dispatchers.IO) { repo.getMyTemplates(uid) }
+            try {
+                _myTemplates.value = withContext(Dispatchers.IO) { repo.getMyTemplates(uid) }
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "loadMyTemplates FAILED", e)
+            }
         }
     }
 

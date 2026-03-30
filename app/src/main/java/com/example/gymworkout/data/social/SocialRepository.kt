@@ -510,28 +510,42 @@ class SocialRepository {
     suspend fun publishTemplate(template: WorkoutTemplate): String {
         return try {
             val docRef = templatesCol.add(template.toMap()).await()
+            android.util.Log.d("SocialRepo", "publishTemplate SUCCESS: id=${docRef.id}")
             docRef.id
-        } catch (_: Exception) { "" }
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepo", "publishTemplate FAILED: ${e.message}", e)
+            throw e
+        }
     }
 
     suspend fun getTemplates(fitnessLevel: String? = null): List<WorkoutTemplate> {
         return try {
             val snapshot = templatesCol.get().await()
-            snapshot.documents.mapNotNull { doc ->
+            val result = snapshot.documents.mapNotNull { doc ->
                 doc.toObject(WorkoutTemplate::class.java)?.copy(id = doc.id)
             }.let { templates ->
                 if (fitnessLevel != null) templates.filter { it.fitnessLevel == fitnessLevel } else templates
             }.sortedByDescending { it.downloads }.take(50)
-        } catch (_: Exception) { emptyList() }
+            android.util.Log.d("SocialRepo", "getTemplates: found ${result.size}")
+            result
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepo", "getTemplates FAILED: ${e.message}", e)
+            throw e
+        }
     }
 
     suspend fun getMyTemplates(uid: String): List<WorkoutTemplate> {
         return try {
             val snapshot = templatesCol.whereEqualTo("creatorId", uid).get().await()
-            snapshot.documents.mapNotNull { doc ->
+            val result = snapshot.documents.mapNotNull { doc ->
                 doc.toObject(WorkoutTemplate::class.java)?.copy(id = doc.id)
             }.sortedByDescending { it.createdAt }
-        } catch (_: Exception) { emptyList() }
+            android.util.Log.d("SocialRepo", "getMyTemplates(uid=$uid): found ${result.size}")
+            result
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepo", "getMyTemplates FAILED: ${e.message}", e)
+            throw e
+        }
     }
 
     suspend fun incrementTemplateDownloads(templateId: String) {

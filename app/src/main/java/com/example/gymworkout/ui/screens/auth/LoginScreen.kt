@@ -65,9 +65,15 @@ fun LoginScreen(
             if (account != null) {
                 // Sign in for backup (UserViewModel)
                 userViewModel.handleSignInResult(result.data)
-                // Sign in for social (SocialViewModel / Firebase)
-                socialViewModel.signInWithGoogle(account)
-                onSignInComplete()
+                // Sign in for social (SocialViewModel / Firebase) — wait for completion before navigating
+                socialViewModel.signInWithGoogle(account) { success ->
+                    if (success) {
+                        onSignInComplete()
+                    } else {
+                        errorMessage = "Sign-in failed"
+                        isLoading = false
+                    }
+                }
             } else {
                 errorMessage = "Sign-in failed"
                 isLoading = false
