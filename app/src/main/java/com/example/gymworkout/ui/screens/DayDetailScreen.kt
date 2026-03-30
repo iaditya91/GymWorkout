@@ -146,8 +146,10 @@ fun DayDetailScreen(
     val reorderableItems = remember { mutableStateListOf<ExerciseItem>() }
     var draggedIndex by remember { mutableIntStateOf(-1) }
     var draggedOffset by remember { mutableFloatStateOf(0f) }
+    var overlapTargetIndex by remember { mutableIntStateOf(-1) }  // index of item being overlapped for superset merge
     val density = LocalDensity.current
     val spacingPx = with(density) { 10.dp.toPx() }
+    val overlapThreshold = with(density) { 30.dp.toPx() }  // how close centers must be to trigger superset hint
     val view = LocalView.current
 
     // Sync items from DB when not dragging
@@ -299,19 +301,27 @@ fun DayDetailScreen(
             ) {
                 itemsIndexed(reorderableItems, key = { _, item -> item.stableKey }) { index, item ->
                     val isDragged = index == draggedIndex
+                    val isOverlapTarget = index == overlapTargetIndex && draggedIndex >= 0
 
                     Box(
                         modifier = Modifier
                             .zIndex(if (isDragged) 1f else 0f)
                             .graphicsLayer {
                                 translationY = if (isDragged) draggedOffset else 0f
-                                scaleX = if (isDragged) 1.03f else 1f
-                                scaleY = if (isDragged) 1.03f else 1f
+                                scaleX = if (isDragged) 1.03f else if (isOverlapTarget) 1.02f else 1f
+                                scaleY = if (isDragged) 1.03f else if (isOverlapTarget) 1.02f else 1f
                                 alpha = if (isDragged) 0.92f else 1f
                                 shadowElevation = if (isDragged) 8f else 0f
                                 shape = RoundedCornerShape(16.dp)
-                                clip = isDragged
+                                clip = isDragged || isOverlapTarget
                             }
+                            .then(
+                                if (isOverlapTarget) Modifier.border(
+                                    2.dp,
+                                    MaterialTheme.colorScheme.tertiary,
+                                    RoundedCornerShape(16.dp)
+                                ) else Modifier
+                            )
                             .then(if (!isDragged) Modifier.animateItem() else Modifier)
                             .pointerInput(item.stableKey) {
                                 detectDragGesturesAfterLongPress(
@@ -321,6 +331,7 @@ fun DayDetailScreen(
                                             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                                             draggedIndex = currentIdx
                                             draggedOffset = 0f
+                                            overlapTargetIndex = -1
                                         }
                                     },
                                     onDrag = { change, dragAmount ->
@@ -333,41 +344,81 @@ fun DayDetailScreen(
                                             ?: return@detectDragGesturesAfterLongPress
                                         val draggedCenter = draggedItemInfo.offset + draggedItemInfo.size / 2 + draggedOffset.toInt()
 
-                                        // Check swap with item above
-                                        if (draggedIndex > 0) {
-                                            val above = layoutInfo.visibleItemsInfo.find { it.index == draggedIndex - 1 }
-                                            if (above != null && draggedCenter < above.offset + above.size / 2) {
-                                                reorderableItems.add(draggedIndex - 1, reorderableItems.removeAt(draggedIndex))
-                                                draggedOffset += above.size.toFloat() + spacingPx
-                                                draggedIndex--
+                                        // Check overlap with adjacent items for superset merge hint
+                                        var newOverlap = -1
+                                        for (visibleItem in layoutInfo.visibleItemsInfo) {
+                                            if (visibleItem.index == draggedIndex) continue
+                                            val itemCenter = visibleItem.offset + visibleItem.size / 2
+                                            val distance = kotlin.math.abs(draggedCenter - itemCenter)
+                                            if (distance < overlapThreshold) {
+                                                newOverlap = visibleItem.index
+                                                break
+                                            }
+                                        }
+
+                                        if (newOverlap != overlapTargetIndex) {
+                                            overlapTargetIndex = newOverlap
+                                            if (newOverlap >= 0) {
                                                 view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                                             }
                                         }
-                                        // Check swap with item below
-                                        if (draggedIndex < reorderableItems.size - 1) {
-                                            val below = layoutInfo.visibleItemsInfo.find { it.index == draggedIndex + 1 }
-                                            if (below != null && draggedCenter > below.offset + below.size / 2) {
-                                                reorderableItems.add(draggedIndex + 1, reorderableItems.removeAt(draggedIndex))
-                                                draggedOffset -= below.size.toFloat() + spacingPx
-                                                draggedIndex++
-                                                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+
+                                        // Only swap if NOT overlapping (normal reorder)
+                                        if (overlapTargetIndex < 0) {
+                                            // Check swap with item above
+                                            if (draggedIndex > 0) {
+                                                val above = layoutInfo.visibleItemsInfo.find { it.index == draggedIndex - 1 }
+                                                if (above != null && draggedCenter < above.offset + above.size / 2) {
+                                                    reorderableItems.add(draggedIndex - 1, reorderableItems.removeAt(draggedIndex))
+                                                    draggedOffset += above.size.toFloat() + spacingPx
+                                                    draggedIndex--
+                                                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                                                }
+                                            }
+                                            // Check swap with item below
+                                            if (draggedIndex < reorderableItems.size - 1) {
+                                                val below = layoutInfo.visibleItemsInfo.find { it.index == draggedIndex + 1 }
+                                                if (below != null && draggedCenter > below.offset + below.size / 2) {
+                                                    reorderableItems.add(draggedIndex + 1, reorderableItems.removeAt(draggedIndex))
+                                                    draggedOffset -= below.size.toFloat() + spacingPx
+                                                    draggedIndex++
+                                                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                                                }
                                             }
                                         }
                                     },
                                     onDragEnd = {
-                                        val orderedExercises = reorderableItems.flatMap { reorderItem ->
-                                            when (reorderItem) {
-                                                is ExerciseItem.Single -> listOf(reorderItem.exercise)
-                                                is ExerciseItem.Superset -> reorderItem.exercises
+                                        if (overlapTargetIndex >= 0 && overlapTargetIndex < reorderableItems.size) {
+                                            // Merge into superset
+                                            val draggedItem = reorderableItems[draggedIndex]
+                                            val targetItem = reorderableItems[overlapTargetIndex]
+                                            val draggedExercises = when (draggedItem) {
+                                                is ExerciseItem.Single -> listOf(draggedItem.exercise)
+                                                is ExerciseItem.Superset -> draggedItem.exercises
                                             }
+                                            val targetExercises = when (targetItem) {
+                                                is ExerciseItem.Single -> listOf(targetItem.exercise)
+                                                is ExerciseItem.Superset -> targetItem.exercises
+                                            }
+                                            viewModel.mergeIntoSuperset(draggedExercises, targetExercises)
+                                        } else {
+                                            // Normal reorder
+                                            val orderedExercises = reorderableItems.flatMap { reorderItem ->
+                                                when (reorderItem) {
+                                                    is ExerciseItem.Single -> listOf(reorderItem.exercise)
+                                                    is ExerciseItem.Superset -> reorderItem.exercises
+                                                }
+                                            }
+                                            viewModel.reorderExercises(orderedExercises)
                                         }
-                                        viewModel.reorderExercises(orderedExercises)
                                         draggedIndex = -1
                                         draggedOffset = 0f
+                                        overlapTargetIndex = -1
                                     },
                                     onDragCancel = {
                                         draggedIndex = -1
                                         draggedOffset = 0f
+                                        overlapTargetIndex = -1
                                     }
                                 )
                             }
@@ -400,6 +451,31 @@ fun DayDetailScreen(
                                     onDelete = { ex -> viewModel.deleteExercise(ex) },
                                     onStartRest = { ex -> viewModel.startRestTimer(ex.name, ex.restTimeSeconds, dayIndex) }
                                 )
+                            }
+                        }
+
+                        // Superset merge indicator overlay
+                        if (isOverlapTarget) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.tertiary)
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        "Drop to create Superset",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onTertiary
+                                    )
+                                }
                             }
                         }
                     }

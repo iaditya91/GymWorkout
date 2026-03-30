@@ -56,6 +56,9 @@ interface ExerciseDao {
     @Query("UPDATE exercises SET supersetGroupId = '' WHERE id = :id")
     suspend fun clearSupersetGroupId(id: Int)
 
+    @Query("UPDATE exercises SET supersetGroupId = :groupId WHERE id = :id")
+    suspend fun updateSupersetGroupId(id: Int, groupId: String)
+
     @Query("UPDATE exercises SET orderIndex = :orderIndex WHERE id = :id")
     suspend fun updateOrderIndex(id: Int, orderIndex: Int)
 

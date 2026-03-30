@@ -202,6 +202,23 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun mergeIntoSuperset(draggedExercises: List<Exercise>, targetExercises: List<Exercise>) {
+        viewModelScope.launch {
+            // Use existing groupId if either side has one, otherwise create new
+            val groupId = targetExercises.firstOrNull { it.supersetGroupId.isNotBlank() }?.supersetGroupId
+                ?: draggedExercises.firstOrNull { it.supersetGroupId.isNotBlank() }?.supersetGroupId
+                ?: java.util.UUID.randomUUID().toString()
+
+            // Assign same groupId to all exercises and place dragged after target
+            val allExercises = targetExercises + draggedExercises
+            val baseOrder = targetExercises.first().orderIndex
+            allExercises.forEachIndexed { index, exercise ->
+                dao.updateSupersetGroupId(exercise.id, groupId)
+                dao.updateOrderIndex(exercise.id, baseOrder + index)
+            }
+        }
+    }
+
     fun resetDay(day: Int) {
         viewModelScope.launch {
             dao.resetDay(day)
