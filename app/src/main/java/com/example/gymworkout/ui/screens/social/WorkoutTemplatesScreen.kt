@@ -1,6 +1,13 @@
 package com.example.gymworkout.ui.screens.social
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -171,7 +178,14 @@ private fun TemplateCard(
     onReview: (() -> Unit)?,
     onViewReviews: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    var expanded by remember { mutableStateOf(false) }
+    val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -181,11 +195,18 @@ private fun TemplateCard(
                 Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
                     Text(template.fitnessLevel, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
                 }
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             if (template.description.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text(template.description, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                Text(template.description, style = MaterialTheme.typography.bodySmall, maxLines = if (expanded) Int.MAX_VALUE else 2)
             }
 
             Spacer(Modifier.height(8.dp))
@@ -222,6 +243,123 @@ private fun TemplateCard(
                 }
             }
 
+            // Expanded workout plan section
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    HorizontalDivider()
+                    Spacer(Modifier.height(12.dp))
+                    Text("Workout Plan", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+
+                    if (template.exercises.isEmpty()) {
+                        Text(
+                            "No exercises in this template",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        val exercisesByDay = template.exercises
+                            .groupBy { it.dayOfWeek }
+                            .toSortedMap()
+
+                        exercisesByDay.forEach { (day, dayExercises) ->
+                            val dayName = if (day in 0..6) dayNames[day] else "Day ${day + 1}"
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    dayName,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+
+                            // Group consecutive exercises with same non-empty supersetGroupId
+                            val sorted = dayExercises.sortedBy { it.orderIndex }
+                            val items = mutableListOf<Any>() // TemplateExercise or List<TemplateExercise> for superset
+                            var i = 0
+                            while (i < sorted.size) {
+                                val ex = sorted[i]
+                                if (ex.supersetGroupId.isNotBlank()) {
+                                    val group = mutableListOf(ex)
+                                    var j = i + 1
+                                    while (j < sorted.size && sorted[j].supersetGroupId == ex.supersetGroupId) {
+                                        group.add(sorted[j])
+                                        j++
+                                    }
+                                    if (group.size > 1) {
+                                        items.add(group.toList())
+                                    } else {
+                                        items.add(ex)
+                                    }
+                                    i = j
+                                } else {
+                                    items.add(ex)
+                                    i++
+                                }
+                            }
+
+                            items.forEach { item ->
+                                @Suppress("UNCHECKED_CAST")
+                                when (item) {
+                                    is com.example.gymworkout.data.social.TemplateExercise -> {
+                                        ExerciseRow(item)
+                                    }
+                                    is List<*> -> {
+                                        val supersetExercises = item as List<com.example.gymworkout.data.social.TemplateExercise>
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 4.dp, bottom = 6.dp)
+                                                .border(
+                                                    1.dp,
+                                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .background(
+                                                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .padding(8.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.SwapVert,
+                                                    null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = MaterialTheme.colorScheme.tertiary
+                                                )
+                                                Spacer(Modifier.width(4.dp))
+                                                Text(
+                                                    "Superset",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.tertiary
+                                                )
+                                            }
+                                            Spacer(Modifier.height(4.dp))
+                                            supersetExercises.forEach { exercise ->
+                                                ExerciseRow(exercise)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
+                    }
+                }
+            }
+
             if (onDownload != null || onReview != null) {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -241,6 +379,37 @@ private fun TemplateCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ExerciseRow(exercise: com.example.gymworkout.data.social.TemplateExercise) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Default.FitnessCenter,
+            null,
+            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                exercise.name,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                "${exercise.sets} sets x ${exercise.reps} reps" +
+                        if (exercise.restTimeSeconds > 0) " · ${exercise.restTimeSeconds}s rest" else "",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

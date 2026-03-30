@@ -1095,7 +1095,8 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                     TemplateExercise(
                         dayOfWeek = ex.dayOfWeek, name = ex.name,
                         sets = ex.sets, reps = ex.reps,
-                        restTimeSeconds = ex.restTimeSeconds, orderIndex = ex.orderIndex
+                        restTimeSeconds = ex.restTimeSeconds, orderIndex = ex.orderIndex,
+                        supersetGroupId = ex.supersetGroupId
                     )
                 }
                 val daysUsed = exercises.map { it.dayOfWeek }.distinct().size
@@ -1145,7 +1146,8 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                         com.example.gymworkout.data.Exercise(
                             dayOfWeek = ex.dayOfWeek, name = ex.name,
                             sets = ex.sets, reps = ex.reps,
-                            restTimeSeconds = ex.restTimeSeconds, orderIndex = ex.orderIndex
+                            restTimeSeconds = ex.restTimeSeconds, orderIndex = ex.orderIndex,
+                            supersetGroupId = ex.supersetGroupId
                         )
                     )
                 }

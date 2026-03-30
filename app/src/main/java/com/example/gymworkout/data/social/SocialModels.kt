@@ -316,12 +316,14 @@ data class TemplateExercise(
     val sets: Int = 3,
     val reps: String = "10-12",
     val restTimeSeconds: Int = 0,
-    val orderIndex: Int = 0
+    val orderIndex: Int = 0,
+    val supersetGroupId: String = ""
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "dayOfWeek" to dayOfWeek, "name" to name,
         "sets" to sets, "reps" to reps,
-        "restTimeSeconds" to restTimeSeconds, "orderIndex" to orderIndex
+        "restTimeSeconds" to restTimeSeconds, "orderIndex" to orderIndex,
+        "supersetGroupId" to supersetGroupId
     )
 }
 
