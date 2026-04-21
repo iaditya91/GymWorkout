@@ -79,6 +79,7 @@ import com.example.gymworkout.viewmodel.WorkoutViewModel
 import com.example.gymworkout.ui.screens.auth.LoginScreen
 import com.example.gymworkout.ui.screens.social.SocialHubScreen
 import com.example.gymworkout.ui.screens.social.FriendsScreen
+import com.example.gymworkout.ui.screens.social.FriendDetailScreen
 import com.example.gymworkout.ui.screens.social.StreakBattleScreen
 import com.example.gymworkout.ui.screens.social.WeeklyChallengeScreen
 import com.example.gymworkout.ui.screens.social.ProgressShareScreen
@@ -88,6 +89,7 @@ import com.example.gymworkout.ui.screens.social.TeamGoalsScreen
 import com.example.gymworkout.ui.screens.social.NutritionDuelScreen
 import com.example.gymworkout.ui.screens.social.LeaderboardScreen
 import com.example.gymworkout.ui.screens.social.WorkoutTemplatesScreen
+import com.example.gymworkout.ui.screens.social.TemplateDetailScreen
 import com.example.gymworkout.ui.screens.social.AchievementBadgesScreen
 
 class MainActivity : ComponentActivity() {
@@ -390,6 +392,23 @@ fun WorkoutApp() {
             composable("social/friends") {
                 FriendsScreen(
                     socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() },
+                    onFriendClick = { uid ->
+                        navController.navigate("social/friend_detail/${URLEncoder.encode(uid, "UTF-8")}")
+                    }
+                )
+            }
+            composable(
+                route = "social/friend_detail/{uid}",
+                arguments = listOf(navArgument("uid") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val uid = URLDecoder.decode(
+                    backStackEntry.arguments?.getString("uid") ?: "",
+                    "UTF-8"
+                )
+                FriendDetailScreen(
+                    friendUid = uid,
+                    socialViewModel = socialViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -443,6 +462,23 @@ fun WorkoutApp() {
             }
             composable("social/templates") {
                 WorkoutTemplatesScreen(
+                    socialViewModel = socialViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenTemplate = { id ->
+                        navController.navigate("social/template_detail/${URLEncoder.encode(id, "UTF-8")}")
+                    }
+                )
+            }
+            composable(
+                route = "social/template_detail/{id}",
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val id = URLDecoder.decode(
+                    backStackEntry.arguments?.getString("id") ?: "",
+                    "UTF-8"
+                )
+                TemplateDetailScreen(
+                    templateId = id,
                     socialViewModel = socialViewModel,
                     onBack = { navController.popBackStack() }
                 )

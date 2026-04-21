@@ -1,13 +1,7 @@
 package com.example.gymworkout.ui.screens.social
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -27,16 +21,14 @@ import com.example.gymworkout.viewmodel.SocialViewModel
 @Composable
 fun WorkoutTemplatesScreen(
     socialViewModel: SocialViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenTemplate: (String) -> Unit = {}
 ) {
     val templates by socialViewModel.templates.collectAsState()
     val myTemplates by socialViewModel.myTemplates.collectAsState()
-    val reviews by socialViewModel.templateReviews.collectAsState()
     val currentUser by socialViewModel.currentSocialUser.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
     var showPublishDialog by remember { mutableStateOf(false) }
-    var showReviewDialog by remember { mutableStateOf<String?>(null) }
-    var showDownloadConfirm by remember { mutableStateOf<WorkoutTemplate?>(null) }
     var filterLevel by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(currentUser) {
@@ -101,9 +93,7 @@ fun WorkoutTemplatesScreen(
                         items(templates) { template ->
                             TemplateCard(
                                 template = template,
-                                onDownload = { showDownloadConfirm = template },
-                                onReview = { showReviewDialog = template.id },
-                                onViewReviews = { socialViewModel.loadReviewsForTemplate(template.id) }
+                                onClick = { onOpenTemplate(template.id) }
                             )
                         }
                     }
@@ -127,7 +117,10 @@ fun WorkoutTemplatesScreen(
                             }
                         }
                         items(myTemplates) { template ->
-                            TemplateCard(template = template, onDownload = null, onReview = null, onViewReviews = {})
+                            TemplateCard(
+                                template = template,
+                                onClick = { onOpenTemplate(template.id) }
+                            )
                         }
                     }
                 }
@@ -144,47 +137,17 @@ fun WorkoutTemplatesScreen(
             }
         )
     }
-
-    showDownloadConfirm?.let { template ->
-        AlertDialog(
-            onDismissRequest = { showDownloadConfirm = null },
-            title = { Text("Download Template?") },
-            text = { Text("This will REPLACE your current workout plan with \"${template.title}\". This cannot be undone.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    socialViewModel.downloadTemplate(template)
-                    showDownloadConfirm = null
-                }) { Text("Download") }
-            },
-            dismissButton = { TextButton(onClick = { showDownloadConfirm = null }) { Text("Cancel") } }
-        )
-    }
-
-    showReviewDialog?.let { templateId ->
-        ReviewDialog(
-            onDismiss = { showReviewDialog = null },
-            onSubmit = { rating, comment ->
-                socialViewModel.addTemplateReview(templateId, rating, comment)
-                showReviewDialog = null
-            }
-        )
-    }
 }
 
 @Composable
 private fun TemplateCard(
     template: WorkoutTemplate,
-    onDownload: (() -> Unit)?,
-    onReview: (() -> Unit)?,
-    onViewReviews: () -> Unit
+    onClick: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { expanded = !expanded }
+            .clickable { onClick() }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -197,8 +160,8 @@ private fun TemplateCard(
                 }
                 Spacer(Modifier.width(4.dp))
                 Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    Icons.Default.ChevronRight,
+                    contentDescription = "Open",
                     modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -206,7 +169,7 @@ private fun TemplateCard(
 
             if (template.description.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text(template.description, style = MaterialTheme.typography.bodySmall, maxLines = if (expanded) Int.MAX_VALUE else 2)
+                Text(template.description, style = MaterialTheme.typography.bodySmall, maxLines = 2)
             }
 
             Spacer(Modifier.height(8.dp))
@@ -242,174 +205,6 @@ private fun TemplateCard(
                     Text("(${template.ratingCount})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-
-            // Expanded workout plan section
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    HorizontalDivider()
-                    Spacer(Modifier.height(12.dp))
-                    Text("Workout Plan", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-
-                    if (template.exercises.isEmpty()) {
-                        Text(
-                            "No exercises in this template",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        val exercisesByDay = template.exercises
-                            .groupBy { it.dayOfWeek }
-                            .toSortedMap()
-
-                        exercisesByDay.forEach { (day, dayExercises) ->
-                            val dayName = if (day in 0..6) dayNames[day] else "Day ${day + 1}"
-                            Surface(
-                                shape = MaterialTheme.shapes.small,
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            ) {
-                                Text(
-                                    dayName,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                            Spacer(Modifier.height(4.dp))
-
-                            // Group consecutive exercises with same non-empty supersetGroupId
-                            val sorted = dayExercises.sortedBy { it.orderIndex }
-                            val items = mutableListOf<Any>() // TemplateExercise or List<TemplateExercise> for superset
-                            var i = 0
-                            while (i < sorted.size) {
-                                val ex = sorted[i]
-                                if (ex.supersetGroupId.isNotBlank()) {
-                                    val group = mutableListOf(ex)
-                                    var j = i + 1
-                                    while (j < sorted.size && sorted[j].supersetGroupId == ex.supersetGroupId) {
-                                        group.add(sorted[j])
-                                        j++
-                                    }
-                                    if (group.size > 1) {
-                                        items.add(group.toList())
-                                    } else {
-                                        items.add(ex)
-                                    }
-                                    i = j
-                                } else {
-                                    items.add(ex)
-                                    i++
-                                }
-                            }
-
-                            items.forEach { item ->
-                                @Suppress("UNCHECKED_CAST")
-                                when (item) {
-                                    is com.example.gymworkout.data.social.TemplateExercise -> {
-                                        ExerciseRow(item)
-                                    }
-                                    is List<*> -> {
-                                        val supersetExercises = item as List<com.example.gymworkout.data.social.TemplateExercise>
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(start = 4.dp, bottom = 6.dp)
-                                                .border(
-                                                    1.dp,
-                                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
-                                                    RoundedCornerShape(8.dp)
-                                                )
-                                                .background(
-                                                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f),
-                                                    RoundedCornerShape(8.dp)
-                                                )
-                                                .padding(8.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Default.SwapVert,
-                                                    null,
-                                                    modifier = Modifier.size(14.dp),
-                                                    tint = MaterialTheme.colorScheme.tertiary
-                                                )
-                                                Spacer(Modifier.width(4.dp))
-                                                Text(
-                                                    "Superset",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.tertiary
-                                                )
-                                            }
-                                            Spacer(Modifier.height(4.dp))
-                                            supersetExercises.forEach { exercise ->
-                                                ExerciseRow(exercise)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(4.dp))
-                        }
-                    }
-                }
-            }
-
-            if (onDownload != null || onReview != null) {
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    onDownload?.let {
-                        OutlinedButton(onClick = it, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Use Plan")
-                        }
-                    }
-                    onReview?.let {
-                        OutlinedButton(onClick = it, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.RateReview, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Review")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExerciseRow(exercise: com.example.gymworkout.data.social.TemplateExercise) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            Icons.Default.FitnessCenter,
-            null,
-            modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.width(8.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                exercise.name,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                "${exercise.sets} sets x ${exercise.reps} reps" +
-                        if (exercise.restTimeSeconds > 0) " · ${exercise.restTimeSeconds}s rest" else "",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -446,35 +241,3 @@ private fun PublishTemplateDialog(
     )
 }
 
-@Composable
-private fun ReviewDialog(
-    onDismiss: () -> Unit,
-    onSubmit: (Int, String) -> Unit
-) {
-    var rating by remember { mutableIntStateOf(0) }
-    var comment by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Rate Template") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    repeat(5) { i ->
-                        IconButton(onClick = { rating = i + 1 }, modifier = Modifier.size(36.dp)) {
-                            Icon(
-                                if (i < rating) Icons.Default.Star else Icons.Default.StarBorder,
-                                null, tint = Color(0xFFFFB300)
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(value = comment, onValueChange = { comment = it }, label = { Text("Comment (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSubmit(rating, comment) }, enabled = rating > 0) { Text("Submit") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
-}

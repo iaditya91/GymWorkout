@@ -19,7 +19,8 @@ import com.example.gymworkout.viewmodel.SocialViewModel
 @Composable
 fun FriendsScreen(
     socialViewModel: SocialViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onFriendClick: (String) -> Unit = {}
 ) {
     val friends by socialViewModel.friends.collectAsState()
     val searchResult by socialViewModel.friendSearchResult.collectAsState()
@@ -184,6 +185,7 @@ fun FriendsScreen(
             items(acceptedFriends, key = { it.friendshipId }) { friend ->
                 FriendCard(
                     friendInfo = friend,
+                    onClick = { onFriendClick(friend.user.uid) },
                     onRemove = { socialViewModel.removeFriend(friend.friendshipId) }
                 )
             }
@@ -358,14 +360,17 @@ private fun PendingFriendCard(friendInfo: FriendInfo) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FriendCard(
     friendInfo: FriendInfo,
+    onClick: () -> Unit,
     onRemove: () -> Unit
 ) {
     var showRemoveDialog by remember { mutableStateOf(false) }
 
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant

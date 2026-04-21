@@ -104,6 +104,20 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     private val _badges = MutableStateFlow<List<AchievementBadge>>(emptyList())
     val badges: StateFlow<List<AchievementBadge>> = _badges
 
+    // ── Selected Template Detail ──
+    private val _selectedTemplate = MutableStateFlow<WorkoutTemplate?>(null)
+    val selectedTemplate: StateFlow<WorkoutTemplate?> = _selectedTemplate
+
+    // ── Selected Friend Detail ──
+    private val _selectedFriend = MutableStateFlow<SocialUser?>(null)
+    val selectedFriend: StateFlow<SocialUser?> = _selectedFriend
+
+    private val _selectedFriendBadges = MutableStateFlow<List<AchievementBadge>>(emptyList())
+    val selectedFriendBadges: StateFlow<List<AchievementBadge>> = _selectedFriendBadges
+
+    private val _selectedFriendLoading = MutableStateFlow(false)
+    val selectedFriendLoading: StateFlow<Boolean> = _selectedFriendLoading
+
     // ── Loading / Error ──
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
@@ -1176,6 +1190,19 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun selectTemplate(templateId: String) {
+        // Look up in already-loaded lists first so UI has something to render
+        val existing = _templates.value.firstOrNull { it.id == templateId }
+            ?: _myTemplates.value.firstOrNull { it.id == templateId }
+        _selectedTemplate.value = existing
+        loadReviewsForTemplate(templateId)
+    }
+
+    fun clearSelectedTemplate() {
+        _selectedTemplate.value = null
+        _templateReviews.value = emptyList()
+    }
+
     // ═══════════════════════════════════════════
     // ACHIEVEMENT BADGES
     // ═══════════════════════════════════════════
@@ -1270,6 +1297,31 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _badges.value = withContext(Dispatchers.IO) { repo.getUserBadges(uid) }
         }
+    }
+
+    fun loadFriendDetail(uid: String) {
+        // Seed from cached friends list so UI has something immediately
+        val cached = _friends.value.firstOrNull { it.user.uid == uid }?.user
+        _selectedFriend.value = cached
+        _selectedFriendBadges.value = emptyList()
+        viewModelScope.launch {
+            _selectedFriendLoading.value = true
+            try {
+                val fresh = withContext(Dispatchers.IO) { repo.getUser(uid) }
+                if (fresh != null) _selectedFriend.value = fresh
+                _selectedFriendBadges.value = withContext(Dispatchers.IO) { repo.getUserBadges(uid) }
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "loadFriendDetail FAILED", e)
+            } finally {
+                _selectedFriendLoading.value = false
+            }
+        }
+    }
+
+    fun clearFriendDetail() {
+        _selectedFriend.value = null
+        _selectedFriendBadges.value = emptyList()
+        _selectedFriendLoading.value = false
     }
 
     // ═══════════════════════════════════════════
