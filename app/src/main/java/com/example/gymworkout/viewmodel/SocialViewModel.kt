@@ -1356,17 +1356,44 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                     (min(sleepActual / sleepTarget, 1f) * 0.15f) +
                     (min(waterActual / waterTarget, 1f) * 0.10f)
 
+            // Build today's daily progress snapshot for friends to see
+            val profile = withContext(Dispatchers.IO) { userDao.getProfileSync() }
+            val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+            val todayDayName = dayNames[LocalDate.now().dayOfWeek.value - 1]
+            val daysOnJourney = if (profile?.journeyStartDate?.isNotEmpty() == true) {
+                ChronoUnit.DAYS.between(
+                    LocalDate.parse(profile.journeyStartDate, formatter),
+                    LocalDate.now()
+                ).toInt().coerceAtLeast(0)
+            } else 0
+            val dailyProgress = DailyProgress(
+                date = today,
+                workoutDone = checkIn?.workoutDone ?: false,
+                workoutName = todayDayName,
+                proteinProgress = proteinActual,
+                proteinTarget = proteinTarget,
+                caloriesProgress = caloriesActual,
+                caloriesTarget = caloriesTarget,
+                waterProgress = waterActual,
+                waterTarget = waterTarget,
+                sleepProgress = sleepActual,
+                sleepTarget = sleepTarget,
+                daysOnJourney = daysOnJourney
+            )
+
             // Sync to Firestore if Firebase auth is available
             if (uid != null) {
                 withContext(Dispatchers.IO) {
                     repo.updateUserStreaks(uid, streaks, dmgs)
+                    repo.updateDailyProgress(uid, dailyProgress)
                 }
             }
 
             // Always update local social user so UI reflects new dmgs
             _currentSocialUser.value = _currentSocialUser.value?.copy(
                 streaks = streaks,
-                dmgs = dmgs
+                dmgs = dmgs,
+                dailyProgress = dailyProgress
             )
 
             // Cloud-dependent features

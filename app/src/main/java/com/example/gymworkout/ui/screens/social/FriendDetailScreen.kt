@@ -18,12 +18,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gymworkout.data.social.AchievementBadge
+import com.example.gymworkout.data.social.DailyProgress
 import com.example.gymworkout.data.social.SocialUser
+import kotlin.math.min
 import com.example.gymworkout.viewmodel.SocialViewModel
 import java.text.SimpleDateFormat
 import java.time.LocalDate
@@ -99,12 +102,16 @@ fun FriendDetailScreen(
 
 @Composable
 private fun FriendProgressCard(user: SocialUser) {
-    val daysOnJourney = remember(user.joinedAt) {
-        val joinedDate = user.joinedAt.toDate()
-            .toInstant()
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-        ChronoUnit.DAYS.between(joinedDate, LocalDate.now()).toInt().coerceAtLeast(0)
+    val daysOnJourney = remember(user.joinedAt, user.dailyProgress.daysOnJourney) {
+        if (user.dailyProgress.daysOnJourney > 0) {
+            user.dailyProgress.daysOnJourney
+        } else {
+            val joinedDate = user.joinedAt.toDate()
+                .toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+            ChronoUnit.DAYS.between(joinedDate, LocalDate.now()).toInt().coerceAtLeast(0)
+        }
     }
     val joinedFormatted = remember(user.joinedAt) {
         SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(user.joinedAt.toDate())
@@ -201,6 +208,93 @@ private fun FriendProgressCard(user: SocialUser) {
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
 
+                val progress = user.dailyProgress
+                val hasProgress = progress.date.isNotBlank()
+
+                if (hasProgress) {
+                    Text(
+                        "Today's Progress",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+
+                    // Workout status
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (progress.workoutDone) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                else MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+                            )
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (progress.workoutDone) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                            contentDescription = null,
+                            tint = if (progress.workoutDone) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        val workoutDay = progress.workoutName.ifEmpty { "Today" }
+                        Text(
+                            if (progress.workoutDone) "Workout Complete ($workoutDay)"
+                            else "Workout Pending ($workoutDay)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Nutrition grid
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        NutritionTile(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Filled.Egg,
+                            label = "Protein",
+                            current = progress.proteinProgress,
+                            target = progress.proteinTarget,
+                            unit = "g"
+                        )
+                        NutritionTile(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Filled.LocalFireDepartment,
+                            label = "Calories",
+                            current = progress.caloriesProgress,
+                            target = progress.caloriesTarget,
+                            unit = ""
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        NutritionTile(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Filled.WaterDrop,
+                            label = "Water",
+                            current = progress.waterProgress,
+                            target = progress.waterTarget,
+                            unit = "L",
+                            isDecimal = true
+                        )
+                        NutritionTile(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Filled.Bedtime,
+                            label = "Sleep",
+                            current = progress.sleepProgress,
+                            target = progress.sleepTarget,
+                            unit = "h",
+                            isDecimal = true
+                        )
+                    }
+                }
+
                 // Streaks row
                 Text(
                     "Current Streaks",
@@ -253,7 +347,7 @@ private fun FriendProgressCard(user: SocialUser) {
                 ) {
                     Column {
                         Text(
-                            "Day $daysOnJourney of journey",
+                            "Day $daysOnJourney of fitness journey",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -367,6 +461,55 @@ private fun FriendBadgeTile(def: FriendBadgeDef, earned: Boolean) {
                 maxLines = 2,
                 color = if (earned) MaterialTheme.colorScheme.onSurface
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun NutritionTile(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    current: Float,
+    target: Float,
+    unit: String,
+    isDecimal: Boolean = false
+) {
+    val fraction = if (target > 0f) min(current / target, 1f) else 0f
+    val met = current >= target && target > 0f
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = if (met) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = if (met) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (isDecimal) "${"%.1f".format(current)}/${"%.1f".format(target)}$unit"
+                else "${current.toInt()}/${target.toInt()}$unit",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(label, style = MaterialTheme.typography.labelSmall)
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { fraction },
+                modifier = Modifier.fillMaxWidth(),
+                color = if (met) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
             )
         }
     }

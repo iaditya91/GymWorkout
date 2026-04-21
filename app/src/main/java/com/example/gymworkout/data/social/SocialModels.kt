@@ -15,7 +15,8 @@ data class SocialUser(
     val dmgs: Float = 0f,
     val isOnline: Boolean = false,
     val isPublic: Boolean = false,
-    val lastSeen: Timestamp = Timestamp.now()
+    val lastSeen: Timestamp = Timestamp.now(),
+    val dailyProgress: DailyProgress = DailyProgress()
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "uid" to uid,
@@ -28,7 +29,38 @@ data class SocialUser(
         "dmgs" to dmgs,
         "isOnline" to isOnline,
         "isPublic" to isPublic,
-        "lastSeen" to lastSeen
+        "lastSeen" to lastSeen,
+        "dailyProgress" to dailyProgress.toMap()
+    )
+}
+
+data class DailyProgress(
+    val date: String = "",
+    val workoutDone: Boolean = false,
+    val workoutName: String = "",
+    val proteinProgress: Float = 0f,
+    val proteinTarget: Float = 0f,
+    val caloriesProgress: Float = 0f,
+    val caloriesTarget: Float = 0f,
+    val waterProgress: Float = 0f,
+    val waterTarget: Float = 0f,
+    val sleepProgress: Float = 0f,
+    val sleepTarget: Float = 0f,
+    val daysOnJourney: Int = 0
+) {
+    fun toMap(): Map<String, Any?> = mapOf(
+        "date" to date,
+        "workoutDone" to workoutDone,
+        "workoutName" to workoutName,
+        "proteinProgress" to proteinProgress,
+        "proteinTarget" to proteinTarget,
+        "caloriesProgress" to caloriesProgress,
+        "caloriesTarget" to caloriesTarget,
+        "waterProgress" to waterProgress,
+        "waterTarget" to waterTarget,
+        "sleepProgress" to sleepProgress,
+        "sleepTarget" to sleepTarget,
+        "daysOnJourney" to daysOnJourney
     )
 }
 

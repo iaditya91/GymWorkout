@@ -29,8 +29,6 @@ fun WorkoutTemplatesScreen(
     val currentUser by socialViewModel.currentSocialUser.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
     var showPublishDialog by remember { mutableStateOf(false) }
-    var showReviewDialog by remember { mutableStateOf<String?>(null) }
-    var showDownloadConfirm by remember { mutableStateOf<WorkoutTemplate?>(null) }
     var filterLevel by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(currentUser) {
@@ -95,9 +93,7 @@ fun WorkoutTemplatesScreen(
                         items(templates) { template ->
                             TemplateCard(
                                 template = template,
-                                onClick = { onOpenTemplate(template.id) },
-                                onUsePlan = { showDownloadConfirm = template },
-                                onReview = { showReviewDialog = template.id }
+                                onClick = { onOpenTemplate(template.id) }
                             )
                         }
                     }
@@ -123,9 +119,7 @@ fun WorkoutTemplatesScreen(
                         items(myTemplates) { template ->
                             TemplateCard(
                                 template = template,
-                                onClick = { onOpenTemplate(template.id) },
-                                onUsePlan = null,
-                                onReview = null
+                                onClick = { onOpenTemplate(template.id) }
                             )
                         }
                     }
@@ -143,39 +137,12 @@ fun WorkoutTemplatesScreen(
             }
         )
     }
-
-    showDownloadConfirm?.let { template ->
-        AlertDialog(
-            onDismissRequest = { showDownloadConfirm = null },
-            title = { Text("Use This Plan?") },
-            text = { Text("This will REPLACE your current workout plan with \"${template.title}\". This cannot be undone.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    socialViewModel.downloadTemplate(template)
-                    showDownloadConfirm = null
-                }) { Text("Use Plan") }
-            },
-            dismissButton = { TextButton(onClick = { showDownloadConfirm = null }) { Text("Cancel") } }
-        )
-    }
-
-    showReviewDialog?.let { templateId ->
-        ReviewDialog(
-            onDismiss = { showReviewDialog = null },
-            onSubmit = { rating, comment ->
-                socialViewModel.addTemplateReview(templateId, rating, comment)
-                showReviewDialog = null
-            }
-        )
-    }
 }
 
 @Composable
 private fun TemplateCard(
     template: WorkoutTemplate,
-    onClick: () -> Unit,
-    onUsePlan: (() -> Unit)?,
-    onReview: (() -> Unit)?
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -239,66 +206,8 @@ private fun TemplateCard(
                 }
             }
 
-            if (onUsePlan != null || onReview != null) {
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    onUsePlan?.let {
-                        OutlinedButton(onClick = it, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Use Plan")
-                        }
-                    }
-                    onReview?.let {
-                        OutlinedButton(onClick = it, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.RateReview, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Review")
-                        }
-                    }
-                }
-            }
         }
     }
-}
-
-@Composable
-private fun ReviewDialog(
-    onDismiss: () -> Unit,
-    onSubmit: (Int, String) -> Unit
-) {
-    var rating by remember { mutableIntStateOf(0) }
-    var comment by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Rate Template") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    repeat(5) { i ->
-                        IconButton(onClick = { rating = i + 1 }, modifier = Modifier.size(36.dp)) {
-                            Icon(
-                                if (i < rating) Icons.Default.Star else Icons.Default.StarBorder,
-                                null, tint = Color(0xFFFFB300)
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = comment,
-                    onValueChange = { comment = it },
-                    label = { Text("Comment (optional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSubmit(rating, comment) }, enabled = rating > 0) { Text("Submit") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
 }
 
 @Composable

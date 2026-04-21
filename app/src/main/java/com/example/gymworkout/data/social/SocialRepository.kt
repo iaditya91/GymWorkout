@@ -52,6 +52,14 @@ class SocialRepository {
         } catch (_: Exception) { }
     }
 
+    suspend fun updateDailyProgress(uid: String, progress: DailyProgress) {
+        try {
+            usersCol.document(uid).update(
+                mapOf("dailyProgress" to progress.toMap(), "lastSeen" to Timestamp.now())
+            ).await()
+        } catch (_: Exception) { }
+    }
+
     suspend fun updateOnlineStatus(uid: String, isOnline: Boolean) {
         try {
             usersCol.document(uid).update(

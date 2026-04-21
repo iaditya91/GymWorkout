@@ -100,9 +100,9 @@ fun TemplateDetailScreen(
                             onClick = { showCopyConfirm = true },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Copy to My Plan")
+                            Text("Use Plan")
                         }
                         OutlinedButton(
                             onClick = { showReviewDialog = true },
@@ -196,7 +196,7 @@ fun TemplateDetailScreen(
         if (t != null) {
             AlertDialog(
                 onDismissRequest = { showCopyConfirm = false },
-                title = { Text("Copy Template?") },
+                title = { Text("Use This Plan?") },
                 text = {
                     Text("This will REPLACE your current workout plan with \"${t.title}\". This cannot be undone.")
                 },
@@ -205,7 +205,7 @@ fun TemplateDetailScreen(
                         socialViewModel.downloadTemplate(t)
                         showCopyConfirm = false
                         onBack()
-                    }) { Text("Copy") }
+                    }) { Text("Use Plan") }
                 },
                 dismissButton = {
                     TextButton(onClick = { showCopyConfirm = false }) { Text("Cancel") }
