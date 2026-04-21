@@ -1,5 +1,7 @@
 package com.example.gymworkout.ui.screens.social
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -15,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gymworkout.data.social.TemplateExercise
@@ -33,6 +36,7 @@ fun TemplateDetailScreen(
     val template by socialViewModel.selectedTemplate.collectAsState()
     val reviews by socialViewModel.templateReviews.collectAsState()
     val currentUser by socialViewModel.currentSocialUser.collectAsState()
+    val context = LocalContext.current
     var showCopyConfirm by remember { mutableStateOf(false) }
     var showReviewDialog by remember { mutableStateOf(false) }
 
@@ -57,6 +61,13 @@ fun TemplateDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    template?.let { t ->
+                        IconButton(onClick = { shareTemplate(context, t) }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share template")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -143,7 +154,7 @@ fun TemplateDetailScreen(
             } else {
                 val exercisesByDay = t.exercises.groupBy { it.dayOfWeek }.toSortedMap()
                 exercisesByDay.forEach { (day, dayExercises) ->
-                    item { DayPlanSection(day = day, dayExercises = dayExercises) }
+                    item { DayPlanSection(day = day, dayExercises = dayExercises, templateTitle = t.title) }
                 }
             }
 
@@ -306,7 +317,7 @@ private fun MetaItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text
 }
 
 @Composable
-private fun DayPlanSection(day: Int, dayExercises: List<TemplateExercise>) {
+private fun DayPlanSection(day: Int, dayExercises: List<TemplateExercise>, templateTitle: String) {
     val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
     val dayName = if (day in 0..6) dayNames[day] else "Day ${day + 1}"
 
@@ -348,7 +359,7 @@ private fun DayPlanSection(day: Int, dayExercises: List<TemplateExercise>) {
 
             items.forEach { item ->
                 when (item) {
-                    is TemplateExercise -> ExerciseLine(item)
+                    is TemplateExercise -> ExerciseLine(item, templateTitle = templateTitle)
                     is List<*> -> {
                         @Suppress("UNCHECKED_CAST")
                         val supersetExercises = item as List<TemplateExercise>
@@ -382,7 +393,7 @@ private fun DayPlanSection(day: Int, dayExercises: List<TemplateExercise>) {
                                 )
                             }
                             Spacer(Modifier.height(4.dp))
-                            supersetExercises.forEach { ExerciseLine(it) }
+                            supersetExercises.forEach { ExerciseLine(it, templateTitle = templateTitle) }
                         }
                     }
                 }
@@ -392,7 +403,8 @@ private fun DayPlanSection(day: Int, dayExercises: List<TemplateExercise>) {
 }
 
 @Composable
-private fun ExerciseLine(exercise: TemplateExercise) {
+private fun ExerciseLine(exercise: TemplateExercise, templateTitle: String?) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -414,6 +426,17 @@ private fun ExerciseLine(exercise: TemplateExercise) {
                         if (exercise.restTimeSeconds > 0) " · ${exercise.restTimeSeconds}s rest" else "",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        IconButton(
+            onClick = { shareExercise(context, exercise, templateTitle) },
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Default.Share,
+                contentDescription = "Share exercise",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -455,6 +478,75 @@ private fun ReviewRow(userName: String, rating: Int, comment: String, createdAt:
             }
         }
     }
+}
+
+private fun shareExercise(context: Context, exercise: TemplateExercise, templateTitle: String?) {
+    val rest = if (exercise.restTimeSeconds > 0) " · ${exercise.restTimeSeconds}s rest" else ""
+    val header = if (!templateTitle.isNullOrBlank()) "From \"$templateTitle\"\n\n" else ""
+    val text = buildString {
+        append(header)
+        append("💪 ${exercise.name}\n")
+        append("${exercise.sets} sets x ${exercise.reps} reps$rest")
+        append("\n\n— Shared via GymWorkout")
+    }
+    launchShare(context, subject = exercise.name, text = text)
+}
+
+private fun shareTemplate(context: Context, template: WorkoutTemplate) {
+    val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    val text = buildString {
+        append("🏋️ ${template.title}\n")
+        if (template.creatorName.isNotBlank()) append("by ${template.creatorName}\n")
+        append("Level: ${template.fitnessLevel.replaceFirstChar { it.uppercase() }}  ·  ${template.daysPerWeek} days/week\n")
+        if (template.description.isNotBlank()) {
+            append("\n${template.description}\n")
+        }
+
+        val byDay = template.exercises.groupBy { it.dayOfWeek }.toSortedMap()
+        byDay.forEach { (day, list) ->
+            val dayName = if (day in 0..6) dayNames[day] else "Day ${day + 1}"
+            append("\n— $dayName —\n")
+            val sorted = list.sortedBy { it.orderIndex }
+            var i = 0
+            while (i < sorted.size) {
+                val ex = sorted[i]
+                if (ex.supersetGroupId.isNotBlank()) {
+                    val group = mutableListOf(ex)
+                    var j = i + 1
+                    while (j < sorted.size && sorted[j].supersetGroupId == ex.supersetGroupId) {
+                        group.add(sorted[j]); j++
+                    }
+                    if (group.size > 1) {
+                        append("↕ Superset:\n")
+                        group.forEach { append("   • ${formatExerciseLine(it)}\n") }
+                    } else {
+                        append("• ${formatExerciseLine(ex)}\n")
+                    }
+                    i = j
+                } else {
+                    append("• ${formatExerciseLine(ex)}\n")
+                    i++
+                }
+            }
+        }
+
+        append("\n— Shared via GymWorkout")
+    }
+    launchShare(context, subject = template.title, text = text)
+}
+
+private fun formatExerciseLine(ex: TemplateExercise): String {
+    val rest = if (ex.restTimeSeconds > 0) " · ${ex.restTimeSeconds}s rest" else ""
+    return "${ex.name} — ${ex.sets} x ${ex.reps}$rest"
+}
+
+private fun launchShare(context: Context, subject: String, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share workout"))
 }
 
 @Composable
