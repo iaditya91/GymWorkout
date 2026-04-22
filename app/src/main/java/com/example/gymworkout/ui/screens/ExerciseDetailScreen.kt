@@ -69,10 +69,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
 import com.example.gymworkout.data.ExerciseInfo
 import com.example.gymworkout.data.ExerciseRepository
 import com.example.gymworkout.data.MuscleTarget
+import com.example.gymworkout.data.WorkoutDatabase
+import com.example.gymworkout.ui.components.ExerciseProgressionCard
 import com.example.gymworkout.ui.components.MuscleBodyMapCard
+import kotlinx.coroutines.flow.map
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -82,8 +87,9 @@ fun ExerciseDetailScreen(
     onNavigateToExercise: (String) -> Unit = {}
 ) {
     val foundExercise = remember { ExerciseRepository.findByName(exerciseName) }
-    val isCustom = foundExercise == null
-    var isEditing by remember { mutableStateOf(isCustom) }
+    // Always land in the read-only detail view; the Edit button in the top bar
+    // opens edit mode. Custom exercises start empty but are still viewable.
+    var isEditing by remember { mutableStateOf(false) }
 
     // Editable state
     var force by remember { mutableStateOf(foundExercise?.force ?: "") }
@@ -107,6 +113,16 @@ fun ExerciseDetailScreen(
 
     val generatedId = remember(exerciseName) { ExerciseRepository.generateId(exerciseName) }
     val exerciseId = foundExercise?.id ?: generatedId
+
+    // Progression data — logs for this exercise across all time, plus user's weight unit.
+    val context = LocalContext.current
+    val db = remember { WorkoutDatabase.getDatabase(context) }
+    val setLogs by remember(exerciseName) {
+        db.workoutSetLogDao().getLogsByExerciseName(exerciseName)
+    }.collectAsState(initial = emptyList())
+    val weightUnit by remember {
+        db.userDao().getProfile().map { it?.weightUnit ?: "kg" }
+    }.collectAsState(initial = "kg")
 
     Scaffold(
         topBar = {
@@ -201,6 +217,15 @@ fun ExerciseDetailScreen(
                 MuscleBodyMapCard(
                     primaryMuscles = foundExercise?.primaryMuscles ?: primaryMuscleNames.map { MuscleTarget(target = it) },
                     secondaryMuscles = foundExercise?.secondaryMuscles ?: secondaryMuscleNames.map { MuscleTarget(target = it) }
+                )
+            }
+
+            // Progression (read-only view): shows estimated 1RM, top set, volume,
+            // weight-over-time chart, and recent sessions for this exercise.
+            if (!isEditing) {
+                ExerciseProgressionCard(
+                    logs = setLogs,
+                    displayUnit = weightUnit
                 )
             }
 

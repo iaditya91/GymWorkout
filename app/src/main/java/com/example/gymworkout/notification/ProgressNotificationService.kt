@@ -24,6 +24,7 @@ import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
+import androidx.room.InvalidationTracker
 import com.example.gymworkout.MainActivity
 import com.example.gymworkout.R
 import com.example.gymworkout.data.DailyFocusPreference
@@ -31,8 +32,10 @@ import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -44,7 +47,10 @@ class ProgressNotificationService : Service() {
     companion object {
         const val CHANNEL_ID = "progress_notification"
         const val NOTIFICATION_ID = 9903
+        const val ACTION_RESTART = "com.example.gymworkout.PROGRESS_NOTIF_RESTART"
         private const val REFRESH_INTERVAL_MS = 5 * 60 * 1000L // 5 min
+        // Short coalesce window so multi-row DB writes (e.g. logFood inserts 4 rows) map to one re-render.
+        private const val DB_CHANGE_DEBOUNCE_MS = 250L
 
         // Metric ring colors — matched to progress_*.xml drawable fills.
         private val METRIC_COLOR_WORKOUT = Color.parseColor("#6C9FFF")  // blue
@@ -124,6 +130,11 @@ class ProgressNotificationService : Service() {
         }
     }
 
+    // Fires when any of the observed Room tables change; coalesced into one update per ~250ms burst.
+    private var dbObserver: InvalidationTracker.Observer? = null
+    private var pendingDbUpdate: Job? = null
+    private var focusObserverJob: Job? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -140,13 +151,70 @@ class ProgressNotificationService : Service() {
         handler.removeCallbacks(refreshRunnable)
         handler.postDelayed(refreshRunnable, REFRESH_INTERVAL_MS)
 
+        registerDbObserver()
+        registerFocusObserver()
+
         return START_STICKY
     }
 
     override fun onDestroy() {
         handler.removeCallbacks(refreshRunnable)
+        dbObserver?.let {
+            WorkoutDatabase.getDatabase(applicationContext).invalidationTracker.removeObserver(it)
+        }
+        dbObserver = null
+        focusObserverJob?.cancel()
+        focusObserverJob = null
         scope.cancel()
         super.onDestroy()
+    }
+
+    /**
+     * Android 14+ lets users dismiss foreground-service notifications by swiping.
+     * The user enabled this as a persistent card, so when the system dismisses it we
+     * re-post immediately via a tiny broadcast that restarts this service.
+     */
+    private fun buildRestartDeleteIntent(): PendingIntent {
+        val intent = Intent(this, ProgressNotificationRestartReceiver::class.java).apply {
+            action = ACTION_RESTART
+            setPackage(packageName)
+        }
+        return PendingIntent.getBroadcast(
+            this,
+            1,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun registerDbObserver() {
+        if (dbObserver != null) return
+        val db = WorkoutDatabase.getDatabase(applicationContext)
+        val observer = object : InvalidationTracker.Observer(
+            arrayOf("exercises", "nutrition_entries", "nutrition_targets", "food_log")
+        ) {
+            override fun onInvalidated(tables: Set<String>) {
+                pendingDbUpdate?.cancel()
+                pendingDbUpdate = scope.launch {
+                    delay(DB_CHANGE_DEBOUNCE_MS)
+                    updateNotification()
+                }
+            }
+        }
+        db.invalidationTracker.addObserver(observer)
+        dbObserver = observer
+    }
+
+    private fun registerFocusObserver() {
+        focusObserverJob?.cancel()
+        focusObserverJob = scope.launch {
+            // StateFlow emits current value on subscribe — skip the initial tick; onStartCommand already rendered.
+            var first = true
+            DailyFocusPreference.focus.collect {
+                if (first) { first = false; return@collect }
+                updateNotification()
+            }
+        }
     }
 
     private fun updateNotification() {
@@ -361,6 +429,7 @@ class ProgressNotificationService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(openIntent)
+            .setDeleteIntent(buildRestartDeleteIntent())
             .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)

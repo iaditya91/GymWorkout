@@ -42,6 +42,75 @@ object VolumeAnalytics {
         val volumeKg: Double
     )
 
+    /** One session's summary for an exercise, used to plot progression. */
+    data class ExerciseSession(
+        val dayStartMs: Long,           // local day start, for X-axis
+        val sets: Int,
+        val totalReps: Int,
+        val totalVolumeKg: Double,
+        val topWeightKg: Double,        // heaviest single set weight
+        val topWeightReps: Int,         // reps @ topWeight (tiebreak: highest reps)
+        val estimatedOneRepMaxKg: Double
+    )
+
+    data class ExerciseProgression(
+        val sessions: List<ExerciseSession>, // chronological ascending
+        val allTimeTopWeightKg: Double,
+        val allTimeTopWeightReps: Int,
+        val allTimeEstimatedOneRepMaxKg: Double,
+        val totalSessions: Int,
+        val totalSets: Int,
+        val totalVolumeKg: Double
+    )
+
+    /** Epley formula: 1RM ≈ w * (1 + reps/30). For 1-rep sets, returns weight. */
+    fun estimatedOneRepMax(weightKg: Double, reps: Int): Double {
+        if (reps <= 0 || weightKg <= 0.0) return 0.0
+        if (reps == 1) return weightKg
+        return weightKg * (1.0 + reps / 30.0)
+    }
+
+    fun buildProgression(logs: List<WorkoutSetLog>): ExerciseProgression {
+        if (logs.isEmpty()) {
+            return ExerciseProgression(emptyList(), 0.0, 0, 0.0, 0, 0, 0.0)
+        }
+        val byDay = logs.groupBy { startOfDay(it.loggedAt) }
+        val sessions = byDay.entries
+            .sortedBy { it.key }
+            .map { (dayStart, dayLogs) ->
+                // Top set = heaviest weight; break ties by most reps at that weight.
+                val top = dayLogs.maxWithOrNull(
+                    compareBy<WorkoutSetLog> { it.weightKg }.thenBy { it.reps }
+                )!!
+                ExerciseSession(
+                    dayStartMs = dayStart,
+                    sets = dayLogs.size,
+                    totalReps = dayLogs.sumOf { it.reps },
+                    totalVolumeKg = dayLogs.sumOf { it.volumeKg },
+                    topWeightKg = top.weightKg,
+                    topWeightReps = top.reps,
+                    estimatedOneRepMaxKg = dayLogs.maxOf {
+                        estimatedOneRepMax(it.weightKg, it.reps)
+                    }
+                )
+            }
+
+        val topOverall = logs.maxWithOrNull(
+            compareBy<WorkoutSetLog> { it.weightKg }.thenBy { it.reps }
+        )!!
+        val allTime1RM = logs.maxOf { estimatedOneRepMax(it.weightKg, it.reps) }
+
+        return ExerciseProgression(
+            sessions = sessions,
+            allTimeTopWeightKg = topOverall.weightKg,
+            allTimeTopWeightReps = topOverall.reps,
+            allTimeEstimatedOneRepMaxKg = allTime1RM,
+            totalSessions = sessions.size,
+            totalSets = logs.size,
+            totalVolumeKg = logs.sumOf { it.volumeKg }
+        )
+    }
+
     fun summarizeWorkout(logs: List<WorkoutSetLog>): WorkoutVolumeSummary {
         val byExercise = logs.groupBy { it.exerciseId }.map { (id, exLogs) ->
             PerExerciseVolume(

@@ -90,7 +90,15 @@
             android:exported="false" />
 
         <receiver
+            android:name=".notification.ProgressNotificationRestartReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".notification.AiPlannerNotificationReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notification.AccountabilityCheckReceiver"
             android:exported="false" />
 
         <receiver

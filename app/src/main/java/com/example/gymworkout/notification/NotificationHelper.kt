@@ -34,6 +34,10 @@ object NotificationHelper {
     private const val SOCIAL_CHANNEL_NAME = "Social"
     private const val SOCIAL_CHANNEL_DESC = "Friend requests, battle/duel invites, and partnership requests"
 
+    const val ACCOUNTABILITY_CHANNEL_ID = "accountability_check"
+    private const val ACCOUNTABILITY_CHANNEL_NAME = "Accountability Partners"
+    private const val ACCOUNTABILITY_CHANNEL_DESC = "Daily nudges when a partner hasn't logged their workout or habits"
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -112,6 +116,20 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = SOCIAL_CHANNEL_DESC
+            }
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    fun createAccountabilityNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                ACCOUNTABILITY_CHANNEL_ID,
+                ACCOUNTABILITY_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = ACCOUNTABILITY_CHANNEL_DESC
             }
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)

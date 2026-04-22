@@ -482,7 +482,7 @@ private fun CreateBattleDialog(
     var categoryExpanded by remember { mutableStateOf(false) }
     var friendExpanded by remember { mutableStateOf(false) }
 
-    val categories = listOf("WATER", "PROTEIN", "CALORIES", "SLEEP")
+    val categories = listOf("WORKOUT", "HABITS", "WATER", "PROTEIN", "CALORIES", "SLEEP")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -583,6 +583,8 @@ private fun categoryEmoji(category: String): String = when (category.uppercase()
     "PROTEIN" -> "\uD83E\uDD69"
     "CALORIES" -> "\uD83D\uDD25"
     "SLEEP" -> "\uD83D\uDE34"
+    "WORKOUT" -> "\uD83C\uDFCB\uFE0F"
+    "HABITS" -> "\u2705"
     else -> "\uD83C\uDFAF"
 }
 

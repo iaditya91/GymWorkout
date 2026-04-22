@@ -18,6 +18,9 @@ interface WorkoutSetLogDao {
     @Query("SELECT * FROM workout_set_logs WHERE exerciseId = :exerciseId ORDER BY loggedAt DESC LIMIT 1")
     suspend fun getMostRecentForExercise(exerciseId: Int): WorkoutSetLog?
 
+    @Query("SELECT * FROM workout_set_logs WHERE LOWER(exerciseName) = LOWER(:name) ORDER BY loggedAt ASC")
+    fun getLogsByExerciseName(name: String): Flow<List<WorkoutSetLog>>
+
     @Query("SELECT * FROM workout_set_logs WHERE exerciseId = :exerciseId AND loggedAt BETWEEN :from AND :to ORDER BY setIndex ASC")
     suspend fun getLogsForExerciseInRange(exerciseId: Int, from: Long, to: Long): List<WorkoutSetLog>
 

@@ -510,9 +510,16 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         var d = today
         while (!d.isBefore(start)) {
             val dateStr = d.format(formatter)
-            val total = nutritionDao.getTotalForDateAndCategorySync(dateStr, category)
-            val target = nutritionDao.getTargetSync(category)?.targetValue ?: 0f
-            if (target > 0f && total >= target) {
+            val satisfied = when (category.uppercase()) {
+                "WORKOUT" -> checkInDao.getCheckInSync(dateStr)?.workoutDone == true
+                "HABITS" -> checkInDao.getCheckInSync(dateStr)?.habitsDone == true
+                else -> {
+                    val total = nutritionDao.getTotalForDateAndCategorySync(dateStr, category)
+                    val target = nutritionDao.getTargetSync(category)?.targetValue ?: 0f
+                    target > 0f && total >= target
+                }
+            }
+            if (satisfied) {
                 streak++
             } else {
                 break

@@ -1,5 +1,7 @@
 package com.example.gymworkout.ui.screens.social
 
+import android.app.TimePickerDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,10 +12,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.gymworkout.data.AccountabilityCheckPreference
 import com.example.gymworkout.data.social.AccountabilityPartnership
 import com.example.gymworkout.data.social.FriendInfo
+import com.example.gymworkout.notification.AccountabilityCheckScheduler
 import com.example.gymworkout.viewmodel.SocialViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,6 +76,9 @@ fun AccountabilityScreen(
                     }
                 }
             }
+
+            // Daily check-in card
+            item { DailyCheckCard() }
 
             // Outgoing pending requests
             val outgoing = pending.filter { it.user1Id == myUid }
@@ -226,4 +234,63 @@ private fun CreatePartnerDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+@Composable
+private fun DailyCheckCard() {
+    val context = LocalContext.current
+    val enabled by AccountabilityCheckPreference.enabled.collectAsState()
+    val time by AccountabilityCheckPreference.time.collectAsState()
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Daily partner check", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Check partners once a day. Runs on your device — no server cost.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { on ->
+                        AccountabilityCheckPreference.setEnabled(context, on)
+                        if (on) AccountabilityCheckScheduler.schedule(context)
+                        else AccountabilityCheckScheduler.cancel(context)
+                    }
+                )
+            }
+            if (enabled) {
+                val parts = time.split(":")
+                val hour = parts.getOrNull(0)?.toIntOrNull() ?: 21
+                val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            TimePickerDialog(context, { _, h, m ->
+                                val newTime = String.format("%02d:%02d", h, m)
+                                AccountabilityCheckPreference.setTime(context, newTime)
+                                AccountabilityCheckScheduler.schedule(context)
+                            }, hour, minute, false).show()
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Schedule, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Check at $time", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
 }

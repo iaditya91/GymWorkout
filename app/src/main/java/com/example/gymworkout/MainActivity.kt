@@ -75,12 +75,14 @@ import com.example.gymworkout.ui.screens.nutrition.NutritionScreen
 import com.example.gymworkout.ui.screens.nutrition.HabitDetailScreen
 import com.example.gymworkout.ui.screens.stats.StatsScreen
 import com.example.gymworkout.ui.screens.user.UserScreen
+import com.example.gymworkout.data.AccountabilityCheckPreference
 import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.AiPlannerPreference
 import com.example.gymworkout.data.DailyFocusPreference
 import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.data.ThemePreference
 import com.example.gymworkout.data.sync.SyncPreference
+import com.example.gymworkout.notification.AccountabilityCheckScheduler
 import com.example.gymworkout.notification.NotificationHelper
 import com.example.gymworkout.notification.ProgressNotificationService
 import com.example.gymworkout.ui.theme.GymWorkoutTheme
@@ -156,9 +158,13 @@ class MainActivity : ComponentActivity() {
         ProgressNotificationPreference.init(this)
         DailyFocusPreference.init(this)
         SyncPreference.init(this)
+        AccountabilityCheckPreference.init(this)
 
         if (ProgressNotificationPreference.getEnabled(this)) {
             ProgressNotificationService.start(this)
+        }
+        if (AccountabilityCheckPreference.getEnabled(this)) {
+            AccountabilityCheckScheduler.schedule(this)
         }
         handleIntentExtras(intent)
         lifecycleScope.launch { AiCapabilityManager.refresh() }
