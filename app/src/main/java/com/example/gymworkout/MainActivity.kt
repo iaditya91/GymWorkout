@@ -67,9 +67,11 @@ import com.example.gymworkout.ui.screens.stats.StatsScreen
 import com.example.gymworkout.ui.screens.user.UserScreen
 import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.AiPlannerPreference
+import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.data.ThemePreference
 import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.notification.NotificationHelper
+import com.example.gymworkout.notification.ProgressNotificationService
 import com.example.gymworkout.ui.theme.GymWorkoutTheme
 import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.viewmodel.StatsViewModel
@@ -116,11 +118,17 @@ class MainActivity : ComponentActivity() {
         NotificationHelper.createQuoteNotificationChannel(this)
         NotificationHelper.createAutoBackupNotificationChannel(this)
         NotificationHelper.createAiPlannerNotificationChannel(this)
+        NotificationHelper.createProgressNotificationChannel(this)
         requestNotificationPermission()
         ExerciseRepository.load(this)
         QuotePreference.init(this)
         AiPlannerPreference.init(this)
+        ProgressNotificationPreference.init(this)
         SyncPreference.init(this)
+
+        if (ProgressNotificationPreference.getEnabled(this)) {
+            ProgressNotificationService.start(this)
+        }
         setContent {
             val darkMode by ThemePreference.isDarkMode.collectAsState()
             GymWorkoutTheme(

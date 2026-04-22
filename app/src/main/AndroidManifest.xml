@@ -15,6 +15,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:hardwareAccelerated="true"
@@ -79,6 +80,11 @@
         <service
             android:name=".notification.TimerAlertService"
             android:foregroundServiceType="shortService"
+            android:exported="false" />
+
+        <service
+            android:name=".notification.ProgressNotificationService"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
 
         <receiver

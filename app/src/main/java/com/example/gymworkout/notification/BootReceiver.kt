@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.AiPlannerPreference
+import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,11 @@ class BootReceiver : BroadcastReceiver() {
                 // Reschedule AI planner notifications
                 if (AiPlannerPreference.getEnabled(context)) {
                     AiPlannerNotificationScheduler.schedule(context)
+                }
+
+                // Restart persistent progress notification card
+                if (ProgressNotificationPreference.getEnabled(context)) {
+                    ProgressNotificationService.start(context)
                 }
             }
         }

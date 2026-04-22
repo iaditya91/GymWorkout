@@ -10,6 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gymworkout.data.social.FriendInfo
@@ -30,6 +33,9 @@ fun FriendsScreen(
 
     var friendCode by remember { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
+
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
 
     val incomingRequests = friends.filter { it.isPending && it.isIncoming }
     val outgoingRequests = friends.filter { it.isPending && !it.isIncoming }
@@ -89,12 +95,27 @@ fun FriendsScreen(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
-                        Icon(
-                            Icons.Filled.QrCode,
-                            contentDescription = null,
-                            modifier = Modifier.size(32.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        val code = currentUser?.friendCode
+                        IconButton(
+                            onClick = {
+                                if (!code.isNullOrBlank()) {
+                                    clipboardManager.setText(AnnotatedString(code))
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Friend code copied",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            },
+                            enabled = !code.isNullOrBlank()
+                        ) {
+                            Icon(
+                                Icons.Filled.ContentCopy,
+                                contentDescription = "Copy friend code",
+                                modifier = Modifier.size(28.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))

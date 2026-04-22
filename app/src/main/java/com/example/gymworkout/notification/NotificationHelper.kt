@@ -100,6 +100,23 @@ object NotificationHelper {
         }
     }
 
+    fun createProgressNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "progress_notification",
+                "Daily Progress Card",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Ongoing card showing today's workout, nutrition, sleep, and hydration progress"
+                setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+            }
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
     fun showNotification(
         context: Context,
         notificationId: Int,

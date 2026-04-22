@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -100,7 +101,9 @@ import com.example.gymworkout.data.MotivationalQuotes
 import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.data.AiPlannerPreference
+import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.notification.AiPlannerNotificationScheduler
+import com.example.gymworkout.notification.ProgressNotificationService
 import android.media.RingtoneManager
 import androidx.compose.material.icons.filled.MusicNote
 import com.example.gymworkout.data.TimerSoundPreference
@@ -147,6 +150,9 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNav
 
     // AI Planner notification state
     val aiPlannerEnabled by AiPlannerPreference.enabled.collectAsState()
+
+    // Progress notification card state
+    val progressNotifEnabled by ProgressNotificationPreference.enabled.collectAsState()
 
     // Auto-dismiss success/error after 3 seconds
     LaunchedEffect(syncState) {
@@ -306,6 +312,20 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNav
                             AiPlannerNotificationScheduler.schedule(context)
                         } else {
                             AiPlannerNotificationScheduler.cancel(context)
+                        }
+                    }
+                )
+            }
+
+            item {
+                ProgressNotificationCard(
+                    enabled = progressNotifEnabled,
+                    onToggle = { enabled ->
+                        ProgressNotificationPreference.setEnabled(context, enabled)
+                        if (enabled) {
+                            ProgressNotificationService.start(context)
+                        } else {
+                            ProgressNotificationService.stop(context)
                         }
                     }
                 )
@@ -1787,6 +1807,66 @@ fun AiPlannerCard(
                 )
                 Text(
                     if (enabled) "" else "Tap to enable daily AI tips",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                )
+            )
+        }
+    }
+}
+
+@Composable
+fun ProgressNotificationCard(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Insights,
+                    contentDescription = null,
+                    tint = if (enabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Progress Notification Card",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    if (enabled) "Showing today's progress on your notification bar"
+                    else "Show today's workout, nutrition, sleep and hydration in a persistent notification",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
