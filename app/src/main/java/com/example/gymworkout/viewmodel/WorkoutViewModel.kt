@@ -6,11 +6,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.gymworkout.data.DayHeading
 import com.example.gymworkout.data.Exercise
+import com.example.gymworkout.data.VolumeAnalytics
 import com.example.gymworkout.data.WorkoutDatabase
+import com.example.gymworkout.data.WorkoutSetLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class RestTimerState(
@@ -42,6 +45,14 @@ data class RestTimerState(
 class WorkoutViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = WorkoutDatabase.getDatabase(application).exerciseDao()
+    private val setLogDao = WorkoutDatabase.getDatabase(application).workoutSetLogDao()
+    private val userDao = WorkoutDatabase.getDatabase(application).userDao()
+
+    /** "kg" or "lb" — reflects the user's profile preference. */
+    val weightUnit: Flow<String> = userDao.getProfile().map { it?.weightUnit ?: "kg" }
+
+    suspend fun getExercisesByGroupId(groupId: String): List<Exercise> =
+        dao.getExercisesByGroupId(groupId)
 
     // Rest timer state — survives navigation
     private val _restTimerState = MutableStateFlow<RestTimerState?>(null)
@@ -174,19 +185,85 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun decrementSet(exercise: Exercise) {
         viewModelScope.launch {
+            val dayStart = VolumeAnalytics.startOfDay()
+            val dayEnd = VolumeAnalytics.endOfDay()
             if (exercise.supersetGroupId.isNotBlank()) {
                 // Decrement all exercises in the superset group together
                 val group = dao.getExercisesByGroupId(exercise.supersetGroupId)
                 for (ex in group) {
                     val newCompleted = (ex.completedSets - 1).coerceAtLeast(0)
                     dao.updateCompletedSets(ex.id, newCompleted, false)
+                    setLogDao.deleteLatestForExerciseInRange(ex.id, dayStart, dayEnd)
                 }
             } else {
                 val newCompleted = (exercise.completedSets - 1).coerceAtLeast(0)
                 dao.updateCompletedSets(exercise.id, newCompleted, false)
+                setLogDao.deleteLatestForExerciseInRange(exercise.id, dayStart, dayEnd)
             }
         }
     }
+
+    /**
+     * Log a completed set with actual reps + weight, then bump completedSets.
+     * For supersets the caller provides one (reps, weightKg) pair per exercise in the group.
+     */
+    fun logAndIncrementSet(
+        exercise: Exercise,
+        reps: Int,
+        weightKg: Double,
+        groupEntries: List<Triple<Exercise, Int, Double>>? = null
+    ) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            if (exercise.supersetGroupId.isNotBlank() && groupEntries != null) {
+                for ((ex, r, w) in groupEntries) {
+                    val setIndex = ex.completedSets + 1
+                    val newCompleted = setIndex.coerceAtMost(ex.sets)
+                    val isDone = newCompleted >= ex.sets
+                    dao.updateCompletedSets(ex.id, newCompleted, isDone)
+                    setLogDao.insert(
+                        WorkoutSetLog(
+                            exerciseId = ex.id,
+                            exerciseName = ex.name,
+                            dayOfWeek = ex.dayOfWeek,
+                            setIndex = setIndex,
+                            reps = r,
+                            weightKg = w,
+                            loggedAt = now
+                        )
+                    )
+                }
+            } else {
+                val setIndex = exercise.completedSets + 1
+                val newCompleted = setIndex.coerceAtMost(exercise.sets)
+                val isDone = newCompleted >= exercise.sets
+                dao.updateCompletedSets(exercise.id, newCompleted, isDone)
+                setLogDao.insert(
+                    WorkoutSetLog(
+                        exerciseId = exercise.id,
+                        exerciseName = exercise.name,
+                        dayOfWeek = exercise.dayOfWeek,
+                        setIndex = setIndex,
+                        reps = reps,
+                        weightKg = weightKg,
+                        loggedAt = now
+                    )
+                )
+            }
+        }
+    }
+
+    /** Most recent log row for this exercise, used to prefill the log dialog. */
+    suspend fun getLastLogForExercise(exerciseId: Int): WorkoutSetLog? =
+        setLogDao.getMostRecentForExercise(exerciseId)
+
+    /** Flow of all logs in the current local week (Mon 00:00 → next Mon 00:00). */
+    fun getLogsForCurrentWeek(): Flow<List<WorkoutSetLog>> =
+        setLogDao.getLogsInRange(VolumeAnalytics.startOfWeek(), VolumeAnalytics.endOfWeek())
+
+    /** Flow of all logs for today (local). */
+    fun getLogsForToday(): Flow<List<WorkoutSetLog>> =
+        setLogDao.getLogsInRange(VolumeAnalytics.startOfDay(), VolumeAnalytics.endOfDay())
 
     fun updateNotes(id: Int, notes: String) {
         viewModelScope.launch {

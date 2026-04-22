@@ -11,6 +11,7 @@ import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.data.UserProfile
 import com.example.gymworkout.data.WeightEntry
 import com.example.gymworkout.data.WorkoutReminder
+import com.example.gymworkout.data.WorkoutSetLog
 import com.example.gymworkout.data.CustomFoodItem
 import com.example.gymworkout.data.MotivationalQuote
 
@@ -39,5 +40,6 @@ data class BackupData(
     val quoteTime: String = "08:00",
     val progressPhotos: List<BackupPhoto> = emptyList(),
     val customFoods: List<CustomFoodItem> = emptyList(),
-    val weightEntries: List<WeightEntry> = emptyList()
+    val weightEntries: List<WeightEntry> = emptyList(),
+    val workoutSetLogs: List<WorkoutSetLog> = emptyList()
 )

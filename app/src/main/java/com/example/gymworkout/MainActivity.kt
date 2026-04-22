@@ -1,6 +1,7 @@
 package com.example.gymworkout
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -10,6 +11,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
@@ -35,6 +39,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -101,6 +106,24 @@ import com.example.gymworkout.ui.screens.social.TemplateDetailScreen
 import com.example.gymworkout.ui.screens.social.AchievementBadgesScreen
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        const val EXTRA_DESTINATION = "extra_destination"
+        private val _pendingDestination = MutableStateFlow<String?>(null)
+        val pendingDestination: StateFlow<String?> = _pendingDestination.asStateFlow()
+        fun consumePendingDestination() { _pendingDestination.value = null }
+    }
+
+    private fun handleIntentExtras(intent: Intent?) {
+        val dest = intent?.getStringExtra(EXTRA_DESTINATION) ?: return
+        _pendingDestination.value = dest
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntentExtras(intent)
+    }
+
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -137,6 +160,7 @@ class MainActivity : ComponentActivity() {
         if (ProgressNotificationPreference.getEnabled(this)) {
             ProgressNotificationService.start(this)
         }
+        handleIntentExtras(intent)
         lifecycleScope.launch { AiCapabilityManager.refresh() }
         setContent {
             val darkMode by ThemePreference.isDarkMode.collectAsState()
@@ -186,6 +210,21 @@ fun WorkoutApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomBarRoutes
+
+    val pendingDestination by MainActivity.pendingDestination.collectAsState()
+    LaunchedEffect(pendingDestination, hasCompletedLogin) {
+        val dest = pendingDestination ?: return@LaunchedEffect
+        if (hasCompletedLogin && dest in bottomBarRoutes) {
+            navController.navigate(dest) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+        MainActivity.consumePendingDestination()
+    }
 
     // Pending social items for bottom-nav badge
     val socialFriends by socialViewModel.friends.collectAsState()

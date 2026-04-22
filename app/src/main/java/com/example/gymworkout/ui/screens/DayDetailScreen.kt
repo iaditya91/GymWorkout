@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,11 +79,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.example.gymworkout.data.Exercise
+import com.example.gymworkout.data.ExerciseRepository
 import com.example.gymworkout.ai.AiCapabilityManager
 import com.example.gymworkout.ui.components.AddExerciseDialog
+import com.example.gymworkout.ui.components.LogSetDialog
+import com.example.gymworkout.ui.components.LogSetEntry
 import com.example.gymworkout.ui.components.NotesDialog
 import com.example.gymworkout.ui.components.InlineRestTimer
 import com.example.gymworkout.ui.components.RestTimerDialog
+import com.example.gymworkout.ui.components.VolumeAnalyticsCard
 import com.example.gymworkout.viewmodel.WorkoutViewModel
 
 // Group exercises: consecutive exercises with same non-empty supersetGroupId form a superset
@@ -94,6 +99,12 @@ sealed class ExerciseItem {
         is Single -> "s_${exercise.id}"
         is Superset -> "ss_${exercises.first().id}"
     }
+}
+
+/** Parse the high end of a reps range like "10-12" -> 12, or "AMRAP" -> 10 (fallback). */
+fun parseHighReps(repsRange: String): Int {
+    val matches = Regex("""\d+""").findAll(repsRange).toList()
+    return matches.lastOrNull()?.value?.toIntOrNull()?.coerceAtLeast(1) ?: 10
 }
 
 fun groupExercises(exercises: List<Exercise>): List<ExerciseItem> {
@@ -141,6 +152,41 @@ fun DayDetailScreen(
     var editingExercise by remember { mutableStateOf<Exercise?>(null) }
     var notesExercise by remember { mutableStateOf<Exercise?>(null) }
     val restTimerState by viewModel.restTimerState.collectAsState()
+
+    // Volume analytics state
+    val todayLogs by viewModel.getLogsForToday().collectAsState(initial = emptyList())
+    val weekLogs by viewModel.getLogsForCurrentWeek().collectAsState(initial = emptyList())
+    val weightUnit by viewModel.weightUnit.collectAsState(initial = "kg")
+    var volumeCardExpanded by rememberSaveable { mutableStateOf(false) }
+    var pendingLogExercises by remember { mutableStateOf<List<Exercise>?>(null) }
+    var pendingLogEntries by remember { mutableStateOf<List<LogSetEntry>?>(null) }
+
+    val requestLogSet: (List<Exercise>) -> Unit = { exList ->
+        // Block if all sets already completed for the (first) exercise
+        val ref = exList.first()
+        if (ref.completedSets < ref.sets) {
+            pendingLogExercises = exList
+        }
+    }
+
+    // Build LogSetEntry list asynchronously (reads last log per exercise)
+    LaunchedEffect(pendingLogExercises) {
+        val exList = pendingLogExercises ?: return@LaunchedEffect
+        val entries = exList.map { ex ->
+            val last = viewModel.getLastLogForExercise(ex.id)
+            val prefillReps = last?.reps?.takeIf { it > 0 } ?: parseHighReps(ex.reps)
+            val prefillWeightKg = last?.weightKg ?: 0.0
+            LogSetEntry(
+                exerciseId = ex.id,
+                exerciseName = ex.name,
+                setIndex = (ex.completedSets + 1).coerceAtMost(ex.sets),
+                totalSets = ex.sets,
+                prefillReps = prefillReps,
+                prefillWeightKg = prefillWeightKg
+            )
+        }
+        pendingLogEntries = entries
+    }
 
     // Drag-and-drop state
     val listState = rememberLazyListState()
@@ -300,6 +346,21 @@ fun DayDetailScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                item(key = "volume_card") {
+                    VolumeAnalyticsCard(
+                        todayLogs = todayLogs,
+                        weekLogs = weekLogs,
+                        displayUnit = weightUnit,
+                        muscleLookup = { name ->
+                            val info = ExerciseRepository.findByName(name)
+                            val primary = info?.primaryMuscles?.map { it.target } ?: emptyList()
+                            val secondary = info?.secondaryMuscles?.map { it.target } ?: emptyList()
+                            primary to secondary
+                        },
+                        expanded = volumeCardExpanded,
+                        onToggleExpanded = { volumeCardExpanded = !volumeCardExpanded }
+                    )
+                }
                 itemsIndexed(reorderableItems, key = { _, item -> item.stableKey }) { index, item ->
                     val isDragged = index == draggedIndex
                     val isOverlapTarget = index == overlapTargetIndex && draggedIndex >= 0
@@ -429,7 +490,7 @@ fun DayDetailScreen(
                                 ExerciseCard(
                                     index = item.displayIndex,
                                     exercise = item.exercise,
-                                    onIncrementSet = { viewModel.incrementSet(item.exercise) },
+                                    onIncrementSet = { requestLogSet(listOf(item.exercise)) },
                                     onDecrementSet = { viewModel.decrementSet(item.exercise) },
                                     onPlayVideo = { onPlayVideo(item.exercise.name, item.exercise.youtubeUrl) },
                                     onExerciseClick = { onViewExerciseDetail(item.exercise.name) },
@@ -443,7 +504,7 @@ fun DayDetailScreen(
                                 SupersetCard(
                                     displayIndex = item.displayIndex,
                                     exercises = item.exercises,
-                                    onIncrementSet = { ex -> viewModel.incrementSet(ex) },
+                                    onIncrementSet = { _ -> requestLogSet(item.exercises) },
                                     onDecrementSet = { ex -> viewModel.decrementSet(ex) },
                                     onPlayVideo = { ex -> onPlayVideo(ex.name, ex.youtubeUrl) },
                                     onExerciseClick = { ex -> onViewExerciseDetail(ex.name) },
@@ -537,6 +598,35 @@ fun DayDetailScreen(
             onSave = { notes ->
                 viewModel.updateNotes(notesExercise!!.id, notes)
                 notesExercise = null
+            }
+        )
+    }
+
+    pendingLogEntries?.let { entries ->
+        val exList = pendingLogExercises ?: emptyList()
+        LogSetDialog(
+            entries = entries,
+            displayUnit = weightUnit,
+            onDismiss = {
+                pendingLogExercises = null
+                pendingLogEntries = null
+            },
+            onSave = { result ->
+                val ref = exList.first()
+                if (ref.supersetGroupId.isNotBlank() && exList.size > 1) {
+                    val groupEntries = exList.mapIndexed { i, ex ->
+                        Triple(ex, result.reps.getOrElse(i) { 0 }, result.weightKg.getOrElse(i) { 0.0 })
+                    }
+                    viewModel.logAndIncrementSet(ref, result.reps.first(), result.weightKg.first(), groupEntries)
+                } else {
+                    viewModel.logAndIncrementSet(ref, result.reps.first(), result.weightKg.first())
+                    // Auto-start rest timer if configured
+                    if (ref.restTimeSeconds > 0) {
+                        viewModel.startRestTimer(ref.name, ref.restTimeSeconds, dayIndex, inline = true)
+                    }
+                }
+                pendingLogExercises = null
+                pendingLogEntries = null
             }
         )
     }

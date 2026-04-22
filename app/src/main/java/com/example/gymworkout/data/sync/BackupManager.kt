@@ -18,6 +18,7 @@ class BackupManager(
     private val checkInDao = database.dailyCheckInDao()
     private val userDao = database.userDao()
     private val reminderDao = database.reminderDao()
+    private val setLogDao = database.workoutSetLogDao()
 
     suspend fun createBackup(): BackupData = withContext(Dispatchers.IO) {
         // Encode progress photos as Base64
@@ -56,7 +57,8 @@ class BackupManager(
             quoteTime = QuotePreference.getTime(context),
             progressPhotos = photos,
             customFoods = nutritionDao.getAllCustomFoodsSync(),
-            weightEntries = userDao.getAllWeightEntriesSync()
+            weightEntries = userDao.getAllWeightEntriesSync(),
+            workoutSetLogs = setLogDao.getAllSync()
         )
     }
 
@@ -74,6 +76,7 @@ class BackupManager(
         userDao.deleteAllWorkoutReminders()
         userDao.deleteAllCustomQuotes()
         userDao.deleteAllWeightEntries()
+        setLogDao.deleteAll()
         reminderDao.deleteAll()
 
         // Restore progress photos to internal storage
@@ -121,6 +124,7 @@ class BackupManager(
         if (data.customQuotes.isNotEmpty()) userDao.insertAllCustomQuotes(data.customQuotes)
         if (data.customFoods.isNotEmpty()) nutritionDao.insertAllCustomFoods(data.customFoods)
         if (data.weightEntries.isNotEmpty()) userDao.insertAllWeightEntries(data.weightEntries)
+        if (data.workoutSetLogs.isNotEmpty()) setLogDao.insertAll(data.workoutSetLogs)
 
         // Restore theme preference
         ThemePreference.setDarkMode(context, data.themePreference)
