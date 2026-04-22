@@ -629,6 +629,37 @@ class SocialRepository {
         try { templatesCol.document(templateId).update("downloads", FieldValue.increment(1)).await() } catch (_: Exception) { }
     }
 
+    suspend fun updateTemplate(templateId: String, title: String, description: String, fitnessLevel: String) {
+        try {
+            templatesCol.document(templateId).update(
+                mapOf(
+                    "title" to title,
+                    "description" to description,
+                    "fitnessLevel" to fitnessLevel
+                )
+            ).await()
+            android.util.Log.d("SocialRepo", "updateTemplate SUCCESS: id=$templateId")
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepo", "updateTemplate FAILED: ${e.message}", e)
+            throw e
+        }
+    }
+
+    suspend fun deleteTemplate(templateId: String) {
+        try {
+            // Delete associated reviews first
+            val reviewSnap = reviewsCol.whereEqualTo("templateId", templateId).get().await()
+            for (doc in reviewSnap.documents) {
+                try { doc.reference.delete().await() } catch (_: Exception) { }
+            }
+            templatesCol.document(templateId).delete().await()
+            android.util.Log.d("SocialRepo", "deleteTemplate SUCCESS: id=$templateId")
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepo", "deleteTemplate FAILED: ${e.message}", e)
+            throw e
+        }
+    }
+
     suspend fun addTemplateReview(review: TemplateReview) {
         try {
             reviewsCol.add(review.toMap()).await()

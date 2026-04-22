@@ -39,6 +39,8 @@ fun TemplateDetailScreen(
     val context = LocalContext.current
     var showCopyConfirm by remember { mutableStateOf(false) }
     var showReviewDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(templateId) {
         socialViewModel.selectTemplate(templateId)
@@ -113,23 +115,24 @@ fun TemplateDetailScreen(
                             Text("Review")
                         }
                     } else {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer
+                        Button(
+                            onClick = { showEditDialog = true },
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "This is your published template",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
+                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Edit")
+                        }
+                        OutlinedButton(
+                            onClick = { showDeleteConfirm = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Delete")
                         }
                     }
                 }
@@ -220,6 +223,50 @@ fun TemplateDetailScreen(
             onSubmit = { rating, comment ->
                 socialViewModel.addTemplateReview(templateId, rating, comment)
                 showReviewDialog = false
+            }
+        )
+    }
+
+    if (showEditDialog) {
+        val t = template
+        if (t != null) {
+            EditTemplateDialog(
+                initialTitle = t.title,
+                initialDescription = t.description,
+                initialLevel = t.fitnessLevel.ifEmpty { "beginner" },
+                onDismiss = { showEditDialog = false },
+                onSave = { newTitle, newDescription, newLevel ->
+                    socialViewModel.updateWorkoutTemplate(
+                        templateId = templateId,
+                        title = newTitle,
+                        description = newDescription,
+                        fitnessLevel = newLevel
+                    )
+                    showEditDialog = false
+                }
+            )
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Template?") },
+            text = {
+                Text("This will permanently remove \"${template?.title.orEmpty()}\" and its reviews. This cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    socialViewModel.deleteWorkoutTemplate(templateId) { success ->
+                        if (success) onBack()
+                    }
+                    showDeleteConfirm = false
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
             }
         )
     }
@@ -547,6 +594,67 @@ private fun launchShare(context: Context, subject: String, text: String) {
         putExtra(Intent.EXTRA_TEXT, text)
     }
     context.startActivity(Intent.createChooser(intent, "Share workout"))
+}
+
+@Composable
+private fun EditTemplateDialog(
+    initialTitle: String,
+    initialDescription: String,
+    initialLevel: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String) -> Unit
+) {
+    var title by remember { mutableStateOf(initialTitle) }
+    var description by remember { mutableStateOf(initialDescription) }
+    var level by remember { mutableStateOf(initialLevel) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Template") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+                Text("Fitness Level", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = level == "beginner",
+                        onClick = { level = "beginner" },
+                        label = { Text("Beginner") }
+                    )
+                    FilterChip(
+                        selected = level == "intermediate",
+                        onClick = { level = "intermediate" },
+                        label = { Text("Intermediate") }
+                    )
+                    FilterChip(
+                        selected = level == "advanced",
+                        onClick = { level = "advanced" },
+                        label = { Text("Advanced") }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(title.trim(), description.trim(), level) },
+                enabled = title.isNotBlank()
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable

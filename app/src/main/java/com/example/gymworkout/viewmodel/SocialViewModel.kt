@@ -1171,6 +1171,63 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun updateWorkoutTemplate(
+        templateId: String,
+        title: String,
+        description: String,
+        fitnessLevel: String,
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        val myUid = effectiveUserId ?: run { onResult(false); return }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.updateTemplate(templateId, title, description, fitnessLevel)
+                }
+                // Update local state immediately so UI reflects changes
+                _selectedTemplate.value = _selectedTemplate.value?.copy(
+                    title = title, description = description, fitnessLevel = fitnessLevel
+                )
+                _myTemplates.value = _myTemplates.value.map {
+                    if (it.id == templateId) it.copy(
+                        title = title, description = description, fitnessLevel = fitnessLevel
+                    ) else it
+                }
+                _templates.value = _templates.value.map {
+                    if (it.id == templateId) it.copy(
+                        title = title, description = description, fitnessLevel = fitnessLevel
+                    ) else it
+                }
+                loadMyTemplates()
+                loadTemplates()
+                onResult(true)
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "updateWorkoutTemplate FAILED", e)
+                _error.value = "Failed to update template: ${e.message}"
+                onResult(false)
+            }
+        }
+    }
+
+    fun deleteWorkoutTemplate(templateId: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.deleteTemplate(templateId) }
+                _selectedTemplate.value = null
+                _templateReviews.value = emptyList()
+                _myTemplates.value = _myTemplates.value.filterNot { it.id == templateId }
+                _templates.value = _templates.value.filterNot { it.id == templateId }
+                loadMyTemplates()
+                loadTemplates()
+                onResult(true)
+            } catch (e: Exception) {
+                android.util.Log.e("SocialVM", "deleteWorkoutTemplate FAILED", e)
+                _error.value = "Failed to delete template: ${e.message}"
+                onResult(false)
+            }
+        }
+    }
+
     fun addTemplateReview(templateId: String, rating: Int, comment: String) {
         val myUid = effectiveUserId ?: return
         val myName = _currentSocialUser.value?.displayName ?: ""

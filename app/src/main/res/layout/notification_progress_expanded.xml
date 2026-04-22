@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp">
+
+    <!-- Header: motivational headline + big bold percentage -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:baselineAligned="false">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/notif_headline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?android:attr/textColorPrimary"
+                android:text="Today's progress" />
+
+            <TextView
+                android:id="@+id/notif_subline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:text="" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/notif_percent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false"
+            android:textColor="#56D6C2"
+            android:text="0%" />
+    </LinearLayout>
+
+    <!-- Overall progress bar -->
+    <ProgressBar
+        android:id="@+id/notif_overall_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="10dp"
+        android:layout_marginTop="8dp"
+        android:progressDrawable="@drawable/progress_overall"
+        android:max="100"
+        android:progress="0" />
+
+    <!-- Focus chip (optional, hidden when empty) -->
+    <TextView
+        android:id="@+id/notif_focus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:background="@drawable/bg_focus_chip"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="?android:attr/textColorPrimary"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:visibility="gone"
+        android:text="" />
+
+    <!-- Metric rows -->
+
+    <!-- Workout -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="92dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:text="💪  Workout" />
+
+        <ProgressBar
+            android:id="@+id/notif_bar_workout"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="6dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:progressDrawable="@drawable/progress_workout"
+            android:max="100"
+            android:progress="0" />
+
+        <TextView
+            android:id="@+id/notif_val_workout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="64dp"
+            android:gravity="end"
+            android:textSize="12sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:text="0/0" />
+    </LinearLayout>
+
+    <!-- Protein -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="92dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:text="🥩  Protein" />
+
+        <ProgressBar
+            android:id="@+id/notif_bar_protein"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="6dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:progressDrawable="@drawable/progress_protein"
+            android:max="100"
+            android:progress="0" />
+
+        <TextView
+            android:id="@+id/notif_val_protein"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="64dp"
+            android:gravity="end"
+            android:textSize="12sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:text="0g" />
+    </LinearLayout>
+
+    <!-- Calories -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="92dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:text="🔥  Calories" />
+
+        <ProgressBar
+            android:id="@+id/notif_bar_calories"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="6dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:progressDrawable="@drawable/progress_calories"
+            android:max="100"
+            android:progress="0" />
+
+        <TextView
+            android:id="@+id/notif_val_calories"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="64dp"
+            android:gravity="end"
+            android:textSize="12sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:text="0 kcal" />
+    </LinearLayout>
+
+    <!-- Sleep -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="92dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:text="😴  Sleep" />
+
+        <ProgressBar
+            android:id="@+id/notif_bar_sleep"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="6dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:progressDrawable="@drawable/progress_sleep"
+            android:max="100"
+            android:progress="0" />
+
+        <TextView
+            android:id="@+id/notif_val_sleep"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="64dp"
+            android:gravity="end"
+            android:textSize="12sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:text="0h" />
+    </LinearLayout>
+
+    <!-- Water -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="92dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:text="💧  Water" />
+
+        <ProgressBar
+            android:id="@+id/notif_bar_water"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="6dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:progressDrawable="@drawable/progress_water"
+            android:max="100"
+            android:progress="0" />
+
+        <TextView
+            android:id="@+id/notif_val_water"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="64dp"
+            android:gravity="end"
+            android:textSize="12sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:text="0L" />
+    </LinearLayout>
+
+</LinearLayout>
