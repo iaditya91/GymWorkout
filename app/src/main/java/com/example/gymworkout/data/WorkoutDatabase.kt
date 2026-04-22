@@ -185,6 +185,18 @@ val MIGRATION_21_22 = object : Migration(21, 22) {
     }
 }
 
+val MIGRATION_22_23 = object : Migration(22, 23) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS weight_entries (
+                date TEXT NOT NULL PRIMARY KEY DEFAULT '',
+                weight REAL NOT NULL DEFAULT 0,
+                unit TEXT NOT NULL DEFAULT 'kg'
+            )
+        """.trimIndent())
+    }
+}
+
 @Database(
     entities = [
         Exercise::class,
@@ -199,9 +211,10 @@ val MIGRATION_21_22 = object : Migration(21, 22) {
         FoodLogEntry::class,
         MotivationalQuote::class,
         CustomFoodItem::class,
-        AtomicHabit::class
+        AtomicHabit::class,
+        WeightEntry::class
     ],
-    version = 22,
+    version = 23,
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -223,7 +236,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     WorkoutDatabase::class.java,
                     "workout_database"
                 )
-                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22)
+                    .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

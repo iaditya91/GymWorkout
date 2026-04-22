@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.gymworkout.data.DailyCheckIn
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.UserProfile
+import com.example.gymworkout.data.WeightEntry
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -207,6 +208,35 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
     // Journey methods
 
     fun getProfile(): Flow<UserProfile?> = userDao.getProfile()
+
+    // ===== WEIGHT TRACKING =====
+
+    fun getWeightEntries(): Flow<List<WeightEntry>> = userDao.getAllWeightEntries()
+
+    fun logWeight(date: String, weight: Float, unit: String) {
+        viewModelScope.launch {
+            userDao.upsertWeightEntry(WeightEntry(date = date, weight = weight, unit = unit))
+            // Also sync profile's current weight with the most recent entry
+            val latest = userDao.getAllWeightEntriesSync().maxByOrNull { it.date }
+            if (latest != null) {
+                val existing = userDao.getAllProfilesSync().firstOrNull() ?: UserProfile()
+                userDao.upsertProfile(
+                    existing.copy(weight = latest.weight, weightUnit = latest.unit)
+                )
+            }
+        }
+    }
+
+    fun deleteWeightEntry(date: String) {
+        viewModelScope.launch {
+            userDao.deleteWeightEntryByDate(date)
+            val latest = userDao.getAllWeightEntriesSync().maxByOrNull { it.date }
+            val existing = userDao.getAllProfilesSync().firstOrNull() ?: UserProfile()
+            userDao.upsertProfile(
+                existing.copy(weight = latest?.weight ?: 0f, weightUnit = latest?.unit ?: existing.weightUnit)
+            )
+        }
+    }
 
     fun saveJourneySetup(requiredShape: String, idealDays: Int) {
         viewModelScope.launch {

@@ -30,11 +30,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.BedtimeOff
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Egg
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingFlat
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -73,7 +79,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -81,6 +89,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gymworkout.data.DailyCheckIn
+import com.example.gymworkout.data.WeightEntry
 import com.example.gymworkout.viewmodel.DailyScoreBreakdown
 import com.example.gymworkout.viewmodel.JourneyData
 import com.example.gymworkout.viewmodel.StatsViewModel
@@ -229,7 +238,9 @@ fun OverviewTab(viewModel: StatsViewModel) {
 @Composable
 fun JourneyTab(viewModel: StatsViewModel) {
     val journeyData by viewModel.journeyData.collectAsState()
+    val weightEntries by viewModel.getWeightEntries().collectAsState(initial = emptyList())
     var showSetupDialog by remember { mutableStateOf(false) }
+    var showWeightDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadJourneyData()
@@ -242,6 +253,18 @@ fun JourneyTab(viewModel: StatsViewModel) {
             onSave = { requiredShape, idealDays ->
                 viewModel.saveJourneySetup(requiredShape, idealDays)
                 showSetupDialog = false
+            }
+        )
+    }
+
+    if (showWeightDialog) {
+        LogWeightDialog(
+            defaultUnit = journeyData.profile?.weightUnit?.ifEmpty { "kg" } ?: "kg",
+            existingForToday = weightEntries.lastOrNull { it.date == viewModel.todayString() },
+            onDismiss = { showWeightDialog = false },
+            onSave = { date, weight, unit ->
+                viewModel.logWeight(date, weight, unit)
+                showWeightDialog = false
             }
         )
     }
@@ -264,6 +287,17 @@ fun JourneyTab(viewModel: StatsViewModel) {
                 JourneyProgressCard(
                     journeyData = journeyData,
                     onEdit = { showSetupDialog = true }
+                )
+            }
+
+            // Weight Journey Card with line graph
+            item {
+                WeightJourneyCard(
+                    entries = weightEntries,
+                    targetWeight = journeyData.profile?.targetWeight ?: 0f,
+                    unit = journeyData.profile?.weightUnit?.ifEmpty { "kg" } ?: "kg",
+                    onLogWeight = { showWeightDialog = true },
+                    onDeleteEntry = { viewModel.deleteWeightEntry(it) }
                 )
             }
 
@@ -866,6 +900,490 @@ fun JourneySetupDialog(
             }
         }
     )
+}
+
+// ============ Weight Journey Components ============
+
+val WeightColor = Color(0xFF9C27B0)
+
+@Composable
+fun WeightJourneyCard(
+    entries: List<WeightEntry>,
+    targetWeight: Float,
+    unit: String,
+    onLogWeight: () -> Unit,
+    onDeleteEntry: (String) -> Unit
+) {
+    val sorted = remember(entries) { entries.sortedBy { it.date } }
+    val current = sorted.lastOrNull()
+    val starting = sorted.firstOrNull()
+    val change = if (current != null && starting != null && current != starting) {
+        current.weight - starting.weight
+    } else 0f
+
+    val trendIcon = when {
+        change > 0.1f -> Icons.Default.TrendingUp
+        change < -0.1f -> Icons.Default.TrendingDown
+        else -> Icons.Default.TrendingFlat
+    }
+    // Interpretation depends on goal direction: if target < starting, losing weight is "good"
+    val isLossGoal = targetWeight > 0f && starting != null && targetWeight < starting.weight
+    val isGainGoal = targetWeight > 0f && starting != null && targetWeight > starting.weight
+    val trendColor = when {
+        change == 0f || current == starting -> MaterialTheme.colorScheme.onSurfaceVariant
+        isLossGoal && change < 0f -> Color(0xFF2E7D32)
+        isLossGoal && change > 0f -> Color(0xFFE53935)
+        isGainGoal && change > 0f -> Color(0xFF2E7D32)
+        isGainGoal && change < 0f -> Color(0xFFE53935)
+        else -> WeightColor
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.MonitorWeight,
+                        contentDescription = null,
+                        tint = WeightColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Weight Journey",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                IconButton(
+                    onClick = onLogWeight,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(WeightColor.copy(alpha = 0.15f))
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Log weight",
+                        tint = WeightColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Stats row: Current | Change | Target
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Current",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        if (current != null) "${formatWeight(current.weight)} ${current.unit}" else "—",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = WeightColor
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Change",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            trendIcon,
+                            contentDescription = null,
+                            tint = trendColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            if (sorted.size >= 2) "${if (change >= 0) "+" else ""}${formatWeight(change)}" else "—",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = trendColor
+                        )
+                    }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Target",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        if (targetWeight > 0f) "${formatWeight(targetWeight)} $unit" else "—",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (sorted.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(WeightColor.copy(alpha = 0.06f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.MonitorWeight,
+                            contentDescription = null,
+                            tint = WeightColor.copy(alpha = 0.6f),
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Log your first weight to see your journey graph",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                WeightLineGraph(
+                    entries = sorted,
+                    targetWeight = targetWeight,
+                    unit = unit
+                )
+
+                if (sorted.size >= 2) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val dateFmt = DateTimeFormatter.ofPattern("MMM d")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            LocalDate.parse(sorted.first().date).format(dateFmt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "${sorted.size} entries",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            LocalDate.parse(sorted.last().date).format(dateFmt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Recent entries list with delete
+                Spacer(modifier = Modifier.height(12.dp))
+                val recent = sorted.takeLast(5).reversed()
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    recent.forEach { entry ->
+                        val prevEntry = sorted.getOrNull(sorted.indexOf(entry) - 1)
+                        val delta = if (prevEntry != null) entry.weight - prevEntry.weight else 0f
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                LocalDate.parse(entry.date).format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "${formatWeight(entry.weight)} ${entry.unit}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (prevEntry != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "${if (delta >= 0) "+" else ""}${formatWeight(delta)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (delta >= 0f) Color(0xFFE57373) else Color(0xFF66BB6A)
+                                )
+                            }
+                            IconButton(
+                                onClick = { onDeleteEntry(entry.date) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete entry",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WeightLineGraph(
+    entries: List<WeightEntry>,
+    targetWeight: Float,
+    unit: String
+) {
+    if (entries.isEmpty()) return
+
+    val weights = entries.map { it.weight }
+    val minRaw = weights.min()
+    val maxRaw = weights.max()
+    // Include target weight in range if set
+    val minAll = if (targetWeight > 0f) minOf(minRaw, targetWeight) else minRaw
+    val maxAll = if (targetWeight > 0f) maxOf(maxRaw, targetWeight) else maxRaw
+    // Pad range so points aren't flush with edges
+    val pad = ((maxAll - minAll) * 0.15f).coerceAtLeast(0.5f)
+    val minY = minAll - pad
+    val maxY = maxAll + pad
+    val rangeY = (maxY - minY).coerceAtLeast(0.1f)
+
+    val lineColor = WeightColor
+    val targetColor = JourneyColor
+    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Column {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp)
+        ) {
+            val leftPad = 40f
+            val rightPad = 12f
+            val topPad = 12f
+            val bottomPad = 12f
+            val chartW = size.width - leftPad - rightPad
+            val chartH = size.height - topPad - bottomPad
+
+            // Horizontal grid lines (4 divisions)
+            val divisions = 4
+            for (i in 0..divisions) {
+                val y = topPad + chartH * i / divisions
+                drawLine(
+                    color = gridColor,
+                    start = Offset(leftPad, y),
+                    end = Offset(size.width - rightPad, y),
+                    strokeWidth = 1f
+                )
+            }
+
+            // Target line
+            if (targetWeight > 0f) {
+                val targetNorm = (targetWeight - minY) / rangeY
+                val targetYPx = topPad + chartH * (1f - targetNorm)
+                val dashLen = 10f
+                var x = leftPad
+                while (x < size.width - rightPad) {
+                    drawLine(
+                        color = targetColor,
+                        start = Offset(x, targetYPx),
+                        end = Offset(minOf(x + dashLen, size.width - rightPad), targetYPx),
+                        strokeWidth = 2f
+                    )
+                    x += dashLen * 2
+                }
+            }
+
+            // Compute point positions
+            val n = entries.size
+            val points = entries.mapIndexed { idx, entry ->
+                val xFrac = if (n == 1) 0.5f else idx.toFloat() / (n - 1)
+                val yFrac = (entry.weight - minY) / rangeY
+                Offset(
+                    x = leftPad + chartW * xFrac,
+                    y = topPad + chartH * (1f - yFrac)
+                )
+            }
+
+            // Line path
+            if (points.size >= 2) {
+                val path = Path().apply {
+                    moveTo(points.first().x, points.first().y)
+                    for (p in points.drop(1)) lineTo(p.x, p.y)
+                }
+                drawPath(
+                    path = path,
+                    color = lineColor,
+                    style = Stroke(width = 3.5f, cap = StrokeCap.Round)
+                )
+            }
+
+            // Data points
+            for (p in points) {
+                drawCircle(
+                    color = lineColor,
+                    radius = 5f,
+                    center = p
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 2.5f,
+                    center = p
+                )
+            }
+        }
+
+        // Y-axis labels (min / max weight)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "${formatWeight(minAll)} $unit",
+                style = MaterialTheme.typography.labelSmall,
+                color = labelColor
+            )
+            if (targetWeight > 0f) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(targetColor)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "Target ${formatWeight(targetWeight)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = labelColor
+                    )
+                }
+            }
+            Text(
+                "${formatWeight(maxAll)} $unit",
+                style = MaterialTheme.typography.labelSmall,
+                color = labelColor
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LogWeightDialog(
+    defaultUnit: String,
+    existingForToday: WeightEntry?,
+    onDismiss: () -> Unit,
+    onSave: (date: String, weight: Float, unit: String) -> Unit
+) {
+    val todayStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+    var weightText by remember {
+        mutableStateOf(existingForToday?.weight?.let { formatWeight(it) } ?: "")
+    }
+    var unit by remember { mutableStateOf(existingForToday?.unit?.ifEmpty { defaultUnit } ?: defaultUnit) }
+    var unitExpanded by remember { mutableStateOf(false) }
+    val units = listOf("kg", "lb")
+
+    val parsed = weightText.toFloatOrNull()
+    val valid = parsed != null && parsed > 0f
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (existingForToday != null) "Update Today's Weight" else "Log Weight") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Date: ${LocalDate.now().format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = weightText,
+                    onValueChange = { new ->
+                        // Allow digits and a single dot
+                        if (new.matches(Regex("^\\d*\\.?\\d*$"))) weightText = new
+                    },
+                    label = { Text("Weight") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                ExposedDropdownMenuBox(
+                    expanded = unitExpanded,
+                    onExpandedChange = { unitExpanded = !unitExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = unit,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Unit") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = unitExpanded,
+                        onDismissRequest = { unitExpanded = false }
+                    ) {
+                        units.forEach { u ->
+                            DropdownMenuItem(
+                                text = { Text(u) },
+                                onClick = {
+                                    unit = u
+                                    unitExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (valid) onSave(todayStr, parsed!!, unit)
+                },
+                enabled = valid
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+private fun formatWeight(value: Float): String {
+    // 1 decimal, strip trailing .0
+    val rounded = (kotlin.math.round(value * 10f) / 10f)
+    return if (rounded == rounded.toInt().toFloat()) rounded.toInt().toString()
+    else "%.1f".format(rounded)
 }
 
 // ============ Original Overview Components ============

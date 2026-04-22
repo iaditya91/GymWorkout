@@ -98,4 +98,26 @@ interface UserDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllCustomQuotes(quotes: List<MotivationalQuote>)
+
+    // Weight entries
+    @Query("SELECT * FROM weight_entries ORDER BY date ASC")
+    fun getAllWeightEntries(): Flow<List<WeightEntry>>
+
+    @Query("SELECT * FROM weight_entries ORDER BY date DESC LIMIT 1")
+    fun getLatestWeightEntry(): Flow<WeightEntry?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertWeightEntry(entry: WeightEntry)
+
+    @Query("DELETE FROM weight_entries WHERE date = :date")
+    suspend fun deleteWeightEntryByDate(date: String)
+
+    @Query("SELECT * FROM weight_entries ORDER BY date ASC")
+    suspend fun getAllWeightEntriesSync(): List<WeightEntry>
+
+    @Query("DELETE FROM weight_entries")
+    suspend fun deleteAllWeightEntries()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllWeightEntries(entries: List<WeightEntry>)
 }

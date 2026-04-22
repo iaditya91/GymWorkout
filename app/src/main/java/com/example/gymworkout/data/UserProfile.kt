@@ -29,3 +29,11 @@ data class ChecklistItem(
     val text: String = "",
     val isChecked: Boolean = false
 )
+
+@Entity(tableName = "weight_entries")
+data class WeightEntry(
+    @PrimaryKey
+    val date: String = "", // yyyy-MM-dd
+    val weight: Float = 0f,
+    val unit: String = "kg" // "kg" or "lb"
+)
