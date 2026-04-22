@@ -372,6 +372,7 @@ fun WorkoutApp() {
                 UserScreen(
                     viewModel = userViewModel,
                     socialViewModel = socialViewModel,
+                    nutritionViewModel = nutritionViewModel,
                     onNavigateToLogin = { navController.navigate("login") }
                 )
             }

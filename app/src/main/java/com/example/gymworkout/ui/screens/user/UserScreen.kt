@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,6 +63,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -107,12 +107,15 @@ import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.data.AiPlannerPreference
 import com.example.gymworkout.data.DailyFocusPreference
+import com.example.gymworkout.data.NutritionCategory
+import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.notification.AiPlannerNotificationScheduler
 import com.example.gymworkout.notification.ProgressNotificationService
 import android.media.RingtoneManager
 import androidx.compose.material.icons.filled.MusicNote
 import com.example.gymworkout.data.TimerSoundPreference
+import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.viewmodel.SocialViewModel
 import com.example.gymworkout.viewmodel.SyncState
 import com.example.gymworkout.viewmodel.UserViewModel
@@ -123,9 +126,23 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// Custom objective labels treated as nutrition (not habits) — mirrors NutritionScreen/StatsViewModel.
+private val focusNutritionRelatedNames = setOf(
+    "fat", "fiber",
+    "vitamin a", "vitamin b1", "vitamin b2", "vitamin b3",
+    "vitamin b6", "vitamin b12", "vitamin c", "vitamin d",
+    "vitamin e", "vitamin k",
+    "folate", "iron", "calcium"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNavigateToLogin: () -> Unit = {}) {
+fun UserScreen(
+    viewModel: UserViewModel,
+    socialViewModel: SocialViewModel,
+    nutritionViewModel: NutritionViewModel,
+    onNavigateToLogin: () -> Unit = {}
+) {
     val context = LocalContext.current
     val profile by viewModel.getProfile().collectAsState(initial = null)
     val dos by viewModel.getDos().collectAsState(initial = emptyList())
@@ -163,6 +180,17 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNav
     // Daily focus (goal/habit shown on the progress notification)
     val dailyFocus by DailyFocusPreference.focus.collectAsState()
     var showDailyFocusDialog by remember { mutableStateOf(false) }
+
+    // Habits for the focus dialog — sourced from Objectives tab (NutritionTargets).
+    // Matches NutritionScreen's filter: WATER/SLEEP built-ins plus custom non-nutrition objectives.
+    val allNutritionTargets by nutritionViewModel.getAllTargets().collectAsState(initial = emptyList())
+    val focusHabitOptions: List<NutritionTarget> = remember(allNutritionTargets) {
+        allNutritionTargets.filter { target ->
+            target.category == NutritionCategory.WATER.name ||
+                target.category == NutritionCategory.SLEEP.name ||
+                (target.isCustom && target.label.lowercase() !in focusNutritionRelatedNames)
+        }
+    }
 
     // Auto-dismiss success/error after 3 seconds
     LaunchedEffect(syncState) {
@@ -342,12 +370,12 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNav
             }
 
             item {
-                val habitForId = (dos + donts).firstOrNull { it.id == dailyFocus.habitId }
+                val selectedHabit = focusHabitOptions.firstOrNull { it.category == dailyFocus.habitCategory }
                 val summary = when (dailyFocus.mode) {
                     DailyFocusPreference.MODE_GOAL ->
                         if (dailyFocus.goalText.isNotBlank()) "Goal: ${dailyFocus.goalText}" else "Tap to set a goal"
                     DailyFocusPreference.MODE_HABIT ->
-                        if (habitForId != null) "Habit: ${habitForId.text}" else "Tap to pick a habit"
+                        if (selectedHabit != null) "Habit: ${selectedHabit.label}" else "Tap to pick a habit"
                     else -> "Tap to set a goal or habit for today"
                 }
                 DailyFocusCard(
@@ -360,15 +388,15 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNav
                 if (showDailyFocusDialog) {
                     DailyFocusDialog(
                         current = dailyFocus,
-                        habits = dos + donts,
+                        habits = focusHabitOptions,
                         onDismiss = { showDailyFocusDialog = false },
                         onSaveGoal = { text ->
                             DailyFocusPreference.setGoal(context, text)
                             ProgressNotificationService.refresh(context)
                             showDailyFocusDialog = false
                         },
-                        onSaveHabit = { habitId ->
-                            DailyFocusPreference.setHabit(context, habitId)
+                        onSaveHabit = { category ->
+                            DailyFocusPreference.setHabit(context, category)
                             ProgressNotificationService.refresh(context)
                             showDailyFocusDialog = false
                         },
@@ -1988,18 +2016,22 @@ fun DailyFocusCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DailyFocusDialog(
     current: DailyFocusPreference.Focus,
-    habits: List<ChecklistItem>,
+    habits: List<NutritionTarget>,
     onDismiss: () -> Unit,
     onSaveGoal: (String) -> Unit,
-    onSaveHabit: (Int) -> Unit,
+    onSaveHabit: (String) -> Unit,
     onClear: () -> Unit
 ) {
     var selectedMode by remember { mutableStateOf(current.mode) }
     var goalText by remember { mutableStateOf(current.goalText) }
-    var selectedHabitId by remember { mutableStateOf(current.habitId) }
+    var selectedHabitCategory by remember { mutableStateOf(current.habitCategory) }
+    var habitDropdownExpanded by remember { mutableStateOf(false) }
+
+    val selectedHabit = habits.firstOrNull { it.category == selectedHabitCategory }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2034,7 +2066,7 @@ fun DailyFocusDialog(
                     onSelect = { selectedMode = DailyFocusPreference.MODE_GOAL }
                 )
                 FocusModeRow(
-                    label = "Habit (pick one)",
+                    label = "Habit (from Objectives)",
                     selected = selectedMode == DailyFocusPreference.MODE_HABIT,
                     onSelect = { selectedMode = DailyFocusPreference.MODE_HABIT }
                 )
@@ -2052,41 +2084,41 @@ fun DailyFocusDialog(
                     DailyFocusPreference.MODE_HABIT -> {
                         if (habits.isEmpty()) {
                             Text(
-                                "You haven't added any habits yet. Add Do's or Don'ts from your profile first.",
+                                "You haven't added any habits yet. Add one from the Objectives tab first.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 240.dp)
-                                    .verticalScroll(rememberScrollState())
+                            ExposedDropdownMenuBox(
+                                expanded = habitDropdownExpanded,
+                                onExpandedChange = { habitDropdownExpanded = !habitDropdownExpanded }
                             ) {
-                                habits.forEach { habit ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { selectedHabitId = habit.id }
-                                            .padding(vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = selectedHabitId == habit.id,
-                                            onClick = { selectedHabitId = habit.id }
+                                OutlinedTextField(
+                                    value = selectedHabit?.label ?: "",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Pick a habit") },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(
+                                            expanded = habitDropdownExpanded
                                         )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                habit.text,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                            Text(
-                                                if (habit.type == "DO") "Do" else "Don't",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = habitDropdownExpanded,
+                                    onDismissRequest = { habitDropdownExpanded = false }
+                                ) {
+                                    habits.forEach { habit ->
+                                        DropdownMenuItem(
+                                            text = { Text(habit.label) },
+                                            onClick = {
+                                                selectedHabitCategory = habit.category
+                                                habitDropdownExpanded = false
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -2101,14 +2133,15 @@ fun DailyFocusDialog(
                     when (selectedMode) {
                         DailyFocusPreference.MODE_GOAL -> onSaveGoal(goalText.trim())
                         DailyFocusPreference.MODE_HABIT -> {
-                            if (selectedHabitId >= 0) onSaveHabit(selectedHabitId)
+                            if (selectedHabitCategory.isNotEmpty()) onSaveHabit(selectedHabitCategory)
                         }
                         else -> onClear()
                     }
                 },
                 enabled = when (selectedMode) {
                     DailyFocusPreference.MODE_GOAL -> goalText.isNotBlank()
-                    DailyFocusPreference.MODE_HABIT -> selectedHabitId >= 0 && habits.any { it.id == selectedHabitId }
+                    DailyFocusPreference.MODE_HABIT ->
+                        selectedHabitCategory.isNotEmpty() && habits.any { it.category == selectedHabitCategory }
                     else -> true
                 }
             ) { Text("Save") }

@@ -104,7 +104,6 @@ class ProgressNotificationService : Service() {
         val db = WorkoutDatabase.getDatabase(applicationContext)
         val exerciseDao = db.exerciseDao()
         val nutritionDao = db.nutritionDao()
-        val userDao = db.userDao()
 
         val today = LocalDate.now()
         val todayStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
@@ -131,9 +130,10 @@ class ProgressNotificationService : Service() {
                 if (text.isNotEmpty()) "Goal for today" to text else null to null
             }
             DailyFocusPreference.MODE_HABIT -> {
-                val habit = userDao.getAllChecklistItemsSync()
-                    .firstOrNull { it.id == focus.habitId }
-                if (habit != null) "Habit for today" to habit.text else null to null
+                val habit = if (focus.habitCategory.isNotEmpty()) {
+                    nutritionDao.getTargetSync(focus.habitCategory)
+                } else null
+                if (habit != null) "Habit for today" to habit.label else null to null
             }
             else -> null to null
         }
