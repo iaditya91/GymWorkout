@@ -176,6 +176,7 @@ fun UserScreen(
 
     // Progress notification card state
     val progressNotifEnabled by ProgressNotificationPreference.enabled.collectAsState()
+    var showBatteryOptDialog by remember { mutableStateOf(false) }
 
     // Daily focus (goal/habit shown on the progress notification)
     val dailyFocus by DailyFocusPreference.focus.collectAsState()
@@ -362,11 +363,38 @@ fun UserScreen(
                         ProgressNotificationPreference.setEnabled(context, enabled)
                         if (enabled) {
                             ProgressNotificationService.start(context)
+                            if (!ProgressNotificationService.isIgnoringBatteryOptimizations(context)) {
+                                showBatteryOptDialog = true
+                            }
                         } else {
                             ProgressNotificationService.stop(context)
                         }
                     }
                 )
+                if (showBatteryOptDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showBatteryOptDialog = false },
+                        title = { Text("Keep progress notification alive?") },
+                        text = {
+                            Text(
+                                "To keep your progress card visible and updating throughout the day, " +
+                                        "allow this app to run in the background.\n\n" +
+                                        "On the next screen, choose \"Allow\" or select \"Don't optimize\"."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showBatteryOptDialog = false
+                                ProgressNotificationService.requestIgnoreBatteryOptimizations(context)
+                            }) { Text("Open settings") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showBatteryOptDialog = false }) {
+                                Text("Not now")
+                            }
+                        }
+                    )
+                }
             }
 
             item {

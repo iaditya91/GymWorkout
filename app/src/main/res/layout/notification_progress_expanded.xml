@@ -98,6 +98,7 @@
         android:layout_marginTop="12dp">
 
         <TextView
+            android:id="@+id/notif_lbl_workout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="92dp"
@@ -138,6 +139,7 @@
         android:layout_marginTop="6dp">
 
         <TextView
+            android:id="@+id/notif_lbl_protein"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="92dp"
@@ -178,6 +180,7 @@
         android:layout_marginTop="6dp">
 
         <TextView
+            android:id="@+id/notif_lbl_calories"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="92dp"
@@ -218,6 +221,7 @@
         android:layout_marginTop="6dp">
 
         <TextView
+            android:id="@+id/notif_lbl_sleep"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="92dp"
@@ -258,6 +262,7 @@
         android:layout_marginTop="6dp">
 
         <TextView
+            android:id="@+id/notif_lbl_water"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="92dp"
