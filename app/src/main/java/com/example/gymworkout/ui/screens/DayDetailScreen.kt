@@ -78,7 +78,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.example.gymworkout.data.Exercise
-import android.os.Build
+import com.example.gymworkout.ai.AiCapabilityManager
 import com.example.gymworkout.ui.components.AddExerciseDialog
 import com.example.gymworkout.ui.components.NotesDialog
 import com.example.gymworkout.ui.components.InlineRestTimer
@@ -135,6 +135,7 @@ fun DayDetailScreen(
     val exercises by viewModel.getExercisesForDay(dayIndex).collectAsState(initial = emptyList())
     val groupedItems = remember(exercises) { groupExercises(exercises) }
     val dayHeading by viewModel.getDayHeading(dayIndex).collectAsState(initial = null)
+    val aiSupported by AiCapabilityManager.isAiSupported.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var showHeadingDialog by remember { mutableStateOf(false) }
     var editingExercise by remember { mutableStateOf<Exercise?>(null) }
@@ -220,7 +221,7 @@ fun DayDetailScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (Build.VERSION.SDK_INT >= 31) {
+                if (aiSupported == true) {
                     FloatingActionButton(
                         onClick = onNavigateToAiChat,
                         shape = CircleShape,

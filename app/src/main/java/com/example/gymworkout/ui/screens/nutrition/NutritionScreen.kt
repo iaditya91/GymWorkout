@@ -109,7 +109,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import com.example.gymworkout.ai.AiCapabilityManager
 import androidx.compose.material3.Switch
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
@@ -157,6 +157,7 @@ fun NutritionScreen(
     } catch (_: Exception) { selectedDate }
 
     val entries by viewModel.getEntriesForDate(selectedDate).collectAsState(initial = emptyList())
+    val aiSupported by AiCapabilityManager.isAiSupported.collectAsState()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -179,8 +180,10 @@ fun NutritionScreen(
                     }) {
                         Icon(Icons.Default.TipsAndUpdates, contentDescription = "AI Daily Planner")
                     }
-                    IconButton(onClick = { showAiObjectiveDialog = true }) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = "AI generate objectives")
+                    if (aiSupported == true) {
+                        IconButton(onClick = { showAiObjectiveDialog = true }) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "AI generate objectives")
+                        }
                     }
                     IconButton(onClick = { showAddObjectiveDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Add objective")
@@ -201,7 +204,7 @@ fun NutritionScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (Build.VERSION.SDK_INT >= 31) {
+                if (aiSupported == true) {
                     FloatingActionButton(
                         onClick = onNavigateToAiChat,
                         shape = CircleShape,

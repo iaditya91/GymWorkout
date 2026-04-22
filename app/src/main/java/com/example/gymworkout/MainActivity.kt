@@ -9,6 +9,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.unit.dp
@@ -53,6 +55,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
+import com.example.gymworkout.ai.AiCapabilityManager
 import com.example.gymworkout.ui.screens.AiChatScreen
 import com.example.gymworkout.ui.screens.DayDetailScreen
 import com.example.gymworkout.ui.screens.ExerciseDetailScreen
@@ -131,6 +134,7 @@ class MainActivity : ComponentActivity() {
         if (ProgressNotificationPreference.getEnabled(this)) {
             ProgressNotificationService.start(this)
         }
+        lifecycleScope.launch { AiCapabilityManager.refresh() }
         setContent {
             val darkMode by ThemePreference.isDarkMode.collectAsState()
             GymWorkoutTheme(
@@ -179,7 +183,8 @@ fun WorkoutApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomBarRoutes
-    val showFab = Build.VERSION.SDK_INT >= 31 &&
+    val aiSupported by AiCapabilityManager.isAiSupported.collectAsState()
+    val showFab = aiSupported == true &&
             currentRoute != "ai_chat" &&
             currentRoute != "nutrition" &&
             currentRoute != "login" &&
@@ -362,7 +367,7 @@ fun WorkoutApp() {
                     categoryKey = URLDecoder.decode(categoryKey, "UTF-8"),
                     viewModel = nutritionViewModel,
                     onBack = { navController.popBackStack() },
-                    onChatClick = if (Build.VERSION.SDK_INT >= 31) {{ navController.navigate("ai_chat") }} else null
+                    onChatClick = if (aiSupported == true) {{ navController.navigate("ai_chat") }} else null
                 )
             }
             composable("stats") {
