@@ -171,19 +171,19 @@ fun SocialHubScreen(
                     )
                 }
 
-                // Row 3: Accountability
+                // Row 3: Leaderboard
                 SocialFeatureCard(
-                    modifier = Modifier.fillMaxWidth(), icon = Icons.Filled.Handshake, title = "Accountability",
-                    subtitle = "${partnerships.count { it.status == "active" }} partners",
-                    pendingCount = partnerships.count { it.status == "pending" && it.user2Id == (currentUser?.uid ?: "") },
-                    onClick = onNavigateToAccountability
+                    modifier = Modifier.fillMaxWidth(), icon = Icons.Filled.Leaderboard, title = "Leaderboards",
+                    subtitle = "Global rankings", onClick = onNavigateToLeaderboard
                 )
 
-                // Row 4: Leaderboard + Templates
+                // Row 4: Accountability + Templates
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SocialFeatureCard(
-                        modifier = Modifier.weight(1f), icon = Icons.Filled.Leaderboard, title = "Leaderboards",
-                        subtitle = "Global rankings", onClick = onNavigateToLeaderboard
+                        modifier = Modifier.weight(1f), icon = Icons.Filled.Handshake, title = "Accountability",
+                        subtitle = "${partnerships.count { it.status == "active" }} partners",
+                        pendingCount = partnerships.count { it.status == "pending" && it.user2Id == (currentUser?.uid ?: "") },
+                        onClick = onNavigateToAccountability
                     )
                     SocialFeatureCard(
                         modifier = Modifier.weight(1f), icon = Icons.Filled.FitnessCenter, title = "Templates",
