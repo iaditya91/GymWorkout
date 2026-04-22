@@ -27,6 +27,7 @@ fun AccountabilityScreen(
     socialViewModel: SocialViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val partnerships by socialViewModel.partnerships.collectAsState()
     val friends by socialViewModel.friends.collectAsState()
     val currentUser by socialViewModel.currentSocialUser.collectAsState()
@@ -36,6 +37,14 @@ fun AccountabilityScreen(
     val acceptedFriends = friends.filter { !it.isPending }
     val pending = partnerships.filter { it.status == "pending" }
     val active = partnerships.filter { it.status == "active" }
+
+    // Ensure every active partnership has a scheduled alarm with its current/default time.
+    LaunchedEffect(active.map { it.id }) {
+        active.forEach { p ->
+            AccountabilityCheckPreference.ensureTimeForPartner(context, p.id)
+            AccountabilityCheckScheduler.scheduleForPartner(context, p.id)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -77,13 +86,10 @@ fun AccountabilityScreen(
                 }
             }
 
-            // Daily check-in card
-            item { DailyCheckCard() }
-
             // Outgoing pending requests
             val outgoing = pending.filter { it.user1Id == myUid }
             if (outgoing.isNotEmpty()) {
-                item { Text("Pending \u2013 Waiting for Accept", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { Text("Pending – Waiting for Accept", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(outgoing) { p ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
@@ -130,35 +136,17 @@ fun AccountabilityScreen(
                 item { Text("Your Partners", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold) }
                 items(active) { p ->
                     val partnerName = if (p.user1Id == myUid) p.user2Name else p.user1Name
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Handshake, null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(partnerName, fontWeight = FontWeight.SemiBold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    FilterChip(
-                                        selected = p.notifyWorkout,
-                                        onClick = { socialViewModel.togglePartnershipNotify(p.id, "notifyWorkout", p.notifyWorkout) },
-                                        label = { Text("Workout") },
-                                        leadingIcon = { Icon(Icons.Default.FitnessCenter, null, modifier = Modifier.size(14.dp)) }
-                                    )
-                                    FilterChip(
-                                        selected = p.notifyHabits,
-                                        onClick = { socialViewModel.togglePartnershipNotify(p.id, "notifyHabits", p.notifyHabits) },
-                                        label = { Text("Habits") },
-                                        leadingIcon = { Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(14.dp)) }
-                                    )
-                                }
-                            }
-                            IconButton(onClick = { socialViewModel.removePartnership(p.id) }) {
-                                Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
-                            }
+                    ActivePartnerCard(
+                        partnership = p,
+                        partnerName = partnerName,
+                        onToggleWorkout = { socialViewModel.togglePartnershipNotify(p.id, "notifyWorkout", p.notifyWorkout) },
+                        onToggleHabits = { socialViewModel.togglePartnershipNotify(p.id, "notifyHabits", p.notifyHabits) },
+                        onRemove = {
+                            AccountabilityCheckScheduler.cancelForPartner(context, p.id)
+                            AccountabilityCheckPreference.clearPartner(context, p.id)
+                            socialViewModel.removePartnership(p.id)
                         }
-                    }
+                    )
                 }
             }
 
@@ -188,6 +176,74 @@ fun AccountabilityScreen(
                 showCreateDialog = false
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ActivePartnerCard(
+    partnership: AccountabilityPartnership,
+    partnerName: String,
+    onToggleWorkout: () -> Unit,
+    onToggleHabits: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val context = LocalContext.current
+    val partnerTimes by AccountabilityCheckPreference.partnerTimes.collectAsState()
+    val time = partnerTimes[partnership.id] ?: AccountabilityCheckPreference.DEFAULT_TIME
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Handshake, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Text(partnerName, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = partnership.notifyWorkout,
+                    onClick = onToggleWorkout,
+                    label = { Text("Workout") },
+                    leadingIcon = { Icon(Icons.Default.FitnessCenter, null, modifier = Modifier.size(14.dp)) }
+                )
+                FilterChip(
+                    selected = partnership.notifyHabits,
+                    onClick = onToggleHabits,
+                    label = { Text("Habits") },
+                    leadingIcon = { Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(14.dp)) }
+                )
+            }
+            val parts = time.split(":")
+            val hour = parts.getOrNull(0)?.toIntOrNull() ?: 20
+            val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        TimePickerDialog(context, { _, h, m ->
+                            val newTime = String.format("%02d:%02d", h, m)
+                            AccountabilityCheckPreference.setTimeForPartner(context, partnership.id, newTime)
+                            AccountabilityCheckScheduler.scheduleForPartner(context, partnership.id)
+                        }, hour, minute, false).show()
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Schedule, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Check daily at $time", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.weight(1f))
+                    Text("Tap to change", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
     }
 }
 
@@ -234,63 +290,4 @@ private fun CreatePartnerDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
-}
-
-@Composable
-private fun DailyCheckCard() {
-    val context = LocalContext.current
-    val enabled by AccountabilityCheckPreference.enabled.collectAsState()
-    val time by AccountabilityCheckPreference.time.collectAsState()
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Daily partner check", fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Check partners once a day. Runs on your device — no server cost.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = { on ->
-                        AccountabilityCheckPreference.setEnabled(context, on)
-                        if (on) AccountabilityCheckScheduler.schedule(context)
-                        else AccountabilityCheckScheduler.cancel(context)
-                    }
-                )
-            }
-            if (enabled) {
-                val parts = time.split(":")
-                val hour = parts.getOrNull(0)?.toIntOrNull() ?: 21
-                val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            TimePickerDialog(context, { _, h, m ->
-                                val newTime = String.format("%02d:%02d", h, m)
-                                AccountabilityCheckPreference.setTime(context, newTime)
-                                AccountabilityCheckScheduler.schedule(context)
-                            }, hour, minute, false).show()
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Schedule, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Check at $time", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-        }
-    }
 }

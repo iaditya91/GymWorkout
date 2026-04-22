@@ -100,7 +100,6 @@ import com.example.gymworkout.ui.screens.social.WeeklyChallengeScreen
 import com.example.gymworkout.ui.screens.social.ProgressShareScreen
 import com.example.gymworkout.ui.screens.social.JourneyTimelineScreen
 import com.example.gymworkout.ui.screens.social.AccountabilityScreen
-import com.example.gymworkout.ui.screens.social.TeamGoalsScreen
 import com.example.gymworkout.ui.screens.social.NutritionDuelScreen
 import com.example.gymworkout.ui.screens.social.LeaderboardScreen
 import com.example.gymworkout.ui.screens.social.WorkoutTemplatesScreen
@@ -163,9 +162,7 @@ class MainActivity : ComponentActivity() {
         if (ProgressNotificationPreference.getEnabled(this)) {
             ProgressNotificationService.start(this)
         }
-        if (AccountabilityCheckPreference.getEnabled(this)) {
-            AccountabilityCheckScheduler.schedule(this)
-        }
+        AccountabilityCheckScheduler.rescheduleAll(this)
         handleIntentExtras(intent)
         lifecycleScope.launch { AiCapabilityManager.refresh() }
         setContent {
@@ -469,7 +466,6 @@ fun WorkoutApp() {
                     onNavigateToTimeline = { navController.navigate("social/timeline") },
                     onNavigateToShare = { navController.navigate("social/share") },
                     onNavigateToAccountability = { navController.navigate("social/accountability") },
-                    onNavigateToTeamGoals = { navController.navigate("social/team_goals") },
                     onNavigateToNutritionDuels = { navController.navigate("social/duels") },
                     onNavigateToLeaderboard = { navController.navigate("social/leaderboard") },
                     onNavigateToTemplates = { navController.navigate("social/templates") },
@@ -502,6 +498,7 @@ fun WorkoutApp() {
             composable("social/battles") {
                 StreakBattleScreen(
                     socialViewModel = socialViewModel,
+                    nutritionViewModel = nutritionViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -525,12 +522,6 @@ fun WorkoutApp() {
             }
             composable("social/accountability") {
                 AccountabilityScreen(
-                    socialViewModel = socialViewModel,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-            composable("social/team_goals") {
-                TeamGoalsScreen(
                     socialViewModel = socialViewModel,
                     onBack = { navController.popBackStack() }
                 )

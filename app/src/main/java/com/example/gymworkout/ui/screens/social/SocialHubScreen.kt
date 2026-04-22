@@ -27,7 +27,6 @@ fun SocialHubScreen(
     onNavigateToTimeline: () -> Unit,
     onNavigateToShare: () -> Unit,
     onNavigateToAccountability: () -> Unit,
-    onNavigateToTeamGoals: () -> Unit,
     onNavigateToNutritionDuels: () -> Unit,
     onNavigateToLeaderboard: () -> Unit,
     onNavigateToTemplates: () -> Unit,
@@ -172,20 +171,13 @@ fun SocialHubScreen(
                     )
                 }
 
-                // Row 3: Accountability + Team Goals
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SocialFeatureCard(
-                        modifier = Modifier.weight(1f), icon = Icons.Filled.Handshake, title = "Accountability",
-                        subtitle = "${partnerships.count { it.status == "active" }} partners",
-                        pendingCount = partnerships.count { it.status == "pending" && it.user2Id == (currentUser?.uid ?: "") },
-                        onClick = onNavigateToAccountability
-                    )
-                    SocialFeatureCard(
-                        modifier = Modifier.weight(1f), icon = Icons.Filled.Groups, title = "Team Goals",
-                        subtitle = "${socialViewModel.teamGoals.collectAsState().value.size} active",
-                        onClick = onNavigateToTeamGoals
-                    )
-                }
+                // Row 3: Accountability
+                SocialFeatureCard(
+                    modifier = Modifier.fillMaxWidth(), icon = Icons.Filled.Handshake, title = "Accountability",
+                    subtitle = "${partnerships.count { it.status == "active" }} partners",
+                    pendingCount = partnerships.count { it.status == "pending" && it.user2Id == (currentUser?.uid ?: "") },
+                    onClick = onNavigateToAccountability
+                )
 
                 // Row 4: Leaderboard + Templates
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

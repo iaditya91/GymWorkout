@@ -14,18 +14,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.gymworkout.data.NutritionTarget
 import com.example.gymworkout.data.social.StreakBattle
+import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.viewmodel.SocialViewModel
+
+private val nutritionRelatedLabels = setOf(
+    "fat", "fiber",
+    "vitamin a", "vitamin b1", "vitamin b2", "vitamin b3",
+    "vitamin b6", "vitamin b12", "vitamin c", "vitamin d",
+    "vitamin e", "vitamin k",
+    "folate", "iron", "calcium"
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StreakBattleScreen(
     socialViewModel: SocialViewModel,
+    nutritionViewModel: NutritionViewModel,
     onBack: () -> Unit
 ) {
     val battles by socialViewModel.battles.collectAsState()
     val friends by socialViewModel.friends.collectAsState()
     val currentUser by socialViewModel.currentSocialUser.collectAsState()
+    val allTargets by nutritionViewModel.getAllTargets().collectAsState(initial = emptyList())
+
+    val habitTargets = allTargets.filter {
+        it.isCustom && it.label.lowercase() !in nutritionRelatedLabels
+    }
+    val categoryLabels: Map<String, String> = remember(habitTargets) {
+        habitTargets.associate { it.category to it.label }
+    }
 
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -121,6 +140,7 @@ fun StreakBattleScreen(
                 items(incomingBattles, key = { it.id }) { battle ->
                     BattleInviteCard(
                         battle = battle,
+                        categoryLabels = categoryLabels,
                         onAccept = { socialViewModel.acceptBattle(battle.id) },
                         onDecline = { socialViewModel.declineBattle(battle.id) }
                     )
@@ -138,7 +158,7 @@ fun StreakBattleScreen(
                     )
                 }
                 items(outgoingBattles, key = { it.id }) { battle ->
-                    PendingSentCard(battle = battle)
+                    PendingSentCard(battle = battle, categoryLabels = categoryLabels)
                 }
             }
 
@@ -152,7 +172,7 @@ fun StreakBattleScreen(
                     )
                 }
                 items(activeBattles, key = { it.id }) { battle ->
-                    ActiveBattleCard(battle = battle, myUid = myUid)
+                    ActiveBattleCard(battle = battle, myUid = myUid, categoryLabels = categoryLabels)
                 }
             }
 
@@ -167,7 +187,7 @@ fun StreakBattleScreen(
                     )
                 }
                 items(completedBattles.take(10), key = { it.id }) { battle ->
-                    CompletedBattleCard(battle = battle, myUid = myUid)
+                    CompletedBattleCard(battle = battle, myUid = myUid, categoryLabels = categoryLabels)
                 }
             }
 
@@ -208,6 +228,7 @@ fun StreakBattleScreen(
     if (showCreateDialog) {
         CreateBattleDialog(
             friends = friends.filter { !it.isPending },
+            habitTargets = habitTargets,
             onDismiss = { showCreateDialog = false },
             onCreate = { opponentId, opponentName, category, days ->
                 socialViewModel.createStreakBattle(opponentId, opponentName, category, days)
@@ -220,9 +241,11 @@ fun StreakBattleScreen(
 @Composable
 private fun BattleInviteCard(
     battle: StreakBattle,
+    categoryLabels: Map<String, String>,
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
+    val displayCategory = categoryLabels[battle.category] ?: battle.category
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -245,7 +268,7 @@ private fun BattleInviteCard(
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "${battle.category} streak battle for ${daysBetween(battle.startDate, battle.endDate)} days",
+                "$displayCategory streak battle for ${daysBetween(battle.startDate, battle.endDate)} days",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
             )
@@ -263,7 +286,8 @@ private fun BattleInviteCard(
 }
 
 @Composable
-private fun PendingSentCard(battle: StreakBattle) {
+private fun PendingSentCard(battle: StreakBattle, categoryLabels: Map<String, String>) {
+    val displayCategory = categoryLabels[battle.category] ?: battle.category
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -280,7 +304,7 @@ private fun PendingSentCard(battle: StreakBattle) {
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "${battle.category} Battle vs ${battle.opponentName}",
+                    "$displayCategory Battle vs ${battle.opponentName}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -307,12 +331,13 @@ private fun PendingSentCard(battle: StreakBattle) {
 }
 
 @Composable
-private fun ActiveBattleCard(battle: StreakBattle, myUid: String) {
+private fun ActiveBattleCard(battle: StreakBattle, myUid: String, categoryLabels: Map<String, String>) {
     val isCreator = battle.creatorId == myUid
     val myStreak = if (isCreator) battle.creatorStreak else battle.opponentStreak
     val theirStreak = if (isCreator) battle.opponentStreak else battle.creatorStreak
     val opponentName = if (isCreator) battle.opponentName else battle.creatorName
     val isWinning = myStreak > theirStreak
+    val displayCategory = categoryLabels[battle.category] ?: battle.category
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -332,7 +357,7 @@ private fun ActiveBattleCard(battle: StreakBattle, myUid: String) {
                 Spacer(Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "${battle.category} Battle",
+                        "$displayCategory Battle",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -407,13 +432,14 @@ private fun ActiveBattleCard(battle: StreakBattle, myUid: String) {
 }
 
 @Composable
-private fun CompletedBattleCard(battle: StreakBattle, myUid: String) {
+private fun CompletedBattleCard(battle: StreakBattle, myUid: String, categoryLabels: Map<String, String>) {
     val isCreator = battle.creatorId == myUid
     val myStreak = if (isCreator) battle.creatorStreak else battle.opponentStreak
     val theirStreak = if (isCreator) battle.opponentStreak else battle.creatorStreak
     val opponentName = if (isCreator) battle.opponentName else battle.creatorName
     val iWon = battle.winnerId == myUid
     val isTie = battle.winnerId == "tie"
+    val displayCategory = categoryLabels[battle.category] ?: battle.category
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -431,7 +457,7 @@ private fun CompletedBattleCard(battle: StreakBattle, myUid: String) {
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "${battle.category} vs $opponentName",
+                    "$displayCategory vs $opponentName",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -473,6 +499,7 @@ private fun CompletedBattleCard(battle: StreakBattle, myUid: String) {
 @Composable
 private fun CreateBattleDialog(
     friends: List<com.example.gymworkout.data.social.FriendInfo>,
+    habitTargets: List<NutritionTarget>,
     onDismiss: () -> Unit,
     onCreate: (opponentId: String, opponentName: String, category: String, days: Int) -> Unit
 ) {
@@ -482,7 +509,14 @@ private fun CreateBattleDialog(
     var categoryExpanded by remember { mutableStateOf(false) }
     var friendExpanded by remember { mutableStateOf(false) }
 
-    val categories = listOf("WORKOUT", "HABITS", "WATER", "PROTEIN", "CALORIES", "SLEEP")
+    // Built-in categories + user's custom habit objectives.
+    // Each entry is (categoryKey, displayLabel) — the key is stored on the battle
+    // so computeStreakForCategory can look up the target, but the label is what we show.
+    val builtInCategories = listOf("WORKOUT", "HABITS", "WATER", "PROTEIN", "CALORIES", "SLEEP")
+    val categoryItems: List<Pair<String, String>> =
+        builtInCategories.map { it to it } +
+        habitTargets.map { it.category to it.label }
+    val selectedLabel = categoryItems.firstOrNull { it.first == selectedCategory }?.second ?: selectedCategory
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -526,7 +560,7 @@ private fun CreateBattleDialog(
                     onExpandedChange = { categoryExpanded = it }
                 ) {
                     OutlinedTextField(
-                        value = "${categoryEmoji(selectedCategory)} $selectedCategory",
+                        value = "${categoryEmoji(selectedCategory)} $selectedLabel",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Category") },
@@ -539,11 +573,11 @@ private fun CreateBattleDialog(
                         expanded = categoryExpanded,
                         onDismissRequest = { categoryExpanded = false }
                     ) {
-                        categories.forEach { cat ->
+                        categoryItems.forEach { (key, label) ->
                             DropdownMenuItem(
-                                text = { Text("${categoryEmoji(cat)} $cat") },
+                                text = { Text("${categoryEmoji(key)} $label") },
                                 onClick = {
-                                    selectedCategory = cat
+                                    selectedCategory = key
                                     categoryExpanded = false
                                 }
                             )

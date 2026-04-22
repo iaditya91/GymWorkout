@@ -6,39 +6,56 @@ import kotlinx.coroutines.flow.StateFlow
 
 object AccountabilityCheckPreference {
     private const val PREF_NAME = "accountability_check_prefs"
-    private const val KEY_ENABLED = "enabled"
-    private const val KEY_TIME = "time"
-    const val DEFAULT_TIME = "21:00"
+    private const val KEY_TIME_PREFIX = "time_"
+    const val DEFAULT_TIME = "20:00"
 
-    private val _enabled = MutableStateFlow(false)
-    val enabled: StateFlow<Boolean> = _enabled
-
-    private val _time = MutableStateFlow(DEFAULT_TIME)
-    val time: StateFlow<String> = _time
+    private val _partnerTimes = MutableStateFlow<Map<String, String>>(emptyMap())
+    val partnerTimes: StateFlow<Map<String, String>> = _partnerTimes
 
     fun init(context: Context) {
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        _enabled.value = prefs.getBoolean(KEY_ENABLED, false)
-        _time.value = prefs.getString(KEY_TIME, DEFAULT_TIME) ?: DEFAULT_TIME
+        _partnerTimes.value = loadAll(context)
     }
 
-    fun setEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_ENABLED, enabled).apply()
-        _enabled.value = enabled
+    fun getTimeForPartner(context: Context, partnershipId: String): String {
+        if (partnershipId.isEmpty()) return DEFAULT_TIME
+        return prefs(context).getString(KEY_TIME_PREFIX + partnershipId, DEFAULT_TIME) ?: DEFAULT_TIME
     }
 
-    fun getEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ENABLED, false)
-
-    fun setTime(context: Context, time: String) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_TIME, time).apply()
-        _time.value = time
+    fun setTimeForPartner(context: Context, partnershipId: String, time: String) {
+        if (partnershipId.isEmpty()) return
+        prefs(context).edit().putString(KEY_TIME_PREFIX + partnershipId, time).apply()
+        _partnerTimes.value = loadAll(context)
     }
 
-    fun getTime(context: Context): String =
+    fun ensureTimeForPartner(context: Context, partnershipId: String): String {
+        if (partnershipId.isEmpty()) return DEFAULT_TIME
+        val p = prefs(context)
+        val existing = p.getString(KEY_TIME_PREFIX + partnershipId, null)
+        if (existing != null) return existing
+        p.edit().putString(KEY_TIME_PREFIX + partnershipId, DEFAULT_TIME).apply()
+        _partnerTimes.value = loadAll(context)
+        return DEFAULT_TIME
+    }
+
+    fun clearPartner(context: Context, partnershipId: String) {
+        if (partnershipId.isEmpty()) return
+        prefs(context).edit().remove(KEY_TIME_PREFIX + partnershipId).apply()
+        _partnerTimes.value = loadAll(context)
+    }
+
+    fun getAllPartnerTimes(context: Context): Map<String, String> = loadAll(context)
+
+    private fun loadAll(context: Context): Map<String, String> {
+        val all = prefs(context).all
+        val out = HashMap<String, String>()
+        for ((k, v) in all) {
+            if (k.startsWith(KEY_TIME_PREFIX) && v is String) {
+                out[k.removePrefix(KEY_TIME_PREFIX)] = v
+            }
+        }
+        return out
+    }
+
+    private fun prefs(context: Context) =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_TIME, DEFAULT_TIME) ?: DEFAULT_TIME
 }

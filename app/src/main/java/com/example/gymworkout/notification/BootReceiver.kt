@@ -51,10 +51,9 @@ class BootReceiver : BroadcastReceiver() {
                     ProgressNotificationService.start(context)
                 }
 
-                // Reschedule accountability partner check
-                if (AccountabilityCheckPreference.getEnabled(context)) {
-                    AccountabilityCheckScheduler.schedule(context)
-                }
+                // Reschedule accountability partner checks (one per partnership)
+                AccountabilityCheckPreference.init(context)
+                AccountabilityCheckScheduler.rescheduleAll(context)
             }
         }
     }
