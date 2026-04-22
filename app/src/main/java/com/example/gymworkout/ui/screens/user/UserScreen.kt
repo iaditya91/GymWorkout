@@ -2713,13 +2713,35 @@ fun ShareWithFriendsCard(context: android.content.Context) {
 private fun shareApk(context: android.content.Context) {
     try {
         val appInfo = context.applicationInfo
-        val sourceApk = java.io.File(appInfo.sourceDir)
+        val baseApk = java.io.File(appInfo.sourceDir)
+        val splitApks = appInfo.splitSourceDirs?.map { java.io.File(it) } ?: emptyList()
 
-        // Copy APK to cache directory for sharing
         val shareDir = java.io.File(context.cacheDir, "apk_share")
         shareDir.mkdirs()
-        val shareFile = java.io.File(shareDir, "GymWorkout.apk")
-        sourceApk.copyTo(shareFile, overwrite = true)
+        shareDir.listFiles()?.forEach { it.delete() }
+
+        val shareFile: java.io.File
+        val mimeType: String
+
+        if (splitApks.isEmpty()) {
+            shareFile = java.io.File(shareDir, "GymWorkout.apk")
+            baseApk.copyTo(shareFile, overwrite = true)
+            mimeType = "application/vnd.android.package-archive"
+        } else {
+            // App is installed as split APKs (base + config splits for ABI/density/language).
+            // Sharing only base.apk produces an "invalid APK" on the receiver's device, so
+            // bundle base + all splits into a single .apks ZIP that Split APK installers (SAI,
+            // APKMirror Installer, etc.) can install.
+            shareFile = java.io.File(shareDir, "GymWorkout.apks")
+            java.util.zip.ZipOutputStream(shareFile.outputStream().buffered()).use { zip ->
+                (listOf(baseApk) + splitApks).forEach { apk ->
+                    zip.putNextEntry(java.util.zip.ZipEntry(apk.name))
+                    apk.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+            }
+            mimeType = "application/zip"
+        }
 
         val uri = androidx.core.content.FileProvider.getUriForFile(
             context,
@@ -2727,15 +2749,21 @@ private fun shareApk(context: android.content.Context) {
             shareFile
         )
 
+        val extraText = if (splitApks.isEmpty()) {
+            "Check out Gym Workout app! It helps you track workouts, nutrition, and more."
+        } else {
+            "Check out Gym Workout app! Install the attached .apks file using a Split APK installer (e.g. SAI from the Play Store)."
+        }
+
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/vnd.android.package-archive"
+            type = mimeType
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_TEXT, "Check out Gym Workout app! It helps you track workouts, nutrition, and more.")
+            putExtra(Intent.EXTRA_TEXT, extraText)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, "Share Gym Workout"))
     } catch (e: Exception) {
-        android.widget.Toast.makeText(context, "Could not share app", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(context, "Could not share app: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
     }
 }
 
