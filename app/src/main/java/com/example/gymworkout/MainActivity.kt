@@ -25,6 +25,8 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -123,6 +125,7 @@ class MainActivity : ComponentActivity() {
         NotificationHelper.createAutoBackupNotificationChannel(this)
         NotificationHelper.createAiPlannerNotificationChannel(this)
         NotificationHelper.createProgressNotificationChannel(this)
+        NotificationHelper.createSocialNotificationChannel(this)
         requestNotificationPermission()
         ExerciseRepository.load(this)
         QuotePreference.init(this)
@@ -183,6 +186,20 @@ fun WorkoutApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomBarRoutes
+
+    // Pending social items for bottom-nav badge
+    val socialFriends by socialViewModel.friends.collectAsState()
+    val socialBattles by socialViewModel.battles.collectAsState()
+    val socialDuels by socialViewModel.duels.collectAsState()
+    val socialPartnerships by socialViewModel.partnerships.collectAsState()
+    val socialUser by socialViewModel.currentSocialUser.collectAsState()
+    val socialPendingCount = run {
+        val myUid = socialUser?.uid ?: ""
+        socialFriends.count { it.isPending && it.isIncoming } +
+            socialBattles.count { it.status == "pending" && it.opponentId == myUid } +
+            socialDuels.count { it.status == "pending" && it.opponentId == myUid } +
+            socialPartnerships.count { it.status == "pending" && it.user2Id == myUid }
+    }
     val aiSupported by AiCapabilityManager.isAiSupported.collectAsState()
     val showFab = aiSupported == true &&
             currentRoute != "ai_chat" &&
@@ -237,10 +254,19 @@ fun WorkoutApp() {
                                 }
                             },
                             icon = {
-                                Icon(
-                                    if (selected) item.selectedIcon else item.unselectedIcon,
-                                    contentDescription = item.label
-                                )
+                                val iconContent: @Composable () -> Unit = {
+                                    Icon(
+                                        if (selected) item.selectedIcon else item.unselectedIcon,
+                                        contentDescription = item.label
+                                    )
+                                }
+                                if (item.route == "social" && socialPendingCount > 0) {
+                                    BadgedBox(badge = {
+                                        Badge { Text(socialPendingCount.toString()) }
+                                    }) { iconContent() }
+                                } else {
+                                    iconContent()
+                                }
                             },
                             label = {
                                 Text(

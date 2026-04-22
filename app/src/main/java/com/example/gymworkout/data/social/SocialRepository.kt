@@ -68,6 +68,12 @@ class SocialRepository {
         } catch (_: Exception) { /* offline — skip */ }
     }
 
+    suspend fun updateFcmToken(uid: String, token: String) {
+        try {
+            usersCol.document(uid).update("fcmToken", token).await()
+        } catch (_: Exception) { /* offline — skip */ }
+    }
+
     suspend fun findUserByFriendCode(code: String): SocialUser? {
         return try {
             val snapshot = usersCol.whereEqualTo("friendCode", code).limit(1).get().await()

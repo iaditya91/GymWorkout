@@ -7,6 +7,7 @@ import com.example.gymworkout.data.WorkoutDatabase
 import com.example.gymworkout.data.social.*
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.Timestamp
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -244,6 +245,8 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                     _isProfilePublic.value = user.isPublic
                     repo.updateOnlineStatus(uid, true)
                 }
+                // Upload current FCM token so Cloud Functions can target this device
+                uploadFcmToken(uid)
                 // Sync local streaks to cloud
                 syncStreaksToCloud()
             } catch (e: Exception) {
@@ -1467,5 +1470,18 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
 
     fun clearError() {
         _error.value = null
+    }
+
+    private fun uploadFcmToken(uid: String) {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                android.util.Log.w("SocialVM", "FCM token fetch failed", task.exception)
+                return@addOnCompleteListener
+            }
+            val token = task.result ?: return@addOnCompleteListener
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) { repo.updateFcmToken(uid, token) }
+            }
+        }
     }
 }

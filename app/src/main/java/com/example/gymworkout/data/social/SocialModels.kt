@@ -16,8 +16,11 @@ data class SocialUser(
     val isOnline: Boolean = false,
     val isPublic: Boolean = false,
     val lastSeen: Timestamp = Timestamp.now(),
-    val dailyProgress: DailyProgress = DailyProgress()
+    val dailyProgress: DailyProgress = DailyProgress(),
+    val fcmToken: String = ""
 ) {
+    // fcmToken is intentionally excluded from toMap() — it's written by a dedicated
+    // updateFcmToken() call so full-profile writes don't clobber the live token.
     fun toMap(): Map<String, Any?> = mapOf(
         "uid" to uid,
         "displayName" to displayName,

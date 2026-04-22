@@ -30,6 +30,10 @@ object NotificationHelper {
     private const val AUTO_BACKUP_CHANNEL_NAME = "Auto Backup"
     private const val AUTO_BACKUP_CHANNEL_DESC = "Daily automatic backup notifications"
 
+    const val SOCIAL_CHANNEL_ID = "social_events"
+    private const val SOCIAL_CHANNEL_NAME = "Social"
+    private const val SOCIAL_CHANNEL_DESC = "Friend requests, battle/duel invites, and partnership requests"
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -94,6 +98,20 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = AUTO_BACKUP_CHANNEL_DESC
+            }
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    fun createSocialNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                SOCIAL_CHANNEL_ID,
+                SOCIAL_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = SOCIAL_CHANNEL_DESC
             }
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
