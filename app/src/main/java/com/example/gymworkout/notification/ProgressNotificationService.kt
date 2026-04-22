@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.gymworkout.MainActivity
 import com.example.gymworkout.R
+import com.example.gymworkout.data.DailyFocusPreference
 import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.data.WorkoutDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -103,6 +104,7 @@ class ProgressNotificationService : Service() {
         val db = WorkoutDatabase.getDatabase(applicationContext)
         val exerciseDao = db.exerciseDao()
         val nutritionDao = db.nutritionDao()
+        val userDao = db.userDao()
 
         val today = LocalDate.now()
         val todayStr = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
@@ -121,6 +123,20 @@ class ProgressNotificationService : Service() {
         val caloriesTarget = nutritionDao.getTargetSync("CALORIES")?.targetValue ?: 0f
         val sleepTarget = nutritionDao.getTargetSync("SLEEP")?.targetValue ?: 0f
         val waterTarget = nutritionDao.getTargetSync("WATER")?.targetValue ?: 0f
+
+        val focus = DailyFocusPreference.get(applicationContext)
+        val (focusLabel, focusText) = when (focus.mode) {
+            DailyFocusPreference.MODE_GOAL -> {
+                val text = focus.goalText.trim()
+                if (text.isNotEmpty()) "Goal for today" to text else null to null
+            }
+            DailyFocusPreference.MODE_HABIT -> {
+                val habit = userDao.getAllChecklistItemsSync()
+                    .firstOrNull { it.id == focus.habitId }
+                if (habit != null) "Habit for today" to habit.text else null to null
+            }
+            else -> null to null
+        }
 
         val workoutScore = if (totalExercises > 0) {
             min(completedExercises.toFloat() / totalExercises, 1f)
@@ -148,7 +164,9 @@ class ProgressNotificationService : Service() {
             sleepTarget = sleepTarget,
             waterActual = waterActual,
             waterTarget = waterTarget,
-            dmgs = dmgs
+            dmgs = dmgs,
+            focusLabel = focusLabel,
+            focusText = focusText
         )
     }
 
@@ -174,8 +192,12 @@ class ProgressNotificationService : Service() {
         val sleepLine = formatLine("Sleep", s.sleepActual, s.sleepTarget, "h")
         val waterLine = formatLine("Water", s.waterActual, s.waterTarget, "L")
 
-        val bigText = listOf(workoutLine, proteinLine, caloriesLine, sleepLine, waterLine)
-            .joinToString("\n")
+        val progressLines = listOf(workoutLine, proteinLine, caloriesLine, sleepLine, waterLine)
+        val bigText = if (s.focusLabel != null && s.focusText != null) {
+            ("${s.focusLabel}: ${s.focusText}\n\n" + progressLines.joinToString("\n"))
+        } else {
+            progressLines.joinToString("\n")
+        }
 
         val summary = "W ${s.completedExercises}/${s.totalExercises} · " +
                 "P ${formatNum(s.proteinActual)}g · " +
@@ -219,6 +241,8 @@ class ProgressNotificationService : Service() {
         val sleepTarget: Float = 0f,
         val waterActual: Float = 0f,
         val waterTarget: Float = 0f,
-        val dmgs: Float = 0f
+        val dmgs: Float = 0f,
+        val focusLabel: String? = null,
+        val focusText: String? = null
     )
 }

@@ -67,6 +67,7 @@ import com.example.gymworkout.ui.screens.stats.StatsScreen
 import com.example.gymworkout.ui.screens.user.UserScreen
 import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.AiPlannerPreference
+import com.example.gymworkout.data.DailyFocusPreference
 import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.data.ThemePreference
 import com.example.gymworkout.data.sync.SyncPreference
@@ -124,6 +125,7 @@ class MainActivity : ComponentActivity() {
         QuotePreference.init(this)
         AiPlannerPreference.init(this)
         ProgressNotificationPreference.init(this)
+        DailyFocusPreference.init(this)
         SyncPreference.init(this)
 
         if (ProgressNotificationPreference.getEnabled(this)) {

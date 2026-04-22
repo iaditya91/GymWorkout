@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,6 +52,7 @@ import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
@@ -63,6 +67,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -101,6 +106,7 @@ import com.example.gymworkout.data.MotivationalQuotes
 import com.example.gymworkout.data.QuotePreference
 import com.example.gymworkout.data.sync.SyncPreference
 import com.example.gymworkout.data.AiPlannerPreference
+import com.example.gymworkout.data.DailyFocusPreference
 import com.example.gymworkout.data.ProgressNotificationPreference
 import com.example.gymworkout.notification.AiPlannerNotificationScheduler
 import com.example.gymworkout.notification.ProgressNotificationService
@@ -153,6 +159,10 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNav
 
     // Progress notification card state
     val progressNotifEnabled by ProgressNotificationPreference.enabled.collectAsState()
+
+    // Daily focus (goal/habit shown on the progress notification)
+    val dailyFocus by DailyFocusPreference.focus.collectAsState()
+    var showDailyFocusDialog by remember { mutableStateOf(false) }
 
     // Auto-dismiss success/error after 3 seconds
     LaunchedEffect(syncState) {
@@ -329,6 +339,46 @@ fun UserScreen(viewModel: UserViewModel, socialViewModel: SocialViewModel, onNav
                         }
                     }
                 )
+            }
+
+            item {
+                val habitForId = (dos + donts).firstOrNull { it.id == dailyFocus.habitId }
+                val summary = when (dailyFocus.mode) {
+                    DailyFocusPreference.MODE_GOAL ->
+                        if (dailyFocus.goalText.isNotBlank()) "Goal: ${dailyFocus.goalText}" else "Tap to set a goal"
+                    DailyFocusPreference.MODE_HABIT ->
+                        if (habitForId != null) "Habit: ${habitForId.text}" else "Tap to pick a habit"
+                    else -> "Tap to set a goal or habit for today"
+                }
+                DailyFocusCard(
+                    summary = summary,
+                    onClick = { showDailyFocusDialog = true }
+                )
+            }
+
+            item {
+                if (showDailyFocusDialog) {
+                    DailyFocusDialog(
+                        current = dailyFocus,
+                        habits = dos + donts,
+                        onDismiss = { showDailyFocusDialog = false },
+                        onSaveGoal = { text ->
+                            DailyFocusPreference.setGoal(context, text)
+                            ProgressNotificationService.refresh(context)
+                            showDailyFocusDialog = false
+                        },
+                        onSaveHabit = { habitId ->
+                            DailyFocusPreference.setHabit(context, habitId)
+                            ProgressNotificationService.refresh(context)
+                            showDailyFocusDialog = false
+                        },
+                        onClear = {
+                            DailyFocusPreference.clear(context)
+                            ProgressNotificationService.refresh(context)
+                            showDailyFocusDialog = false
+                        }
+                    )
+                }
             }
 
             // Reset buttons for checklists
@@ -1880,6 +1930,211 @@ fun ProgressNotificationCard(
                 )
             )
         }
+    }
+}
+
+@Composable
+fun DailyFocusCard(
+    summary: String,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Flag,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Today's Focus",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun DailyFocusDialog(
+    current: DailyFocusPreference.Focus,
+    habits: List<ChecklistItem>,
+    onDismiss: () -> Unit,
+    onSaveGoal: (String) -> Unit,
+    onSaveHabit: (Int) -> Unit,
+    onClear: () -> Unit
+) {
+    var selectedMode by remember { mutableStateOf(current.mode) }
+    var goalText by remember { mutableStateOf(current.goalText) }
+    var selectedHabitId by remember { mutableStateOf(current.habitId) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Flag,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Today's Focus")
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Shown on the progress notification card.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                FocusModeRow(
+                    label = "None",
+                    selected = selectedMode == DailyFocusPreference.MODE_NONE,
+                    onSelect = { selectedMode = DailyFocusPreference.MODE_NONE }
+                )
+                FocusModeRow(
+                    label = "Goal (custom text)",
+                    selected = selectedMode == DailyFocusPreference.MODE_GOAL,
+                    onSelect = { selectedMode = DailyFocusPreference.MODE_GOAL }
+                )
+                FocusModeRow(
+                    label = "Habit (pick one)",
+                    selected = selectedMode == DailyFocusPreference.MODE_HABIT,
+                    onSelect = { selectedMode = DailyFocusPreference.MODE_HABIT }
+                )
+
+                when (selectedMode) {
+                    DailyFocusPreference.MODE_GOAL -> {
+                        OutlinedTextField(
+                            value = goalText,
+                            onValueChange = { goalText = it },
+                            label = { Text("Your goal for today") },
+                            singleLine = false,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    DailyFocusPreference.MODE_HABIT -> {
+                        if (habits.isEmpty()) {
+                            Text(
+                                "You haven't added any habits yet. Add Do's or Don'ts from your profile first.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 240.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                habits.forEach { habit ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { selectedHabitId = habit.id }
+                                            .padding(vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = selectedHabitId == habit.id,
+                                            onClick = { selectedHabitId = habit.id }
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                habit.text,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Text(
+                                                if (habit.type == "DO") "Do" else "Don't",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    when (selectedMode) {
+                        DailyFocusPreference.MODE_GOAL -> onSaveGoal(goalText.trim())
+                        DailyFocusPreference.MODE_HABIT -> {
+                            if (selectedHabitId >= 0) onSaveHabit(selectedHabitId)
+                        }
+                        else -> onClear()
+                    }
+                },
+                enabled = when (selectedMode) {
+                    DailyFocusPreference.MODE_GOAL -> goalText.isNotBlank()
+                    DailyFocusPreference.MODE_HABIT -> selectedHabitId >= 0 && habits.any { it.id == selectedHabitId }
+                    else -> true
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun FocusModeRow(
+    label: String,
+    selected: Boolean,
+    onSelect: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onSelect)
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
