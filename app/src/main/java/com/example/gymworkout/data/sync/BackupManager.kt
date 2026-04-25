@@ -58,7 +58,9 @@ class BackupManager(
             progressPhotos = photos,
             customFoods = nutritionDao.getAllCustomFoodsSync(),
             weightEntries = userDao.getAllWeightEntriesSync(),
-            workoutSetLogs = setLogDao.getAllSync()
+            workoutSetLogs = setLogDao.getAllSync(),
+            journalEntries = nutritionDao.getAllJournalEntriesSync(),
+            atomicHabits = nutritionDao.getAllAtomicHabitsSync()
         )
     }
 
@@ -78,6 +80,8 @@ class BackupManager(
         userDao.deleteAllWeightEntries()
         setLogDao.deleteAll()
         reminderDao.deleteAll()
+        nutritionDao.deleteAllJournalEntries()
+        nutritionDao.deleteAllAtomicHabits()
 
         // Restore progress photos to internal storage
         val photosDir = File(context.filesDir, "progress_photos")
@@ -125,6 +129,8 @@ class BackupManager(
         if (data.customFoods.isNotEmpty()) nutritionDao.insertAllCustomFoods(data.customFoods)
         if (data.weightEntries.isNotEmpty()) userDao.insertAllWeightEntries(data.weightEntries)
         if (data.workoutSetLogs.isNotEmpty()) setLogDao.insertAll(data.workoutSetLogs)
+        if (data.journalEntries.isNotEmpty()) nutritionDao.insertAllJournalEntries(data.journalEntries)
+        if (data.atomicHabits.isNotEmpty()) nutritionDao.insertAllAtomicHabits(data.atomicHabits)
 
         // Restore theme preference
         ThemePreference.setDarkMode(context, data.themePreference)

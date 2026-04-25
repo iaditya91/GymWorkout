@@ -51,6 +51,9 @@ interface NutritionDao {
     @Query("UPDATE nutrition_targets SET notes = :notes WHERE category = :category")
     suspend fun updateTargetNotes(category: String, notes: String)
 
+    @Query("UPDATE nutrition_targets SET description = :description, descriptionMode = :mode WHERE category = :category")
+    suspend fun updateTargetDescription(category: String, description: String, mode: String)
+
     @Query("UPDATE nutrition_targets SET label = :label, unit = :unit, timerSeconds = :timerSeconds, timerNotifyEnabled = :notifyEnabled WHERE category = :category")
     suspend fun updateCustomObjective(category: String, label: String, unit: String, timerSeconds: Int, notifyEnabled: Boolean)
 
@@ -142,4 +145,26 @@ interface NutritionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllAtomicHabits(items: List<AtomicHabit>)
+
+    // Journal entries
+    @Query("SELECT * FROM journal_entries WHERE category = :category ORDER BY date DESC, createdAt DESC")
+    fun getJournalEntriesForCategory(category: String): Flow<List<JournalEntry>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertJournalEntry(entry: JournalEntry): Long
+
+    @Delete
+    suspend fun deleteJournalEntry(entry: JournalEntry)
+
+    @Query("DELETE FROM journal_entries WHERE category = :category")
+    suspend fun deleteJournalEntriesForCategory(category: String)
+
+    @Query("SELECT * FROM journal_entries")
+    suspend fun getAllJournalEntriesSync(): List<JournalEntry>
+
+    @Query("DELETE FROM journal_entries")
+    suspend fun deleteAllJournalEntries()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllJournalEntries(items: List<JournalEntry>)
 }

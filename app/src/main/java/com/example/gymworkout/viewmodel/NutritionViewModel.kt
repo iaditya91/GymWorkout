@@ -11,6 +11,7 @@ import com.example.gymworkout.data.FoodLogEntry
 import com.example.gymworkout.data.NutritionCategory
 import com.example.gymworkout.data.ServingUnit
 import com.example.gymworkout.data.AtomicHabit
+import com.example.gymworkout.data.JournalEntry
 import com.example.gymworkout.data.NutritionEntry
 import com.example.gymworkout.data.NutritionReminder
 import com.example.gymworkout.data.NutritionTarget
@@ -227,6 +228,12 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun updateDescription(category: String, description: com.example.gymworkout.data.HabitDescription) {
+        viewModelScope.launch {
+            dao.updateTargetDescription(category, description.toJson(), description.mode)
+        }
+    }
+
     // --- Atomic Habit methods ---
 
     fun getAtomicHabit(category: String): Flow<AtomicHabit?> = dao.getAtomicHabit(category)
@@ -332,6 +339,41 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             dao.deleteTarget(category)
             dao.deleteEntriesForCategory(category)
+            dao.deleteJournalEntriesForCategory(category)
+        }
+    }
+
+    // --- Journal methods ---
+
+    fun getJournalEntriesForCategory(category: String): Flow<List<JournalEntry>> =
+        dao.getJournalEntriesForCategory(category)
+
+    fun saveJournalEntry(
+        category: String,
+        date: String,
+        mood: String,
+        text: String,
+        existingId: Long = 0L,
+        existingCreatedAt: Long = 0L
+    ) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            dao.insertJournalEntry(
+                JournalEntry(
+                    id = existingId,
+                    category = category,
+                    date = date,
+                    mood = mood,
+                    text = text,
+                    createdAt = if (existingId == 0L || existingCreatedAt == 0L) now else existingCreatedAt
+                )
+            )
+        }
+    }
+
+    fun deleteJournalEntry(entry: JournalEntry) {
+        viewModelScope.launch {
+            dao.deleteJournalEntry(entry)
         }
     }
 

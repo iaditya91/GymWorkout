@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.BarChart
@@ -36,6 +37,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -76,6 +81,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.gymworkout.data.DescriptionChecklistItem
+import com.example.gymworkout.data.HabitDescription
+import com.example.gymworkout.data.JournalEntry
+import com.example.gymworkout.ui.components.JournalEntryDialog
 import com.example.gymworkout.viewmodel.NutritionViewModel
 
 private val HabitGreen = Color(0xFF4CAF50)
@@ -172,12 +181,21 @@ fun HabitDetailScreen(
     val historyResult by viewModel.getHabitHistoryDetailed(categoryKey, 49)
         .collectAsState(initial = null)
 
+    val journalEntries by viewModel.getJournalEntriesForCategory(categoryKey)
+        .collectAsState(initial = emptyList())
+
     var editingField by remember { mutableStateOf<String?>(null) }
     var editText by remember { mutableStateOf("") }
     var showGuidance by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var selectedDayIndex by remember { mutableStateOf<Int?>(null) }
     var frameworkExpanded by remember { mutableStateOf(true) }
+    var journalExpanded by remember { mutableStateOf(true) }
+    var descriptionExpanded by remember { mutableStateOf(true) }
+    var journalDialogEntry by remember { mutableStateOf<JournalEntry?>(null) }
+    var addJournalForDate by remember { mutableStateOf<String?>(null) }
+    var deleteJournalConfirm by remember { mutableStateOf<JournalEntry?>(null) }
+    var calendarMonth by remember { mutableStateOf(java.time.YearMonth.now()) }
 
     Scaffold(
         topBar = {
@@ -551,9 +569,203 @@ fun HabitDetailScreen(
                 }
             }
 
+            // === DESCRIPTION ===
+            DescriptionCard(
+                expanded = descriptionExpanded,
+                onToggleExpand = { descriptionExpanded = !descriptionExpanded },
+                rawDescription = targetState?.description ?: "",
+                mode = targetState?.descriptionMode ?: "text",
+                onSave = { desc -> viewModel.updateDescription(categoryKey, desc) }
+            )
+
+            // === JOURNAL ===
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { journalExpanded = !journalExpanded },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.Book,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Journal",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                if (journalEntries.isEmpty()) "Record how today went"
+                                else "${journalEntries.size} ${if (journalEntries.size == 1) "entry" else "entries"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(
+                            onClick = { addJournalForDate = today },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Add,
+                                contentDescription = "Add journal entry",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Icon(
+                            if (journalExpanded) Icons.Filled.KeyboardArrowUp
+                            else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = journalExpanded,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            JournalCalendar(
+                                month = calendarMonth,
+                                entries = journalEntries,
+                                today = today,
+                                onPrevMonth = { calendarMonth = calendarMonth.minusMonths(1) },
+                                onNextMonth = { calendarMonth = calendarMonth.plusMonths(1) },
+                                onDayClick = { dateStr ->
+                                    val existing = journalEntries.firstOrNull { it.date == dateStr }
+                                    if (existing != null) {
+                                        journalDialogEntry = existing
+                                    } else {
+                                        addJournalForDate = dateStr
+                                    }
+                                }
+                            )
+
+                            if (journalEntries.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f))
+                                        .clickable { addJournalForDate = today }
+                                        .padding(20.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            Icons.Filled.Book,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            "No journal entries yet",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            "Tap a date or the + button to write",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    "All Entries",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                                journalEntries.forEach { entry ->
+                                    JournalEntryRow(
+                                        entry = entry,
+                                        onClick = { journalDialogEntry = entry },
+                                        onDelete = { deleteJournalConfirm = entry }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Bottom spacer for FAB clearance
             Spacer(modifier = Modifier.height(72.dp))
         }
+    }
+
+    addJournalForDate?.let { dateForNewEntry ->
+        JournalEntryDialog(
+            objectiveLabel = targetState?.label ?: "Objective",
+            dateLabel = dateForNewEntry,
+            initialMood = "",
+            initialText = "",
+            onDismiss = { addJournalForDate = null },
+            onSave = { mood, text ->
+                viewModel.saveJournalEntry(
+                    category = categoryKey,
+                    date = dateForNewEntry,
+                    mood = mood,
+                    text = text
+                )
+                addJournalForDate = null
+            }
+        )
+    }
+
+    journalDialogEntry?.let { entry ->
+        JournalEntryDialog(
+            objectiveLabel = targetState?.label ?: "Objective",
+            dateLabel = entry.date,
+            initialMood = entry.mood,
+            initialText = entry.text,
+            onDismiss = { journalDialogEntry = null },
+            onSave = { mood, text ->
+                viewModel.saveJournalEntry(
+                    category = categoryKey,
+                    date = entry.date,
+                    mood = mood,
+                    text = text,
+                    existingId = entry.id,
+                    existingCreatedAt = entry.createdAt
+                )
+                journalDialogEntry = null
+            }
+        )
+    }
+
+    deleteJournalConfirm?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { deleteJournalConfirm = null },
+            title = { Text("Delete entry?") },
+            text = { Text("Remove this journal entry from ${entry.date}? This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteJournalEntry(entry)
+                    deleteJournalConfirm = null
+                }) { Text("Delete", color = HabitRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteJournalConfirm = null }) { Text("Cancel") }
+            }
+        )
     }
 
     // Guidance dialog
@@ -847,6 +1059,724 @@ private fun AtomicHabitFieldCard(
                 Spacer(modifier = Modifier.width(10.dp))
                 Text("Tap to add your strategy", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+    }
+}
+
+@Composable
+private fun DescriptionCard(
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    rawDescription: String,
+    mode: String,
+    onSave: (HabitDescription) -> Unit
+) {
+    val parsed = remember(rawDescription, mode) { HabitDescription.parse(mode, rawDescription) }
+
+    var localMode by remember(mode) { mutableStateOf(mode) }
+    var textValue by remember(rawDescription, mode) {
+        mutableStateOf((parsed as? HabitDescription.Text)?.value ?: "")
+    }
+    var checklistItems by remember(rawDescription, mode) {
+        mutableStateOf((parsed as? HabitDescription.Checklist)?.items ?: emptyList())
+    }
+    var isEditingText by remember { mutableStateOf(false) }
+    var newItemText by remember { mutableStateOf("") }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleExpand() },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.Description,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Description",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (localMode == "checklist") "${checklistItems.count { it.checked }} of ${checklistItems.size} done"
+                        else if (textValue.isBlank()) "Add notes for this habit"
+                        else "${textValue.length} chars",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Mode toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        ModeToggleButton(
+                            icon = Icons.Filled.Description,
+                            label = "Text",
+                            selected = localMode == "text",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                if (localMode != "text") {
+                                    localMode = "text"
+                                    onSave(HabitDescription.Text(textValue))
+                                }
+                            }
+                        )
+                        ModeToggleButton(
+                            icon = Icons.Filled.Checklist,
+                            label = "Checklist",
+                            selected = localMode == "checklist",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                if (localMode != "checklist") {
+                                    localMode = "checklist"
+                                    onSave(HabitDescription.Checklist(checklistItems))
+                                }
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (localMode == "text") {
+                        if (isEditingText) {
+                            OutlinedTextField(
+                                value = textValue,
+                                onValueChange = { textValue = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(140.dp),
+                                placeholder = { Text("Describe what this habit is about, your motivation, rules...") },
+                                shape = RoundedCornerShape(12.dp),
+                                maxLines = 8
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        onSave(HabitDescription.Text(textValue.trim()))
+                                        isEditingText = false
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Save") }
+                                OutlinedButton(
+                                    onClick = {
+                                        textValue = (parsed as? HabitDescription.Text)?.value ?: ""
+                                        isEditingText = false
+                                    },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Cancel") }
+                            }
+                        } else if (textValue.isNotBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                    .clickable { isEditingText = true }
+                                    .padding(14.dp)
+                            ) {
+                                Text(
+                                    textValue,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                        .clickable { isEditingText = true }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Edit",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(HabitRed.copy(alpha = 0.08f))
+                                        .clickable {
+                                            textValue = ""
+                                            onSave(HabitDescription.Text(""))
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = HabitRed.copy(alpha = 0.7f)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Clear",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = HabitRed.copy(alpha = 0.7f),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f))
+                                    .clickable { isEditingText = true }
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Edit,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    "Tap to add a description",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        // Checklist mode
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            checklistItems.forEachIndexed { index, item ->
+                                ChecklistRow(
+                                    item = item,
+                                    onToggle = {
+                                        val updated = checklistItems.toMutableList()
+                                        updated[index] = item.copy(checked = !item.checked)
+                                        checklistItems = updated
+                                        onSave(HabitDescription.Checklist(updated))
+                                    },
+                                    onDelete = {
+                                        val updated = checklistItems.toMutableList()
+                                        updated.removeAt(index)
+                                        checklistItems = updated
+                                        onSave(HabitDescription.Checklist(updated))
+                                    },
+                                    onTextChange = { newText ->
+                                        val updated = checklistItems.toMutableList()
+                                        updated[index] = item.copy(text = newText)
+                                        checklistItems = updated
+                                    },
+                                    onCommitText = {
+                                        onSave(HabitDescription.Checklist(checklistItems))
+                                    }
+                                )
+                            }
+
+                            // Add new item row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = newItemText,
+                                    onValueChange = { newItemText = it },
+                                    placeholder = { Text("Add a new item") },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (newItemText.isNotBlank())
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                        .clickable(enabled = newItemText.isNotBlank()) {
+                                            val updated = checklistItems + DescriptionChecklistItem(
+                                                text = newItemText.trim(),
+                                                checked = false
+                                            )
+                                            checklistItems = updated
+                                            newItemText = ""
+                                            onSave(HabitDescription.Checklist(updated))
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Add,
+                                        contentDescription = "Add item",
+                                        tint = if (newItemText.isNotBlank())
+                                            MaterialTheme.colorScheme.onPrimary
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            if (checklistItems.isEmpty()) {
+                                Text(
+                                    "No items yet. Add a step above to build your checklist.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModeToggleButton(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
+    val fg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = fg,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+private fun ChecklistRow(
+    item: DescriptionChecklistItem,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+    onTextChange: (String) -> Unit,
+    onCommitText: () -> Unit
+) {
+    var isEditing by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(
+                    if (item.checked) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+                .border(
+                    1.dp,
+                    if (item.checked) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outlineVariant,
+                    RoundedCornerShape(6.dp)
+                )
+                .clickable { onToggle() },
+            contentAlignment = Alignment.Center
+        ) {
+            if (item.checked) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        if (isEditing) {
+            OutlinedTextField(
+                value = item.text,
+                onValueChange = onTextChange,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+                singleLine = true
+            )
+            IconButton(
+                onClick = { onCommitText(); isEditing = false },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = "Save",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        } else {
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (item.checked) MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (item.checked) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { isEditing = true }
+                    .padding(vertical = 8.dp)
+            )
+            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = "Delete item",
+                    tint = HabitRed.copy(alpha = 0.7f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun JournalCalendar(
+    month: java.time.YearMonth,
+    entries: List<JournalEntry>,
+    today: String,
+    onPrevMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onDayClick: (String) -> Unit
+) {
+    val datesWithEntries = remember(entries) { entries.map { it.date }.toSet() }
+    val firstDay = month.atDay(1)
+    val daysInMonth = month.lengthOfMonth()
+    // dayOfWeek: Monday=1..Sunday=7 → grid cells before day 1
+    val leadingBlanks = (firstDay.dayOfWeek.value - 1).coerceAtLeast(0)
+    val totalCells = leadingBlanks + daysInMonth
+    val rows = (totalCells + 6) / 7
+    val monthFmt = java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy")
+    val isoFmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    val todayDate = try { java.time.LocalDate.parse(today) } catch (_: Exception) { java.time.LocalDate.now() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f))
+            .padding(12.dp)
+    ) {
+        Column {
+            // Month header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onPrevMonth, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Previous month",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Text(
+                    month.format(monthFmt),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                IconButton(onClick = onNextMonth, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Next month",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Weekday headers
+            Row(modifier = Modifier.fillMaxWidth()) {
+                listOf("M", "T", "W", "T", "F", "S", "S").forEach { label ->
+                    Text(
+                        label,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Day grid
+            for (r in 0 until rows) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    for (c in 0 until 7) {
+                        val cellIndex = r * 7 + c
+                        val dayNumber = cellIndex - leadingBlanks + 1
+                        if (dayNumber in 1..daysInMonth) {
+                            val date = month.atDay(dayNumber)
+                            val dateStr = date.format(isoFmt)
+                            val hasEntry = dateStr in datesWithEntries
+                            val isToday = date == todayDate
+                            val isFuture = date.isAfter(todayDate)
+                            CalendarDayCell(
+                                day = dayNumber,
+                                hasEntry = hasEntry,
+                                isToday = isToday,
+                                isFuture = isFuture,
+                                modifier = Modifier.weight(1f),
+                                onClick = { if (!isFuture) onDayClick(dateStr) }
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Legend
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    "has entry",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    "today",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarDayCell(
+    day: Int,
+    hasEntry: Boolean,
+    isToday: Boolean,
+    isFuture: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val bg = when {
+        hasEntry -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        else -> Color.Transparent
+    }
+    val textColor = when {
+        isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+        hasEntry -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    Box(
+        modifier = modifier
+            .padding(1.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .then(
+                if (isToday) Modifier.border(
+                    1.5.dp,
+                    MaterialTheme.colorScheme.primary,
+                    RoundedCornerShape(8.dp)
+                ) else Modifier
+            )
+            .clickable(enabled = !isFuture) { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "$day",
+                style = MaterialTheme.typography.labelMedium,
+                color = textColor,
+                fontWeight = if (isToday || hasEntry) FontWeight.SemiBold else FontWeight.Normal
+            )
+            if (hasEntry) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun JournalEntryRow(
+    entry: JournalEntry,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val displayDate = remember(entry.date) {
+        try {
+            val d = java.time.LocalDate.parse(entry.date)
+            val today = java.time.LocalDate.now()
+            when {
+                d == today -> "Today"
+                d == today.minusDays(1) -> "Yesterday"
+                else -> d.format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy"))
+            }
+        } catch (_: Exception) { entry.date }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable { onClick() }
+            .padding(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        // Mood / fallback letter
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (entry.mood.isNotEmpty()) {
+                Text(entry.mood, fontSize = 22.sp)
+            } else {
+                Icon(
+                    Icons.Filled.Book,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                displayDate,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (entry.text.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    entry.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 4,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+        }
+        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            Icon(
+                Icons.Filled.Delete,
+                contentDescription = "Delete entry",
+                tint = HabitRed.copy(alpha = 0.7f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

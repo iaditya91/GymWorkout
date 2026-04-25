@@ -30,7 +30,9 @@ data class NutritionTarget(
     val isCustom: Boolean = false, // true for user-added objectives
     val notes: String = "",    // User notes for this objective
     val timerSeconds: Int = 0, // Timer duration in seconds (0 = no timer)
-    val timerNotifyEnabled: Boolean = true   // Show notification when timer finishes (respects device sound profile)
+    val timerNotifyEnabled: Boolean = true,  // Show notification when timer finishes (respects device sound profile)
+    val description: String = "",            // JSON: {"type":"text","value":"..."} or {"type":"checklist","items":[{"text":"...","checked":false}]}
+    val descriptionMode: String = "text"     // "text" or "checklist"
 )
 
 @Entity(tableName = "atomic_habits")
