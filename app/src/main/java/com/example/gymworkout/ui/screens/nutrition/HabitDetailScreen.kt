@@ -1104,14 +1104,18 @@ private fun DescriptionCard(
 ) {
     val parsed = remember(rawDescription, mode) { HabitDescription.parse(mode, rawDescription) }
 
-    // Drafts are keyed on the category, not on rawDescription/mode — saving
-    // must not reset them, otherwise toggling between Text and Checklist wipes
-    // whichever side the user was just editing.
-    var localMode by remember(categoryKey) { mutableStateOf(mode) }
-    var textValue by remember(categoryKey) { mutableStateOf(parsed.text) }
-    var checklistItems by remember(categoryKey) { mutableStateOf(parsed.items) }
+    // Drafts are keyed on the category AND the loaded raw value/mode so that the
+    // initial null emission of the target Flow doesn't lock the drafts to empty
+    // values (which would then overwrite the real saved data on the next save).
+    // Saving goes through onSave -> DB -> Flow, which updates rawDescription to
+    // exactly the snapshot just written, so re-keying here is a no-op for the
+    // active editor.
+    var localMode by remember(categoryKey, mode) { mutableStateOf(mode) }
+    var textValue by remember(categoryKey, rawDescription) { mutableStateOf(parsed.text) }
+    var checklistItems by remember(categoryKey, rawDescription) { mutableStateOf(parsed.items) }
     var isEditingText by remember { mutableStateOf(false) }
     var newItemText by remember { mutableStateOf("") }
+    var showAllChecklist by remember(categoryKey) { mutableStateOf(false) }
 
     // Build a complete HabitDescription using the latest in-memory drafts of
     // BOTH sides, so saving one mode never erases the other.
@@ -1342,7 +1346,11 @@ private fun DescriptionCard(
                     } else {
                         // Checklist mode
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            checklistItems.forEachIndexed { index, item ->
+                            val collapsedLimit = 5
+                            val isCollapsed = !showAllChecklist && checklistItems.size > collapsedLimit
+                            val visibleCount =
+                                if (isCollapsed) collapsedLimit else checklistItems.size
+                            checklistItems.take(visibleCount).forEachIndexed { index, item ->
                                 ChecklistRow(
                                     item = item,
                                     onToggle = {
@@ -1366,6 +1374,35 @@ private fun DescriptionCard(
                                         onSave(snapshot())
                                     }
                                 )
+                            }
+
+                            if (checklistItems.size > collapsedLimit) {
+                                val hiddenCount = checklistItems.size - collapsedLimit
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable { showAllChecklist = !showAllChecklist }
+                                        .padding(vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        if (showAllChecklist) "Show less"
+                                        else "Show $hiddenCount more",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        if (showAllChecklist) Icons.Filled.KeyboardArrowUp
+                                        else Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
 
                             // Add new item row
