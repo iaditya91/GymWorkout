@@ -198,6 +198,18 @@ fun HabitDetailScreen(
     var calendarMonth by remember { mutableStateOf(java.time.YearMonth.now()) }
     var selectedJournalDate by remember { mutableStateOf(today) }
 
+    val scoreChecklistItems = remember(targetState?.description, targetState?.descriptionMode) {
+        val mode = targetState?.descriptionMode ?: "text"
+        if (mode != "checklist") emptyList()
+        else {
+            val parsed = HabitDescription.parse(mode, targetState?.description ?: "")
+            (parsed as? HabitDescription.Checklist)?.items
+                ?.map { it.text }
+                ?.filter { it.isNotBlank() }
+                ?: emptyList()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -727,13 +739,18 @@ fun HabitDetailScreen(
             dateLabel = dateForNewEntry,
             initialMood = "",
             initialText = "",
+            checklistItems = scoreChecklistItems,
+            initialScoreChecked = 0,
+            initialScoreTotal = 0,
             onDismiss = { addJournalForDate = null },
-            onSave = { mood, text ->
+            onSave = { mood, text, scoreChecked, scoreTotal ->
                 viewModel.saveJournalEntry(
                     category = categoryKey,
                     date = dateForNewEntry,
                     mood = mood,
-                    text = text
+                    text = text,
+                    scoreChecked = scoreChecked,
+                    scoreTotal = scoreTotal
                 )
                 addJournalForDate = null
             }
@@ -746,15 +763,20 @@ fun HabitDetailScreen(
             dateLabel = entry.date,
             initialMood = entry.mood,
             initialText = entry.text,
+            checklistItems = scoreChecklistItems,
+            initialScoreChecked = entry.scoreChecked,
+            initialScoreTotal = entry.scoreTotal,
             onDismiss = { journalDialogEntry = null },
-            onSave = { mood, text ->
+            onSave = { mood, text, scoreChecked, scoreTotal ->
                 viewModel.saveJournalEntry(
                     category = categoryKey,
                     date = entry.date,
                     mood = mood,
                     text = text,
                     existingId = entry.id,
-                    existingCreatedAt = entry.createdAt
+                    existingCreatedAt = entry.createdAt,
+                    scoreChecked = scoreChecked,
+                    scoreTotal = scoreTotal
                 )
                 journalDialogEntry = null
             }
@@ -1774,12 +1796,37 @@ private fun JournalEntryRow(
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                displayDate,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    displayDate,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                if (entry.scoreTotal > 0) {
+                    val ratio = entry.scoreChecked.toFloat() / entry.scoreTotal.toFloat()
+                    val scoreColor = when {
+                        ratio >= 0.75f -> HabitGreen
+                        ratio >= 0.4f -> HabitOrange
+                        else -> HabitRed
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(scoreColor.copy(alpha = 0.15f))
+                            .border(1.dp, scoreColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            "${entry.scoreChecked}/${entry.scoreTotal}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = scoreColor
+                        )
+                    }
+                }
+            }
             if (entry.text.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(

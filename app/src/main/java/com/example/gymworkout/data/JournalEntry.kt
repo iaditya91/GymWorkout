@@ -15,5 +15,7 @@ data class JournalEntry(
     val date: String = "",       // yyyy-MM-dd
     val mood: String = "",       // emoji string, e.g. "😀"
     val text: String = "",       // free-form journal text
-    val createdAt: Long = 0L     // epoch millis
+    val createdAt: Long = 0L,    // epoch millis
+    val scoreChecked: Int = 0,   // checkboxes ticked at journal time
+    val scoreTotal: Int = 0      // 0 = no score recorded; otherwise total checkboxes
 )

@@ -354,7 +354,9 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
         mood: String,
         text: String,
         existingId: Long = 0L,
-        existingCreatedAt: Long = 0L
+        existingCreatedAt: Long = 0L,
+        scoreChecked: Int = 0,
+        scoreTotal: Int = 0
     ) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
@@ -365,7 +367,9 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
                     date = date,
                     mood = mood,
                     text = text,
-                    createdAt = if (existingId == 0L || existingCreatedAt == 0L) now else existingCreatedAt
+                    createdAt = if (existingId == 0L || existingCreatedAt == 0L) now else existingCreatedAt,
+                    scoreChecked = scoreChecked,
+                    scoreTotal = scoreTotal
                 )
             )
         }

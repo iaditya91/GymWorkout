@@ -1773,6 +1773,13 @@ fun AddObjectiveDialog(
     var timerSecs by remember { mutableStateOf("") }
     var notifyEnabled by remember { mutableStateOf(true) }
 
+    // Validation: only shown after the user attempts to submit
+    var showErrors by remember { mutableStateOf(false) }
+    val nameError = showErrors && selectedName.isBlank()
+    val unitError = showErrors && unit.isBlank()
+    val targetParsed = target.toFloatOrNull()
+    val targetError = showErrors && (targetParsed == null || targetParsed <= 0f)
+
     // Check if objective already exists
     val isDuplicate = selectedName.trim().lowercase().let { trimmedName ->
         trimmedName.isNotBlank() && existingTargets.any { it.label.trim().lowercase() == trimmedName }
@@ -1794,6 +1801,10 @@ fun AddObjectiveDialog(
                         label = { Text("Name") },
                         placeholder = { Text("Select nutrition") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        isError = nameError,
+                        supportingText = if (nameError) {
+                            { Text("Name is required") }
+                        } else null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor()
@@ -1862,6 +1873,10 @@ fun AddObjectiveDialog(
                         label = { Text("Custom Name") },
                         placeholder = { Text("e.g. Creatine") },
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                        isError = nameError,
+                        supportingText = if (nameError) {
+                            { Text("Name is required") }
+                        } else null,
                         minLines = 1,
                         maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
@@ -1871,6 +1886,10 @@ fun AddObjectiveDialog(
                         onValueChange = { unit = it },
                         label = { Text("Unit") },
                         placeholder = { Text("e.g. g, mg, ml") },
+                        isError = unitError,
+                        supportingText = if (unitError) {
+                            { Text("Unit is required") }
+                        } else null,
                         minLines = 1,
                         maxLines = 2,
                         modifier = Modifier.fillMaxWidth()
@@ -1889,6 +1908,15 @@ fun AddObjectiveDialog(
                     label = { Text("Daily Target") },
                     placeholder = { Text("e.g. 5") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    isError = targetError,
+                    supportingText = if (targetError) {
+                        {
+                            Text(
+                                if (target.isBlank()) "Daily target is required"
+                                else "Enter a number greater than 0"
+                            )
+                        }
+                    } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1968,11 +1996,14 @@ fun AddObjectiveDialog(
             TextButton(
                 onClick = {
                     val v = target.toFloatOrNull()
-                    if (!isDuplicate && selectedName.isNotBlank() && unit.isNotBlank() && v != null && v > 0) {
+                    val valid = selectedName.isNotBlank() && unit.isNotBlank() && v != null && v > 0
+                    if (!isDuplicate && valid) {
                         val mins = timerMinutes.toIntOrNull() ?: 0
                         val secs = timerSecs.toIntOrNull() ?: 0
                         val totalTimerSeconds = if (isCustom) (mins * 60) + secs else 0
                         onSave(selectedName.trim(), unit.trim(), v, totalTimerSeconds, notifyEnabled)
+                    } else {
+                        showErrors = true
                     }
                 },
                 enabled = !isDuplicate
