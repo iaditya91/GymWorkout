@@ -127,7 +127,8 @@ fun FoodLogDialog(
                         onValueChange = { customName = it },
                         label = { Text("Food Name") },
                         placeholder = { Text("e.g. Protein Bar") },
-                        singleLine = true,
+                        minLines = 1,
+                        maxLines = 3,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -594,7 +595,8 @@ fun FoodLogDialog(
                         onValueChange = { searchQuery = it },
                         placeholder = { Text("Search food...") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        singleLine = true,
+                        minLines = 1,
+                        maxLines = 2,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                         modifier = Modifier.fillMaxWidth()
                     )

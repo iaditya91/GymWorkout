@@ -577,7 +577,8 @@ private fun ObjectiveCard(
                                 focusManager.clearFocus()
                             }
                         ),
-                        singleLine = true,
+                        minLines = 1,
+                        maxLines = 3,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                         shape = RoundedCornerShape(8.dp)
                     )

@@ -587,7 +587,8 @@ fun AddEditReminderDialog(
                     value = customText,
                     onValueChange = { customText = it },
                     placeholder = { Text("e.g. Drink a glass of water!") },
-                    singleLine = true,
+                    minLines = 1,
+                    maxLines = 4,
                     modifier = Modifier.fillMaxWidth()
                 )
 

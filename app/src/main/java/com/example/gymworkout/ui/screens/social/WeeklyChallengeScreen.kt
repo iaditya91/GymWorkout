@@ -354,7 +354,8 @@ private fun CreateChallengeDialog(
                     onValueChange = { title = it },
                     label = { Text("Title") },
                     placeholder = { Text("e.g., Protein Week") },
-                    singleLine = true,
+                    minLines = 1,
+                    maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -362,7 +363,8 @@ private fun CreateChallengeDialog(
                     onValueChange = { description = it },
                     label = { Text("Description") },
                     placeholder = { Text("e.g., Hit 100g protein every day") },
-                    singleLine = true,
+                    minLines = 1,
+                    maxLines = 5,
                     modifier = Modifier.fillMaxWidth()
                 )
                 ExposedDropdownMenuBox(

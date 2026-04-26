@@ -1862,7 +1862,8 @@ fun AddObjectiveDialog(
                         label = { Text("Custom Name") },
                         placeholder = { Text("e.g. Creatine") },
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                        singleLine = true,
+                        minLines = 1,
+                        maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
@@ -1870,7 +1871,8 @@ fun AddObjectiveDialog(
                         onValueChange = { unit = it },
                         label = { Text("Unit") },
                         placeholder = { Text("e.g. g, mg, ml") },
-                        singleLine = true,
+                        minLines = 1,
+                        maxLines = 2,
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else if (unit.isNotBlank()) {
@@ -2093,7 +2095,8 @@ fun EditCustomObjectiveDialog(
                     value = label,
                     onValueChange = { label = it },
                     label = { Text("Name") },
-                    singleLine = true,
+                    minLines = 1,
+                    maxLines = 3,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -2103,7 +2106,8 @@ fun EditCustomObjectiveDialog(
                     onValueChange = { unit = it },
                     label = { Text("Unit") },
                     placeholder = { Text("e.g. min, hrs, steps, days") },
-                    singleLine = true,
+                    minLines = 1,
+                    maxLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
 

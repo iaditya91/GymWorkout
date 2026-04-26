@@ -1281,7 +1281,8 @@ fun EditProfileDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name, onValueChange = { name = it }, label = { Text("Name") },
-                    singleLine = true, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    minLines = 1, maxLines = 3,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Column {
@@ -1359,7 +1360,8 @@ fun AddChecklistDialog(title: String, onDismiss: () -> Unit, onSave: (String) ->
         text = {
             OutlinedTextField(
                 value = text, onValueChange = { text = it }, label = { Text("Item") },
-                placeholder = { Text("e.g. Drink 3L water daily") }, singleLine = true,
+                placeholder = { Text("e.g. Drink 3L water daily") },
+                minLines = 1, maxLines = 4,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1382,7 +1384,7 @@ fun EditChecklistDialog(
         text = {
             OutlinedTextField(
                 value = text, onValueChange = { text = it }, label = { Text("Item") },
-                singleLine = true,
+                minLines = 1, maxLines = 4,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -2825,7 +2827,7 @@ fun FeedbackDialog(onDismiss: () -> Unit, onSend: (String, String) -> Unit) {
                     value = subject,
                     onValueChange = { subject = it },
                     label = { Text("Subject") },
-                    singleLine = true,
+                    minLines = 1, maxLines = 3,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth()
                 )

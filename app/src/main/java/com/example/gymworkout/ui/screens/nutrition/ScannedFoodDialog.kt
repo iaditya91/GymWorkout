@@ -352,7 +352,8 @@ private fun ManualEntryDialog(
                     onValueChange = { productName = it },
                     label = { Text("Product Name") },
                     placeholder = { Text("e.g. Granola Bar") },
-                    singleLine = true,
+                    minLines = 1,
+                    maxLines = 3,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth()
                 )

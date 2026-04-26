@@ -293,7 +293,8 @@ private fun ExerciseFields(
             },
             label = { Text("Exercise Name") },
             placeholder = { Text("e.g. Dumbbell Shoulder Press") },
-            singleLine = true,
+            minLines = 1,
+            maxLines = 4,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
             modifier = Modifier.fillMaxWidth()
         )
@@ -366,7 +367,8 @@ private fun ExerciseFields(
         onValueChange = onYoutubeUrlChange,
         label = { Text("YouTube Link (optional)") },
         placeholder = { Text("https://youtube.com/...") },
-        singleLine = true,
+        minLines = 1,
+        maxLines = 3,
         modifier = Modifier.fillMaxWidth()
     )
     Spacer(modifier = Modifier.height(8.dp))

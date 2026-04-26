@@ -618,7 +618,8 @@ private fun EditTemplateDialog(
                     onValueChange = { title = it },
                     label = { Text("Title") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    minLines = 1,
+                    maxLines = 3
                 )
                 OutlinedTextField(
                     value = description,

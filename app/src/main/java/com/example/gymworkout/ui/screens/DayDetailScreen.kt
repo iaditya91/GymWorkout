@@ -676,7 +676,8 @@ fun DayHeadingDialog(
                 onValueChange = { text = it },
                 label = { Text("Heading") },
                 placeholder = { Text("e.g. Shoulder + Legs") },
-                singleLine = true,
+                minLines = 1,
+                maxLines = 3,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                 modifier = Modifier.fillMaxWidth()
             )

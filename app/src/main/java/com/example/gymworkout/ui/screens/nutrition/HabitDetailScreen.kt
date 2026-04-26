@@ -1347,7 +1347,8 @@ private fun DescriptionCard(
                                     placeholder = { Text("Add a new item") },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp),
-                                    singleLine = true
+                                    minLines = 1,
+                                    maxLines = 4
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Box(
@@ -1479,7 +1480,8 @@ private fun ChecklistRow(
                 onValueChange = onTextChange,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp),
-                singleLine = true
+                minLines = 1,
+                maxLines = 4
             )
             IconButton(
                 onClick = { onCommitText(); isEditing = false },
