@@ -202,11 +202,8 @@ fun HabitDetailScreen(
         val mode = targetState?.descriptionMode ?: "text"
         if (mode != "checklist") emptyList()
         else {
-            val parsed = HabitDescription.parse(mode, targetState?.description ?: "")
-            (parsed as? HabitDescription.Checklist)?.items
-                ?.map { it.text }
-                ?.filter { it.isNotBlank() }
-                ?: emptyList()
+            HabitDescription.parse(mode, targetState?.description ?: "")
+                .items.map { it.text }.filter { it.isNotBlank() }
         }
     }
 
@@ -584,6 +581,7 @@ fun HabitDetailScreen(
 
             // === DESCRIPTION ===
             DescriptionCard(
+                categoryKey = categoryKey,
                 expanded = descriptionExpanded,
                 onToggleExpand = { descriptionExpanded = !descriptionExpanded },
                 rawDescription = targetState?.description ?: "",
@@ -1097,6 +1095,7 @@ private fun AtomicHabitFieldCard(
 
 @Composable
 private fun DescriptionCard(
+    categoryKey: String,
     expanded: Boolean,
     onToggleExpand: () -> Unit,
     rawDescription: String,
@@ -1105,15 +1104,19 @@ private fun DescriptionCard(
 ) {
     val parsed = remember(rawDescription, mode) { HabitDescription.parse(mode, rawDescription) }
 
-    var localMode by remember(mode) { mutableStateOf(mode) }
-    var textValue by remember(rawDescription, mode) {
-        mutableStateOf((parsed as? HabitDescription.Text)?.value ?: "")
-    }
-    var checklistItems by remember(rawDescription, mode) {
-        mutableStateOf((parsed as? HabitDescription.Checklist)?.items ?: emptyList())
-    }
+    // Drafts are keyed on the category, not on rawDescription/mode — saving
+    // must not reset them, otherwise toggling between Text and Checklist wipes
+    // whichever side the user was just editing.
+    var localMode by remember(categoryKey) { mutableStateOf(mode) }
+    var textValue by remember(categoryKey) { mutableStateOf(parsed.text) }
+    var checklistItems by remember(categoryKey) { mutableStateOf(parsed.items) }
     var isEditingText by remember { mutableStateOf(false) }
     var newItemText by remember { mutableStateOf("") }
+
+    // Build a complete HabitDescription using the latest in-memory drafts of
+    // BOTH sides, so saving one mode never erases the other.
+    fun snapshot(modeOverride: String = localMode) =
+        HabitDescription(text = textValue, items = checklistItems, mode = modeOverride)
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -1181,8 +1184,14 @@ private fun DescriptionCard(
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 if (localMode != "text") {
+                                    // Flush any pending checklist new-item input so it isn't lost on switch.
+                                    val pending = newItemText.trim()
+                                    if (pending.isNotEmpty()) {
+                                        checklistItems = checklistItems + DescriptionChecklistItem(text = pending, checked = false)
+                                        newItemText = ""
+                                    }
                                     localMode = "text"
-                                    onSave(HabitDescription.Text(textValue))
+                                    onSave(snapshot("text"))
                                 }
                             }
                         )
@@ -1194,7 +1203,7 @@ private fun DescriptionCard(
                             onClick = {
                                 if (localMode != "checklist") {
                                     localMode = "checklist"
-                                    onSave(HabitDescription.Checklist(checklistItems))
+                                    onSave(snapshot("checklist"))
                                 }
                             }
                         )
@@ -1218,7 +1227,8 @@ private fun DescriptionCard(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
                                     onClick = {
-                                        onSave(HabitDescription.Text(textValue.trim()))
+                                        textValue = textValue.trim()
+                                        onSave(snapshot())
                                         isEditingText = false
                                     },
                                     modifier = Modifier.weight(1f),
@@ -1226,7 +1236,7 @@ private fun DescriptionCard(
                                 ) { Text("Save") }
                                 OutlinedButton(
                                     onClick = {
-                                        textValue = (parsed as? HabitDescription.Text)?.value ?: ""
+                                        textValue = parsed.text
                                         isEditingText = false
                                     },
                                     shape = RoundedCornerShape(12.dp)
@@ -1277,7 +1287,7 @@ private fun DescriptionCard(
                                         .background(HabitRed.copy(alpha = 0.08f))
                                         .clickable {
                                             textValue = ""
-                                            onSave(HabitDescription.Text(""))
+                                            onSave(snapshot())
                                         }
                                         .padding(horizontal = 12.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -1339,13 +1349,13 @@ private fun DescriptionCard(
                                         val updated = checklistItems.toMutableList()
                                         updated[index] = item.copy(checked = !item.checked)
                                         checklistItems = updated
-                                        onSave(HabitDescription.Checklist(updated))
+                                        onSave(snapshot())
                                     },
                                     onDelete = {
                                         val updated = checklistItems.toMutableList()
                                         updated.removeAt(index)
                                         checklistItems = updated
-                                        onSave(HabitDescription.Checklist(updated))
+                                        onSave(snapshot())
                                     },
                                     onTextChange = { newText ->
                                         val updated = checklistItems.toMutableList()
@@ -1353,7 +1363,7 @@ private fun DescriptionCard(
                                         checklistItems = updated
                                     },
                                     onCommitText = {
-                                        onSave(HabitDescription.Checklist(checklistItems))
+                                        onSave(snapshot())
                                     }
                                 )
                             }
@@ -1390,7 +1400,7 @@ private fun DescriptionCard(
                                             )
                                             checklistItems = updated
                                             newItemText = ""
-                                            onSave(HabitDescription.Checklist(updated))
+                                            onSave(snapshot())
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {

@@ -31,6 +31,7 @@ import com.example.gymworkout.viewmodel.SocialViewModel
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
@@ -116,6 +117,8 @@ private fun FriendProgressCard(user: SocialUser) {
     val joinedFormatted = remember(user.joinedAt) {
         SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(user.joinedAt.toDate())
     }
+    val today = remember { LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) }
+    val isToday = user.dailyProgress.date == today
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -185,22 +188,25 @@ private fun FriendProgressCard(user: SocialUser) {
                     }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primary
+                        color = if (isToday) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Column(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                "${(user.dmgs * 100).toInt()}%",
+                                if (isToday) "${(user.dmgs * 100).toInt()}%" else "—",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color = if (isToday) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 "DMGS",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                color = if (isToday) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                             )
                         }
                     }
@@ -209,9 +215,8 @@ private fun FriendProgressCard(user: SocialUser) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
 
                 val progress = user.dailyProgress
-                val hasProgress = progress.date.isNotBlank()
 
-                if (hasProgress) {
+                if (isToday) {
                     Text(
                         "Today's Progress",
                         style = MaterialTheme.typography.labelMedium,
@@ -291,6 +296,34 @@ private fun FriendProgressCard(user: SocialUser) {
                             target = progress.sleepTarget,
                             unit = "h",
                             isDecimal = true
+                        )
+                    }
+                } else {
+                    Text(
+                        "Today's Progress",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.HourglassEmpty,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "No activity logged today yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                         )
                     }
                 }
