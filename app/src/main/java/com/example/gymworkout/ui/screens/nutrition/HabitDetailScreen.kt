@@ -196,6 +196,7 @@ fun HabitDetailScreen(
     var addJournalForDate by remember { mutableStateOf<String?>(null) }
     var deleteJournalConfirm by remember { mutableStateOf<JournalEntry?>(null) }
     var calendarMonth by remember { mutableStateOf(java.time.YearMonth.now()) }
+    var selectedJournalDate by remember { mutableStateOf(today) }
 
     Scaffold(
         topBar = {
@@ -613,7 +614,7 @@ fun HabitDetailScreen(
                             )
                         }
                         IconButton(
-                            onClick = { addJournalForDate = today },
+                            onClick = { addJournalForDate = selectedJournalDate },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
@@ -643,25 +644,34 @@ fun HabitDetailScreen(
                                 month = calendarMonth,
                                 entries = journalEntries,
                                 today = today,
+                                selectedDate = selectedJournalDate,
                                 onPrevMonth = { calendarMonth = calendarMonth.minusMonths(1) },
                                 onNextMonth = { calendarMonth = calendarMonth.plusMonths(1) },
                                 onDayClick = { dateStr ->
-                                    val existing = journalEntries.firstOrNull { it.date == dateStr }
-                                    if (existing != null) {
-                                        journalDialogEntry = existing
-                                    } else {
-                                        addJournalForDate = dateStr
-                                    }
+                                    selectedJournalDate = dateStr
                                 }
                             )
 
-                            if (journalEntries.isEmpty()) {
+                            val entriesForSelected = journalEntries.filter { it.date == selectedJournalDate }
+                            val selectedLabel = remember(selectedJournalDate, today) {
+                                try {
+                                    val d = java.time.LocalDate.parse(selectedJournalDate)
+                                    val t = java.time.LocalDate.parse(today)
+                                    when {
+                                        d == t -> "Today"
+                                        d == t.minusDays(1) -> "Yesterday"
+                                        else -> d.format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy"))
+                                    }
+                                } catch (_: Exception) { selectedJournalDate }
+                            }
+
+                            if (entriesForSelected.isEmpty()) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f))
-                                        .clickable { addJournalForDate = today }
+                                        .clickable { addJournalForDate = selectedJournalDate }
                                         .padding(20.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -674,12 +684,12 @@ fun HabitDetailScreen(
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                            "No journal entries yet",
+                                            "No entry for $selectedLabel",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Medium
                                         )
                                         Text(
-                                            "Tap a date or the + button to write",
+                                            "Tap to add one",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -687,13 +697,13 @@ fun HabitDetailScreen(
                                 }
                             } else {
                                 Text(
-                                    "All Entries",
+                                    selectedLabel,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
-                                journalEntries.forEach { entry ->
+                                entriesForSelected.forEach { entry ->
                                     JournalEntryRow(
                                         entry = entry,
                                         onClick = { journalDialogEntry = entry },
@@ -1510,6 +1520,7 @@ private fun JournalCalendar(
     month: java.time.YearMonth,
     entries: List<JournalEntry>,
     today: String,
+    selectedDate: String,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onDayClick: (String) -> Unit
@@ -1596,11 +1607,13 @@ private fun JournalCalendar(
                             val hasEntry = dateStr in datesWithEntries
                             val isToday = date == todayDate
                             val isFuture = date.isAfter(todayDate)
+                            val isSelected = dateStr == selectedDate
                             CalendarDayCell(
                                 day = dayNumber,
                                 hasEntry = hasEntry,
                                 isToday = isToday,
                                 isFuture = isFuture,
+                                isSelected = isSelected,
                                 modifier = Modifier.weight(1f),
                                 onClick = { if (!isFuture) onDayClick(dateStr) }
                             )
@@ -1657,14 +1670,17 @@ private fun CalendarDayCell(
     hasEntry: Boolean,
     isToday: Boolean,
     isFuture: Boolean,
+    isSelected: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val bg = when {
+        isSelected -> MaterialTheme.colorScheme.primary
         hasEntry -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
         else -> Color.Transparent
     }
     val textColor = when {
+        isSelected -> MaterialTheme.colorScheme.onPrimary
         isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
         hasEntry -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurface
@@ -1675,7 +1691,7 @@ private fun CalendarDayCell(
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .then(
-                if (isToday) Modifier.border(
+                if (isToday && !isSelected) Modifier.border(
                     1.5.dp,
                     MaterialTheme.colorScheme.primary,
                     RoundedCornerShape(8.dp)
@@ -1690,7 +1706,7 @@ private fun CalendarDayCell(
                 "$day",
                 style = MaterialTheme.typography.labelMedium,
                 color = textColor,
-                fontWeight = if (isToday || hasEntry) FontWeight.SemiBold else FontWeight.Normal
+                fontWeight = if (isToday || hasEntry || isSelected) FontWeight.SemiBold else FontWeight.Normal
             )
             if (hasEntry) {
                 Spacer(modifier = Modifier.height(2.dp))
@@ -1698,7 +1714,10 @@ private fun CalendarDayCell(
                     modifier = Modifier
                         .size(4.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.primary
+                        )
                 )
             }
         }
