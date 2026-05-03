@@ -23,6 +23,9 @@ interface ReminderDao {
     @Query("SELECT * FROM nutrition_reminders WHERE id = :id")
     suspend fun getReminderById(id: Int): NutritionReminder?
 
+    @Query("SELECT * FROM nutrition_reminders WHERE category = :category")
+    suspend fun getRemindersForCategorySync(category: String): List<NutritionReminder>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReminder(reminder: NutritionReminder): Long
 

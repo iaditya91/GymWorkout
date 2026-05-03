@@ -30,11 +30,18 @@ class ReminderReceiver : BroadcastReceiver() {
                 }
 
                 val db = WorkoutDatabase.getDatabase(context)
-                val label = if (categoryEnum != null) {
-                    categoryEnum.label
-                } else {
-                    db.nutritionDao().getTargetSync(category)?.label ?: category
+                val customTarget = if (categoryEnum == null) db.nutritionDao().getTargetSync(category) else null
+
+                // Custom objective was deleted — skip notification and don't reschedule
+                if (categoryEnum == null && customTarget == null) {
+                    db.reminderDao().getReminderById(reminderId)?.let { stale ->
+                        ReminderScheduler.cancelReminder(context, stale)
+                        db.reminderDao().deleteReminder(stale)
+                    }
+                    return@launch
                 }
+
+                val label = categoryEnum?.label ?: customTarget?.label ?: category
 
                 val title = "$label Reminder"
                 val text = customText.ifBlank {

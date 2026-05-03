@@ -337,9 +337,15 @@ class NutritionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun deleteObjective(category: String) {
         viewModelScope.launch {
+            // Cancel and remove reminders so AlarmManager doesn't keep firing for a deleted objective
+            val reminders = reminderDao.getRemindersForCategorySync(category)
+            reminders.forEach { ReminderScheduler.cancelReminder(getApplication(), it) }
+            reminderDao.deleteRemindersForCategory(category)
+
             dao.deleteTarget(category)
             dao.deleteEntriesForCategory(category)
             dao.deleteJournalEntriesForCategory(category)
+            dao.deleteAtomicHabit(category)
         }
     }
 
