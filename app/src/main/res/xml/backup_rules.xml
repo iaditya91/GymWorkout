@@ -7,7 +7,9 @@
 -->
 <full-backup-content>
     <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
+   The Room DB ("workout_database") uses TRUNCATE journal mode (set in
+   WorkoutDatabase.kt) so the single .db file is always self-consistent and
+   safe for Auto Backup. Do NOT switch Room back to WAL without excluding the
+   -wal/-shm sidecar files here, or restores can lose recent data.
 -->
 </full-backup-content>

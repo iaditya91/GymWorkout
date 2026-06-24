@@ -17,6 +17,7 @@ import com.example.gymworkout.notification.QuoteReminderScheduler
 import com.example.gymworkout.notification.WorkoutReminderScheduler
 import com.example.gymworkout.data.sync.BackupData
 import com.example.gymworkout.data.sync.BackupManager
+import com.example.gymworkout.data.sync.hasUserData
 import com.example.gymworkout.data.sync.GoogleDriveSync
 import com.example.gymworkout.data.sync.SyncPreference
 import com.google.android.gms.auth.GoogleAuthUtil
@@ -260,6 +261,15 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
             _syncState.value = SyncState.Loading("Creating backup...")
             try {
                 val backupData = backupManager.createBackup()
+
+                // SAFETY: don't overwrite cloud backups with an empty/wiped database.
+                if (!backupData.hasUserData()) {
+                    _syncState.value = SyncState.Error(
+                        "Nothing to back up. Your previous cloud backups are unchanged."
+                    )
+                    return@launch
+                }
+
                 val json = withContext(Dispatchers.Default) { gson.toJson(backupData) }
 
                 _syncState.value = SyncState.Loading("Uploading to Google Drive...")
@@ -299,6 +309,15 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
                 val backupData = withContext(Dispatchers.Default) {
                     gson.fromJson(json, BackupData::class.java)
                 }
+
+                // SAFETY: don't wipe good local data by restoring an empty backup.
+                if (!backupData.hasUserData()) {
+                    _syncState.value = SyncState.Error(
+                        "The cloud backup is empty. Local data was left untouched."
+                    )
+                    return@launch
+                }
+
                 backupManager.restoreBackup(backupData)
 
                 val now = System.currentTimeMillis()

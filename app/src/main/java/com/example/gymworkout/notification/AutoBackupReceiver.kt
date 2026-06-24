@@ -6,6 +6,7 @@ import android.content.Intent
 import com.example.gymworkout.data.WorkoutDatabase
 import com.example.gymworkout.data.sync.BackupManager
 import com.example.gymworkout.data.sync.GoogleDriveSync
+import com.example.gymworkout.data.sync.hasUserData
 import com.example.gymworkout.data.sync.SyncPreference
 import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -44,6 +45,14 @@ class AutoBackupReceiver : BroadcastReceiver() {
                 val db = WorkoutDatabase.getDatabase(context)
                 val backupManager = BackupManager(db, context)
                 val backupData = backupManager.createBackup()
+
+                // SAFETY: never let an empty/wiped database overwrite good cloud copies.
+                // If there is no user data, skip this backup and keep existing versions.
+                if (!backupData.hasUserData()) {
+                    reschedule(context)
+                    return@launch
+                }
+
                 val json = withContext(Dispatchers.Default) { Gson().toJson(backupData) }
 
                 // Upload to Google Drive

@@ -47,3 +47,31 @@ data class BackupData(
     val journalEntries: List<JournalEntry> = emptyList(),
     val atomicHabits: List<AtomicHabit> = emptyList()
 )
+
+/**
+ * True if this backup contains any actual user data. Preference flags (theme, quote
+ * settings) do not count as data on their own.
+ *
+ * Used to guard against the catastrophic scenario where a wiped/empty database gets
+ * backed up to the cloud (overwriting a good copy) or an empty cloud backup gets
+ * restored over good local data.
+ */
+fun BackupData.hasUserData(): Boolean {
+    return exercises.isNotEmpty() ||
+        nutritionEntries.isNotEmpty() ||
+        nutritionTargets.isNotEmpty() ||
+        dailyCheckIns.isNotEmpty() ||
+        userProfiles.isNotEmpty() ||
+        checklistItems.isNotEmpty() ||
+        nutritionReminders.isNotEmpty() ||
+        dayHeadings.isNotEmpty() ||
+        workoutReminders.isNotEmpty() ||
+        foodLogEntries.isNotEmpty() ||
+        customQuotes.isNotEmpty() ||
+        progressPhotos.isNotEmpty() ||
+        customFoods.isNotEmpty() ||
+        weightEntries.isNotEmpty() ||
+        workoutSetLogs.isNotEmpty() ||
+        journalEntries.isNotEmpty() ||
+        atomicHabits.isNotEmpty()
+}

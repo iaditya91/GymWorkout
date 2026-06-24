@@ -1,6 +1,7 @@
 package com.example.gymworkout.data
 
 import android.content.Context
+import com.example.gymworkout.BuildConfig
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -241,8 +242,19 @@ val MIGRATION_25_26 = object : Migration(25, 26) {
 
 val MIGRATION_26_27 = object : Migration(26, 27) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE journal_entries ADD COLUMN scoreChecked INTEGER NOT NULL DEFAULT 0")
-        db.execSQL("ALTER TABLE journal_entries ADD COLUMN scoreTotal INTEGER NOT NULL DEFAULT 0")
+        val existingColumns = mutableSetOf<String>()
+        db.query("PRAGMA table_info(journal_entries)").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            while (cursor.moveToNext()) {
+                existingColumns.add(cursor.getString(nameIndex))
+            }
+        }
+        if (!existingColumns.contains("scoreChecked")) {
+            db.execSQL("ALTER TABLE journal_entries ADD COLUMN scoreChecked INTEGER NOT NULL DEFAULT 0")
+        }
+        if (!existingColumns.contains("scoreTotal")) {
+            db.execSQL("ALTER TABLE journal_entries ADD COLUMN scoreTotal INTEGER NOT NULL DEFAULT 0")
+        }
     }
 }
 
@@ -289,7 +301,14 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     "workout_database"
                 )
                     .addMigrations(MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
-                    .fallbackToDestructiveMigration()
+                    // Only allow Room to wipe-and-recreate on schema mismatch in debug builds.
+                    // In production a missing migration must crash loudly during testing rather
+                    // than silently deleting the user's data.
+                    .apply { if (BuildConfig.DEBUG) fallbackToDestructiveMigration() }
+                    // Disable WAL. With WAL, recent writes live in a -wal sidecar file that
+                    // Android Auto Backup captures inconsistently, causing data loss on restore.
+                    // TRUNCATE keeps the single .db file always self-consistent for backup.
+                    .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
                     .build()
                 INSTANCE = instance
                 instance
