@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,14 +38,18 @@ fun TemplateDetailScreen(
     val template by socialViewModel.selectedTemplate.collectAsState()
     val reviews by socialViewModel.templateReviews.collectAsState()
     val currentUser by socialViewModel.currentSocialUser.collectAsState()
+    val localDayCounts by socialViewModel.localDayCounts.collectAsState()
     val context = LocalContext.current
     var showCopyConfirm by remember { mutableStateOf(false) }
     var showReviewDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    // Non-null while the "import a single day" dialog is open; holds the template dayOfWeek tapped.
+    var importDaySource by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(templateId) {
         socialViewModel.selectTemplate(templateId)
+        socialViewModel.refreshLocalPlanInfo()
     }
 
     DisposableEffect(templateId) {
@@ -96,43 +102,58 @@ fun TemplateDetailScreen(
             item { HeaderSection(template = t) }
 
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!isOwnTemplate) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Import is available for ANY template (own or others').
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = { showCopyConfirm = true },
+                            onClick = {
+                                // Only warn when there is an existing plan to overwrite.
+                                if (localDayCounts.values.any { it > 0 }) {
+                                    showCopyConfirm = true
+                                } else {
+                                    socialViewModel.downloadTemplate(t)
+                                    onBack()
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Use Plan")
+                            Text("Import All")
                         }
-                        OutlinedButton(
-                            onClick = { showReviewDialog = true },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.RateReview, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Review")
+                        if (!isOwnTemplate) {
+                            OutlinedButton(
+                                onClick = { showReviewDialog = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.RateReview, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Review")
+                            }
                         }
-                    } else {
-                        Button(
-                            onClick = { showEditDialog = true },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Edit")
-                        }
-                        OutlinedButton(
-                            onClick = { showDeleteConfirm = true },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Delete")
+                    }
+                    // Owner-only management actions.
+                    if (isOwnTemplate) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { showEditDialog = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Edit")
+                            }
+                            OutlinedButton(
+                                onClick = { showDeleteConfirm = true },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Delete")
+                            }
                         }
                     }
                 }
@@ -144,6 +165,13 @@ fun TemplateDetailScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
+                if (t.exercises.isNotEmpty()) {
+                    Text(
+                        "Tap a day to import just that day into your plan.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             if (t.exercises.isEmpty()) {
@@ -157,7 +185,14 @@ fun TemplateDetailScreen(
             } else {
                 val exercisesByDay = t.exercises.groupBy { it.dayOfWeek }.toSortedMap()
                 exercisesByDay.forEach { (day, dayExercises) ->
-                    item { DayPlanSection(day = day, dayExercises = dayExercises, templateTitle = t.title) }
+                    item {
+                        DayPlanSection(
+                            day = day,
+                            dayExercises = dayExercises,
+                            templateTitle = t.title,
+                            onImport = { importDaySource = day }
+                        )
+                    }
                 }
             }
 
@@ -199,16 +234,16 @@ fun TemplateDetailScreen(
         if (t != null) {
             AlertDialog(
                 onDismissRequest = { showCopyConfirm = false },
-                title = { Text("Use This Plan?") },
+                title = { Text("Import Entire Plan?") },
                 text = {
-                    Text("This will REPLACE your current workout plan with \"${t.title}\". This cannot be undone.")
+                    Text("This will REPLACE your current workout plan (all days) with \"${t.title}\". This cannot be undone.")
                 },
                 confirmButton = {
                     TextButton(onClick = {
                         socialViewModel.downloadTemplate(t)
                         showCopyConfirm = false
                         onBack()
-                    }) { Text("Use Plan") }
+                    }) { Text("Replace", color = MaterialTheme.colorScheme.error) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showCopyConfirm = false }) { Text("Cancel") }
@@ -270,6 +305,126 @@ fun TemplateDetailScreen(
             }
         )
     }
+
+    val sourceDay = importDaySource
+    val t = template
+    if (sourceDay != null && t != null) {
+        val sourceCount = t.exercises.count { it.dayOfWeek == sourceDay }
+        ImportDayDialog(
+            sourceDay = sourceDay,
+            sourceExerciseCount = sourceCount,
+            localDayCounts = localDayCounts,
+            onDismiss = { importDaySource = null },
+            onConfirm = { targetDay, replace ->
+                socialViewModel.importTemplateDay(t, sourceDay, targetDay, replace)
+                importDaySource = null
+            }
+        )
+    }
+}
+
+private val DAY_NAMES = listOf(
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+)
+private val DAY_ABBREV = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+private fun dayLabel(day: Int): String =
+    if (day in 0..6) DAY_NAMES[day] else "Day ${day + 1}"
+
+@Composable
+private fun ImportDayDialog(
+    sourceDay: Int,
+    sourceExerciseCount: Int,
+    localDayCounts: Map<Int, Int>,
+    onDismiss: () -> Unit,
+    onConfirm: (targetDay: Int, replace: Boolean) -> Unit
+) {
+    var targetDay by remember { mutableStateOf(sourceDay.coerceIn(0, 6)) }
+    var replace by remember { mutableStateOf(true) }
+    val occupied = (localDayCounts[targetDay] ?: 0)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Import ${dayLabel(sourceDay)}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "$sourceExerciseCount exercise${if (sourceExerciseCount == 1) "" else "s"} " +
+                            "will be imported into the day you pick below.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("Import into", style = MaterialTheme.typography.labelMedium)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    (0..6).forEach { d ->
+                        FilterChip(
+                            selected = targetDay == d,
+                            onClick = { targetDay = d },
+                            label = { Text(DAY_ABBREV[d]) }
+                        )
+                    }
+                }
+
+                Text("Action", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = replace,
+                        onClick = { replace = true },
+                        label = { Text("Replace day") }
+                    )
+                    FilterChip(
+                        selected = !replace,
+                        onClick = { replace = false },
+                        label = { Text("Append") }
+                    )
+                }
+
+                if (occupied > 0) {
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.errorContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Warning, null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                if (replace)
+                                    "${dayLabel(targetDay)} already has $occupied exercise${if (occupied == 1) "" else "s"}. They will be REPLACED."
+                                else
+                                    "${dayLabel(targetDay)} already has $occupied exercise${if (occupied == 1) "" else "s"}. The imported ones will be ADDED after them.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(targetDay, replace) }) {
+                Text(
+                    if (replace) "Import (Replace)" else "Import (Append)",
+                    color = if (replace && occupied > 0) MaterialTheme.colorScheme.error
+                    else Color.Unspecified
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -364,23 +519,41 @@ private fun MetaItem(icon: androidx.compose.ui.graphics.vector.ImageVector, text
 }
 
 @Composable
-private fun DayPlanSection(day: Int, dayExercises: List<TemplateExercise>, templateTitle: String) {
-    val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-    val dayName = if (day in 0..6) dayNames[day] else "Day ${day + 1}"
+private fun DayPlanSection(
+    day: Int,
+    dayExercises: List<TemplateExercise>,
+    templateTitle: String,
+    onImport: (() -> Unit)? = null
+) {
+    val dayName = dayLabel(day)
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onImport != null) Modifier.clickable { onImport() } else Modifier)
+    ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Text(
-                    dayName,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        dayName,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                if (onImport != null) {
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onImport, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Import", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
 

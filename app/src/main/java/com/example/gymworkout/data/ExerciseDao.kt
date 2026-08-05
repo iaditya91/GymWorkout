@@ -47,6 +47,12 @@ interface ExerciseDao {
     @Query("UPDATE exercises SET isCompleted = 0, completedSets = 0 WHERE dayOfWeek = :day")
     suspend fun resetDay(day: Int)
 
+    @Query("DELETE FROM exercises WHERE dayOfWeek = :day")
+    suspend fun deleteForDay(day: Int)
+
+    @Query("SELECT COALESCE(MAX(orderIndex), -1) FROM exercises WHERE dayOfWeek = :day")
+    suspend fun getMaxOrderIndexForDay(day: Int): Int
+
     @Query("UPDATE exercises SET isCompleted = 0, completedSets = 0")
     suspend fun resetAllDays()
 

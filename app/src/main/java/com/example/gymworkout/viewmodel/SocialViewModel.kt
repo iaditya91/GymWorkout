@@ -1160,9 +1160,21 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Number of exercises the local plan currently has per dayOfWeek (0=Mon..6=Sun).
+    // Used by the template detail screen to decide whether importing needs an override warning.
+    private val _localDayCounts = MutableStateFlow<Map<Int, Int>>(emptyMap())
+    val localDayCounts: StateFlow<Map<Int, Int>> = _localDayCounts
+
+    fun refreshLocalPlanInfo() {
+        viewModelScope.launch {
+            val all = withContext(Dispatchers.IO) { exerciseDao.getAllSync() }
+            _localDayCounts.value = all.groupingBy { it.dayOfWeek }.eachCount()
+        }
+    }
+
     fun downloadTemplate(template: WorkoutTemplate) {
         viewModelScope.launch {
-            // Replace local exercises with template exercises
+            // Replace the ENTIRE local plan with the template's exercises (all days).
             withContext(Dispatchers.IO) {
                 exerciseDao.deleteAll()
                 for (ex in template.exercises) {
@@ -1177,6 +1189,56 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 repo.incrementTemplateDownloads(template.id)
             }
+            refreshLocalPlanInfo()
+            loadTemplates()
+        }
+    }
+
+    /**
+     * Import a single day of a template into one weekday slot of the local plan.
+     * @param sourceDay dayOfWeek in the template to copy from (0=Mon..6=Sun)
+     * @param targetDay dayOfWeek in the local plan to copy into
+     * @param replace  true = overwrite the target day's exercises; false = append after them
+     */
+    fun importTemplateDay(
+        template: WorkoutTemplate,
+        sourceDay: Int,
+        targetDay: Int,
+        replace: Boolean
+    ) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val dayExercises = template.exercises
+                    .filter { it.dayOfWeek == sourceDay }
+                    .sortedBy { it.orderIndex }
+
+                if (replace) exerciseDao.deleteForDay(targetDay)
+
+                val baseOrder =
+                    if (replace) 0 else exerciseDao.getMaxOrderIndexForDay(targetDay) + 1
+
+                // Re-map superset group ids to a fresh, unique namespace so an appended
+                // superset can never collide with a group already living in the target day.
+                val batch = System.currentTimeMillis()
+                val groupRemap = HashMap<String, String>()
+
+                dayExercises.forEachIndexed { index, ex ->
+                    val newGroupId =
+                        if (ex.supersetGroupId.isBlank()) ""
+                        else groupRemap.getOrPut(ex.supersetGroupId) { "imp${batch}_${ex.supersetGroupId}" }
+                    exerciseDao.insert(
+                        com.example.gymworkout.data.Exercise(
+                            dayOfWeek = targetDay, name = ex.name,
+                            sets = ex.sets, reps = ex.reps,
+                            restTimeSeconds = ex.restTimeSeconds,
+                            orderIndex = baseOrder + index,
+                            supersetGroupId = newGroupId
+                        )
+                    )
+                }
+                repo.incrementTemplateDownloads(template.id)
+            }
+            refreshLocalPlanInfo()
             loadTemplates()
         }
     }
