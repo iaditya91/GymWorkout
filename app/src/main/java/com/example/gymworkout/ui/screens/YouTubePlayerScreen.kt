@@ -9,8 +9,12 @@ import java.net.URLEncoder
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -19,6 +23,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,9 +39,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 fun YouTubePlayerScreen(
     exerciseName: String,
     youtubeUrl: String,
+    savedUrl: String? = null,
+    onSetVideo: ((String) -> Unit)? = null,
+    onRemoveVideo: (() -> Unit)? = null,
     onBack: () -> Unit
 ) {
     val videoId = extractYouTubeVideoId(youtubeUrl)
+    // Video currently on screen: the embedded one, or whichever the user opened from search.
+    var currentVideoId by remember { mutableStateOf(videoId) }
+    val savedVideoId = savedUrl?.let { extractYouTubeVideoId(it) }
+    val hasSavedVideo = !savedUrl.isNullOrBlank()
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -47,6 +63,37 @@ fun YouTubePlayerScreen(
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                val current = currentVideoId
+                if (onSetVideo != null && current != null) {
+                    if (current == savedVideoId) {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = "Video set for this exercise",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                    } else {
+                        IconButton(onClick = {
+                            onSetVideo("https://www.youtube.com/watch?v=$current")
+                        }) {
+                            Icon(
+                                Icons.Default.StarBorder,
+                                contentDescription = "Set as video for this exercise"
+                            )
+                        }
+                    }
+                }
+                if (onRemoveVideo != null && hasSavedVideo) {
+                    IconButton(onClick = onRemoveVideo) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Remove video from this exercise",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -65,7 +112,20 @@ fun YouTubePlayerScreen(
                     settings.domStorageEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = false
                     webChromeClient = WebChromeClient()
-                    webViewClient = WebViewClient()
+                    webViewClient = object : WebViewClient() {
+                        // YouTube's mobile site navigates via the history API, so this is
+                        // the callback that reliably reports the video the user opened.
+                        override fun doUpdateVisitedHistory(
+                            view: WebView?,
+                            url: String?,
+                            isReload: Boolean
+                        ) {
+                            super.doUpdateVisitedHistory(view, url, isReload)
+                            if (videoId == null) {
+                                currentVideoId = url?.let { extractYouTubeVideoId(it) }
+                            }
+                        }
+                    }
 
                     if (videoId != null) {
                         val htmlContent = """

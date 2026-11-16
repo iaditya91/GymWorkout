@@ -370,10 +370,10 @@ fun WorkoutApp() {
                     dayIndex = dayIndex,
                     viewModel = workoutViewModel,
                     onBack = { navController.popBackStack() },
-                    onPlayVideo = { name, url ->
+                    onPlayVideo = { exerciseId, name, url ->
                         val encodedName = URLEncoder.encode(name, "UTF-8")
                         val encodedUrl = URLEncoder.encode(url, "UTF-8")
-                        navController.navigate("youtube/$encodedName?url=$encodedUrl")
+                        navController.navigate("youtube/$encodedName?url=$encodedUrl&exerciseId=$exerciseId")
                     },
                     onViewExerciseDetail = { exerciseName ->
                         val encodedName = URLEncoder.encode(exerciseName, "UTF-8")
@@ -383,10 +383,11 @@ fun WorkoutApp() {
                 )
             }
             composable(
-                route = "youtube/{name}?url={url}",
+                route = "youtube/{name}?url={url}&exerciseId={exerciseId}",
                 arguments = listOf(
                     navArgument("name") { type = NavType.StringType },
-                    navArgument("url") { type = NavType.StringType }
+                    navArgument("url") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("exerciseId") { type = NavType.IntType; defaultValue = -1 }
                 )
             ) { backStackEntry ->
                 val name = URLDecoder.decode(
@@ -395,9 +396,23 @@ fun WorkoutApp() {
                 val url = URLDecoder.decode(
                     backStackEntry.arguments?.getString("url") ?: "", "UTF-8"
                 )
+                val exerciseId = backStackEntry.arguments?.getInt("exerciseId") ?: -1
+                val savedUrl = if (exerciseId > 0) {
+                    val exercise by remember(exerciseId) {
+                        workoutViewModel.getExerciseById(exerciseId)
+                    }.collectAsState(initial = null)
+                    exercise?.youtubeUrl
+                } else null
                 YouTubePlayerScreen(
                     exerciseName = name,
                     youtubeUrl = url,
+                    savedUrl = savedUrl,
+                    onSetVideo = { videoUrl ->
+                        workoutViewModel.setExerciseYoutubeUrl(exerciseId, videoUrl)
+                    },
+                    onRemoveVideo = {
+                        workoutViewModel.setExerciseYoutubeUrl(exerciseId, "")
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }

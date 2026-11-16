@@ -59,7 +59,12 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     private val _restTimerState = MutableStateFlow<RestTimerState?>(null)
     val restTimerState: StateFlow<RestTimerState?> = _restTimerState.asStateFlow()
 
-    fun startRestTimer(exerciseName: String, totalSeconds: Int, dayIndex: Int, inline: Boolean = false) {
+    fun startRestTimer(
+        exerciseName: String,
+        totalSeconds: Int,
+        dayIndex: Int,
+        inline: Boolean = com.example.gymworkout.data.RestTimerPreference.isShowOnScreenDefault(getApplication())
+    ) {
         com.example.gymworkout.notification.TimerAlertService.clearAcknowledged()
         _restTimerState.value = RestTimerState(
             exerciseName = exerciseName,
@@ -133,6 +138,14 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun updateExercise(exercise: Exercise) {
         viewModelScope.launch {
             dao.update(exercise)
+        }
+    }
+
+    fun getExerciseById(id: Int): Flow<Exercise?> = dao.getExerciseById(id)
+
+    fun setExerciseYoutubeUrl(exerciseId: Int, url: String) {
+        viewModelScope.launch {
+            dao.updateYoutubeUrl(exerciseId, url)
         }
     }
 

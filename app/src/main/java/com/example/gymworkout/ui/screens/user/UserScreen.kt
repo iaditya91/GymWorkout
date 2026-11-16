@@ -291,6 +291,8 @@ fun UserScreen(
 
             item { WeightUnitSettingsCard() }
 
+            item { RestTimerDisplaySettingsCard() }
+
             item { TimerSoundSettingsCard() }
 
             item {
@@ -1017,6 +1019,63 @@ fun WeightUnitSettingsCard() {
                 options = listOf(WeightUnitPreference.KG, WeightUnitPreference.LB),
                 selected = unit,
                 onSelect = { WeightUnitPreference.setUnit(context, it) }
+            )
+        }
+    }
+}
+
+@Composable
+fun RestTimerDisplaySettingsCard() {
+    val context = LocalContext.current
+    var showOnScreen by remember {
+        mutableStateOf(com.example.gymworkout.data.RestTimerPreference.isShowOnScreenDefault(context))
+    }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Show Rest Timer on Screen",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    if (showOnScreen) "Rest timer opens as a bar on the workout screen"
+                    else "Rest timer opens as a popup",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = showOnScreen,
+                onCheckedChange = {
+                    showOnScreen = it
+                    com.example.gymworkout.data.RestTimerPreference.setShowOnScreenDefault(context, it)
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                )
             )
         }
     }

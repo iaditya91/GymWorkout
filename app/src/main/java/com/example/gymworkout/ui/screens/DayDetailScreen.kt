@@ -139,7 +139,7 @@ fun DayDetailScreen(
     dayIndex: Int,
     viewModel: WorkoutViewModel,
     onBack: () -> Unit,
-    onPlayVideo: (exerciseName: String, youtubeUrl: String) -> Unit = { _, _ -> },
+    onPlayVideo: (exerciseId: Int, exerciseName: String, youtubeUrl: String) -> Unit = { _, _, _ -> },
     onViewExerciseDetail: (String) -> Unit = {},
     onNavigateToAiChat: () -> Unit = {}
 ) {
@@ -492,7 +492,7 @@ fun DayDetailScreen(
                                     exercise = item.exercise,
                                     onIncrementSet = { requestLogSet(listOf(item.exercise)) },
                                     onDecrementSet = { viewModel.decrementSet(item.exercise) },
-                                    onPlayVideo = { onPlayVideo(item.exercise.name, item.exercise.youtubeUrl) },
+                                    onPlayVideo = { onPlayVideo(item.exercise.id, item.exercise.name, item.exercise.youtubeUrl) },
                                     onExerciseClick = { onViewExerciseDetail(item.exercise.name) },
                                     onEditNotes = { notesExercise = item.exercise },
                                     onEdit = { editingExercise = item.exercise },
@@ -506,7 +506,7 @@ fun DayDetailScreen(
                                     exercises = item.exercises,
                                     onIncrementSet = { _ -> requestLogSet(item.exercises) },
                                     onDecrementSet = { ex -> viewModel.decrementSet(ex) },
-                                    onPlayVideo = { ex -> onPlayVideo(ex.name, ex.youtubeUrl) },
+                                    onPlayVideo = { ex -> onPlayVideo(ex.id, ex.name, ex.youtubeUrl) },
                                     onExerciseClick = { ex -> onViewExerciseDetail(ex.name) },
                                     onEditNotes = { ex -> notesExercise = ex },
                                     onEdit = { ex -> editingExercise = ex },
