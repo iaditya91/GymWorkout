@@ -143,6 +143,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ThemePreference.init(this)
+        com.example.gymworkout.data.WeightUnitPreference.init(this)
         NotificationHelper.createNotificationChannel(this)
         NotificationHelper.createWorkoutNotificationChannel(this)
         NotificationHelper.createQuoteNotificationChannel(this)

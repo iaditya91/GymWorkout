@@ -121,8 +121,8 @@ fun ExerciseDetailScreen(
         db.workoutSetLogDao().getLogsByExerciseName(exerciseName)
     }.collectAsState(initial = emptyList())
     val weightUnit by remember {
-        db.userDao().getProfile().map { it?.weightUnit ?: "kg" }
-    }.collectAsState(initial = "kg")
+        com.example.gymworkout.data.WeightUnitPreference.apply { init(context) }.unit
+    }.collectAsState()
 
     Scaffold(
         topBar = {

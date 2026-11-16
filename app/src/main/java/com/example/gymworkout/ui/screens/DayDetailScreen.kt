@@ -1032,9 +1032,15 @@ fun ExerciseCard(
                 }
                 if (exercise.restTimeSeconds > 0) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    Box(modifier = Modifier.background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.tertiaryContainer)
+                            .clickable(onClick = onStartRest)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
+                            Icon(Icons.Default.Timer, contentDescription = "Start rest timer", modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
                             Spacer(modifier = Modifier.width(3.dp))
                             Text("${exercise.restTimeSeconds}s", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onTertiaryContainer)
                         }
@@ -1052,22 +1058,6 @@ fun ExerciseCard(
                     .padding(start = 68.dp, top = 4.dp),
                 horizontalArrangement = Arrangement.End
             ) {
-                if (exercise.restTimeSeconds > 0) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.tertiaryContainer)
-                            .clickable(onClick = onStartRest)
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Timer, contentDescription = "Start rest timer", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Rest ${exercise.restTimeSeconds}s", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                        }
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                }
                 IconButton(onClick = onEditNotes, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Add/edit notes", tint = if (exercise.notes.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
                 }

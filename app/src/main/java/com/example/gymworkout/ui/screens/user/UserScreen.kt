@@ -115,6 +115,8 @@ import com.example.gymworkout.notification.ProgressNotificationService
 import android.media.RingtoneManager
 import androidx.compose.material.icons.filled.MusicNote
 import com.example.gymworkout.data.TimerSoundPreference
+import com.example.gymworkout.data.WeightUnitPreference
+import androidx.compose.material.icons.filled.FitnessCenter
 import com.example.gymworkout.viewmodel.NutritionViewModel
 import com.example.gymworkout.viewmodel.SocialViewModel
 import com.example.gymworkout.viewmodel.SyncState
@@ -286,6 +288,8 @@ fun UserScreen(
             }
 
             item { ThemeToggleCard() }
+
+            item { WeightUnitSettingsCard() }
 
             item { TimerSoundSettingsCard() }
 
@@ -969,6 +973,50 @@ fun ThemeToggleCard() {
                     checkedThumbColor = MaterialTheme.colorScheme.primary,
                     checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
                 )
+            )
+        }
+    }
+}
+
+@Composable
+fun WeightUnitSettingsCard() {
+    val context = LocalContext.current
+    val unit by remember { WeightUnitPreference.apply { init(context) }.unit }.collectAsState()
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.FitnessCenter,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Weight Unit", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Used for logged sets & exercise stats",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            UnitToggle(
+                options = listOf(WeightUnitPreference.KG, WeightUnitPreference.LB),
+                selected = unit,
+                onSelect = { WeightUnitPreference.setUnit(context, it) }
             )
         }
     }

@@ -48,8 +48,9 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     private val setLogDao = WorkoutDatabase.getDatabase(application).workoutSetLogDao()
     private val userDao = WorkoutDatabase.getDatabase(application).userDao()
 
-    /** "kg" or "lb" — reflects the user's profile preference. */
-    val weightUnit: Flow<String> = userDao.getProfile().map { it?.weightUnit ?: "kg" }
+    /** "kg" or "lb" — reflects the exercise weight unit chosen in Settings. */
+    val weightUnit: StateFlow<String> =
+        com.example.gymworkout.data.WeightUnitPreference.apply { init(application) }.unit
 
     suspend fun getExercisesByGroupId(groupId: String): List<Exercise> =
         dao.getExercisesByGroupId(groupId)
