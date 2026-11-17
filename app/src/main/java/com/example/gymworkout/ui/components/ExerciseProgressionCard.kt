@@ -34,7 +34,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalDensity
@@ -153,7 +165,7 @@ fun ExerciseProgressionCard(
             AnimatedVisibility(visible = expanded) {
                 Column {
                     Spacer(modifier = Modifier.height(14.dp))
-                    SectionLabel("Top-set weight over time")
+                    SectionLabel("Top-set weight ($displayUnit) over time")
                     Spacer(modifier = Modifier.height(6.dp))
                     ProgressionChart(
                         sessions = progression.sessions,
@@ -225,8 +237,9 @@ private fun ProgressionChart(
 ) {
     val scheme = MaterialTheme.colorScheme
     val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
 
-    // Build display points: x = session index (even spacing), y = topWeightKg
+    // x = session (even spacing, oldest → newest), y = top-set weight in display unit
     val weightsDisplay = sessions.map { VolumeAnalytics.kgToDisplay(it.topWeightKg, displayUnit) }
     val minY = (weightsDisplay.minOrNull() ?: 0.0).coerceAtLeast(0.0)
     val maxY = (weightsDisplay.maxOrNull() ?: 0.0)
@@ -235,111 +248,183 @@ private fun ProgressionChart(
     val padded = span * 0.15
     val yLow = (minY - padded).coerceAtLeast(0.0)
     val yHigh = maxY + padded
+    val yRange = (yHigh - yLow).coerceAtLeast(0.0001)
 
     val lineColor = scheme.primary
-    val dotColor = scheme.primary
     val gridColor = scheme.outline.copy(alpha = 0.25f)
-    val mutedText = scheme.onSurfaceVariant
+    val axisColor = scheme.outline.copy(alpha = 0.6f)
+    val tooltipBg = scheme.inverseSurface
+    val dotHole = scheme.surface
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = scheme.onSurfaceVariant)
+    val tooltipStyle = MaterialTheme.typography.labelMedium.copy(
+        color = scheme.inverseOnSurface,
+        fontWeight = FontWeight.SemiBold
+    )
+
+    // Y-axis ticks (weight), top to bottom
+    val yTickCount = 4
+    val yTicks = (0 until yTickCount).map { yHigh - yRange * it / (yTickCount - 1) }
+    val yTickLabels = remember(yTicks, labelStyle) {
+        yTicks.map { textMeasurer.measure(formatDisplayValue(it), labelStyle) }
+    }
+    val leftGutterPx = (yTickLabels.maxOfOrNull { it.size.width } ?: 0) +
+        with(density) { 8.dp.toPx() }
+    val rightPadPx = with(density) { 10.dp.toPx() }
+
+    // X-axis ticks (dates): up to 4 evenly spread sessions
+    val n = sessions.size
+    val xTickIndices = when {
+        n <= 4 -> sessions.indices.toList()
+        else -> listOf(0, (n - 1) / 3, (n - 1) * 2 / 3, n - 1).distinct()
+    }
+
+    var selected by remember(sessions) { mutableStateOf<Int?>(null) }
+
+    fun indexAt(x: Float, width: Float): Int {
+        if (n <= 1) return 0
+        val plotW = (width - leftGutterPx - rightPadPx).coerceAtLeast(1f)
+        return ((x - leftGutterPx) / plotW * (n - 1)).roundToInt().coerceIn(0, n - 1)
+    }
 
     Column {
-        Box(
+        Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp)
+                .height(190.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(scheme.surfaceVariant.copy(alpha = 0.25f))
-                .padding(horizontal = 10.dp, vertical = 10.dp)
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+                .pointerInput(n, leftGutterPx) {
+                    detectTapGestures { pos ->
+                        val idx = indexAt(pos.x, size.width.toFloat())
+                        selected = if (selected == idx) null else idx
+                    }
+                }
+                .pointerInput(n, leftGutterPx) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { pos -> selected = indexAt(pos.x, size.width.toFloat()) }
+                    ) { change, _ ->
+                        selected = indexAt(change.position.x, size.width.toFloat())
+                    }
+                }
         ) {
-            Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-                val w = size.width
-                val h = size.height
+            val topPad = 8.dp.toPx()
+            val xLabelHeight = (yTickLabels.firstOrNull()?.size?.height ?: 0).toFloat()
+            val bottomGutter = xLabelHeight + 6.dp.toPx()
+            val plotLeft = leftGutterPx
+            val plotRight = size.width - rightPadPx
+            val plotTop = topPad
+            val plotBottom = size.height - bottomGutter
+            val plotW = plotRight - plotLeft
+            val plotH = plotBottom - plotTop
 
-                // Gridlines (3 horizontal)
-                val gridStrokePx = with(density) { 0.8.dp.toPx() }
-                for (i in 0..3) {
-                    val y = h * (i / 3f)
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(0f, y),
-                        end = Offset(w, y),
-                        strokeWidth = gridStrokePx
+            fun xPx(index: Int): Float =
+                if (n <= 1) plotLeft + plotW / 2f else plotLeft + plotW * index / (n - 1)
+
+            fun yPx(value: Double): Float {
+                val t = ((value - yLow) / yRange).toFloat().coerceIn(0f, 1f)
+                return plotBottom - t * plotH
+            }
+
+            // Y gridlines + weight labels
+            yTicks.forEachIndexed { i, value ->
+                val y = yPx(value)
+                drawLine(
+                    color = gridColor,
+                    start = Offset(plotLeft, y),
+                    end = Offset(plotRight, y),
+                    strokeWidth = 0.8.dp.toPx()
+                )
+                val label = yTickLabels[i]
+                drawText(
+                    label,
+                    topLeft = Offset(
+                        plotLeft - 6.dp.toPx() - label.size.width,
+                        (y - label.size.height / 2f).coerceIn(0f, size.height - label.size.height)
                     )
-                }
+                )
+            }
 
-                if (sessions.size < 2) {
-                    // Single-session: just draw one dot centered
-                    val cx = w / 2f
-                    val cy = h / 2f
-                    drawCircle(
-                        color = dotColor,
-                        radius = with(density) { 4.dp.toPx() },
-                        center = Offset(cx, cy)
+            // Axis lines
+            drawLine(axisColor, Offset(plotLeft, plotTop), Offset(plotLeft, plotBottom), 1.dp.toPx())
+            drawLine(axisColor, Offset(plotLeft, plotBottom), Offset(plotRight, plotBottom), 1.dp.toPx())
+
+            // X date labels + tick marks
+            xTickIndices.forEach { idx ->
+                val x = xPx(idx)
+                drawLine(axisColor, Offset(x, plotBottom), Offset(x, plotBottom + 3.dp.toPx()), 1.dp.toPx())
+                val label = textMeasurer.measure(formatShortDate(sessions[idx].dayStartMs), labelStyle)
+                drawText(
+                    label,
+                    topLeft = Offset(
+                        (x - label.size.width / 2f)
+                            .coerceIn(0f, (size.width - label.size.width).coerceAtLeast(0f)),
+                        plotBottom + 5.dp.toPx()
                     )
-                    return@Canvas
-                }
+                )
+            }
 
-                val yRange = (yHigh - yLow).coerceAtLeast(0.0001)
-                val xStep = if (sessions.size > 1) w / (sessions.size - 1).toFloat() else 0f
-
-                fun yPx(value: Double): Float {
-                    val t = ((value - yLow) / yRange).toFloat().coerceIn(0f, 1f)
-                    return h - t * h
-                }
-
-                // Line path
+            // Line
+            if (n >= 2) {
                 val path = Path()
                 weightsDisplay.forEachIndexed { index, v ->
-                    val x = index * xStep
-                    val y = yPx(v)
-                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    if (index == 0) path.moveTo(xPx(index), yPx(v)) else path.lineTo(xPx(index), yPx(v))
                 }
                 drawPath(
                     path = path,
                     color = lineColor,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = with(density) { 2.dp.toPx() }
-                    )
+                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 )
+            }
 
-                // Dots
-                val dotRadius = with(density) { 3.5.dp.toPx() }
-                weightsDisplay.forEachIndexed { index, v ->
-                    val x = index * xStep
-                    val y = yPx(v)
-                    drawCircle(
-                        color = dotColor,
-                        radius = dotRadius,
-                        center = Offset(x, y)
-                    )
-                }
+            // Dots
+            weightsDisplay.forEachIndexed { index, v ->
+                drawCircle(lineColor, 3.5.dp.toPx(), Offset(xPx(index), yPx(v)))
             }
-        }
-        // Y-axis labels (min/max) and session count
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                "min ${formatDisplayValue(yLow)} $displayUnit",
-                style = MaterialTheme.typography.labelSmall,
-                color = mutedText
-            )
-            if (sessions.size >= 2) {
-                val first = sessions.first().dayStartMs
-                val last = sessions.last().dayStartMs
-                Text(
-                    "${formatShortDate(first)} → ${formatShortDate(last)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = mutedText
+
+            // Selection: guideline, highlighted dot, tooltip
+            val sel = selected?.takeIf { it in sessions.indices }
+            if (sel != null) {
+                val session = sessions[sel]
+                val px = xPx(sel)
+                val py = yPx(weightsDisplay[sel])
+                drawLine(
+                    color = lineColor.copy(alpha = 0.5f),
+                    start = Offset(px, plotTop),
+                    end = Offset(px, plotBottom),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
                 )
+                drawCircle(lineColor, 6.dp.toPx(), Offset(px, py))
+                drawCircle(dotHole, 3.dp.toPx(), Offset(px, py))
+
+                val tip = textMeasurer.measure(
+                    "${formatLongDate(session.dayStartMs)}\n" +
+                        "${VolumeAnalytics.formatWeight(session.topWeightKg, displayUnit)} × ${session.topWeightReps} reps",
+                    tooltipStyle
+                )
+                val padH = 8.dp.toPx()
+                val padV = 5.dp.toPx()
+                val boxW = tip.size.width + padH * 2
+                val boxH = tip.size.height + padV * 2
+                val gap = 10.dp.toPx()
+                val boxX = (px - boxW / 2f).coerceIn(0f, (size.width - boxW).coerceAtLeast(0f))
+                val boxY = if (py - gap - boxH >= 0f) py - gap - boxH else py + gap
+                drawRoundRect(
+                    color = tooltipBg,
+                    topLeft = Offset(boxX, boxY),
+                    size = Size(boxW, boxH),
+                    cornerRadius = CornerRadius(8.dp.toPx())
+                )
+                drawText(tip, topLeft = Offset(boxX + padH, boxY + padV))
             }
-            Text(
-                "max ${formatDisplayValue(yHigh)} $displayUnit",
-                style = MaterialTheme.typography.labelSmall,
-                color = mutedText
-            )
         }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Tap or drag across the chart to see each session",
+            style = MaterialTheme.typography.labelSmall,
+            color = scheme.onSurfaceVariant
+        )
     }
 }
 
